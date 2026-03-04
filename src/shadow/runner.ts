@@ -13,6 +13,7 @@ import { resolveConfig } from '../core/config.js';
 import { discoverFiles, detectDomain } from '../core/file-discovery.js';
 import { PatternLoader } from '../knowledge/pattern-loader.js';
 import { AIAnalyzer } from '../analysis/ai-analyzer.js';
+import { gatherProjectContext } from '../analysis/context-gatherer.js';
 import { deduplicateFindings } from '../analysis/deduplicator.js';
 import { postProcessFindings } from '../analysis/post-processor.js';
 import { buildSummary, generateJsonReport } from '../core/reporter.js';
@@ -233,12 +234,19 @@ async function runAudit(
   const totalLOC = files.reduce((sum, f) => sum + f.lines, 0);
   log(`  Found ${files.length} files (${totalLOC.toLocaleString()} LOC)`);
 
+  // Gather project context
+  const projectContext = await gatherProjectContext(projectPath, files);
+  if (projectContext.protocolName) {
+    log(`  Protocol: ${projectContext.protocolName} (${projectContext.protocolType || 'unknown type'})`);
+  }
+
   // Domain & patterns
   const domain = detectDomain(files) as Domain;
   const domainPatterns = loader.getPatternsByDomain(domain);
 
   // Analyze
   const analyzer = new AIAnalyzer(config);
+  analyzer.setProjectContext(projectContext);
   const allFindings: Finding[] = [];
   const fileContentsMap = new Map<string, string>();
 

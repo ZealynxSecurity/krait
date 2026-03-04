@@ -32,6 +32,7 @@ import {
 import { runShadowAudit, runBatchShadowAudit } from './shadow/runner.js';
 import { generateFeedback, writeFeedbackReport } from './shadow/feedback.js';
 import { updateDashboard, loadDashboard, formatDashboard } from './shadow/dashboard.js';
+import { gatherProjectContext, formatContextForPrompt } from './analysis/context-gatherer.js';
 
 const VERSION = '0.1.0';
 
@@ -91,13 +92,30 @@ program
       const totalLOC = files.reduce((sum, f) => sum + f.lines, 0);
       spinner.succeed(`Found ${files.length} source files (${totalLOC.toLocaleString()} LOC)`);
 
-      // Step 3: Select domain and patterns
+      // Step 3: Gather project context
+      spinner.start('Gathering project context...');
+      const projectContext = await gatherProjectContext(projectPath, files);
+      const contextParts: string[] = [];
+      if (projectContext.protocolName) contextParts.push(projectContext.protocolName);
+      if (projectContext.protocolType) contextParts.push(projectContext.protocolType);
+      if (projectContext.compilerVersion) contextParts.push(`Solidity ${projectContext.compilerVersion}`);
+      if (projectContext.dependencies.length > 0) contextParts.push(projectContext.dependencies.join(', '));
+      spinner.succeed(`Project context: ${contextParts.join(' | ') || 'minimal'}`);
+      if (projectContext.contractRoles.size > 0) {
+        console.log(chalk.gray(`  Contract roles: ${projectContext.contractRoles.size} contracts documented`));
+      }
+      if (projectContext.interfaceSignatures.size > 0) {
+        console.log(chalk.gray(`  Interfaces: ${projectContext.interfaceSignatures.size} interfaces extracted`));
+      }
+
+      // Step 4: Select domain and patterns
       const domain = detectDomain(files) as Domain;
       const domainPatterns = loader.getPatternsByDomain(domain);
       console.log(chalk.gray(`  Domain: ${domain} (${domainPatterns.length} domain patterns)`));
 
-      // Step 4: Analyze files
+      // Step 5: Analyze files
       const analyzer = new AIAnalyzer(config);
+      analyzer.setProjectContext(projectContext);
       const allFindings: Finding[] = [];
       const fileContentsMap = new Map<string, string>();
 

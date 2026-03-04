@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Finding, FileInfo, KraitConfig, VulnerabilityPattern } from '../core/types.js';
 import { summarizeContract, formatSummariesForPrompt, ContractSummary } from './contract-summarizer.js';
+import { ProjectContext, formatContextForPrompt } from './context-gatherer.js';
 
 const FINDING_TOOL: Anthropic.Tool = {
   name: 'report_findings',
@@ -37,10 +38,19 @@ export class AIAnalyzer {
   private client: Anthropic;
   private config: KraitConfig;
   private findingCounter = 0;
+  private projectContext: ProjectContext | null = null;
 
   constructor(config: KraitConfig) {
     this.config = config;
     this.client = new Anthropic({ apiKey: config.apiKey });
+  }
+
+  /**
+   * Set the project context gathered before analysis.
+   * This gives Claude protocol-level understanding for every file.
+   */
+  setProjectContext(context: ProjectContext): void {
+    this.projectContext = context;
   }
 
   async analyzeFile(
@@ -70,8 +80,12 @@ export class AIAnalyzer {
     const rankedFiles = this.rankFilesByImportance(summaries, files);
     const coreFiles = rankedFiles.slice(0, 5); // Top 5 most interconnected
 
+    const projectBrief = this.projectContext ? formatContextForPrompt(this.projectContext) : '';
+
     const systemPrompt = `You are a senior security auditor performing cross-contract analysis.
 You have already analyzed individual files. Now analyze how these contracts INTERACT with each other.
+
+${projectBrief}
 
 Focus on:
 - Cross-contract reentrancy (Contract A calls Contract B which calls back into A)
@@ -246,6 +260,8 @@ Use the vulnerability patterns below as reference for what to look for. They are
 
 ${patternContext}
 
+${this.projectContext ? formatContextForPrompt(this.projectContext) : ''}
+
 ## Critical Rules:
 
 - Do NOT report issues in test files, mock contracts, or example code.
@@ -261,11 +277,23 @@ ${patternContext}
     const lines = content.split('\n');
     const numberedContent = lines.map((line, i) => `${i + 1}: ${line}`).join('\n');
 
+    // Add contract role context if available
+    let roleContext = '';
+    if (this.projectContext) {
+      const contractName = this.extractContractNameFromContent(content);
+      if (contractName) {
+        const role = this.projectContext.contractRoles.get(contractName);
+        const parents = this.projectContext.inheritanceGraph.get(contractName);
+        if (role) roleContext += `\nContract role: ${role}`;
+        if (parents && parents.length > 0) roleContext += `\nInherits from: ${parents.join(', ')}`;
+      }
+    }
+
     return `Analyze the following ${file.language} file for security vulnerabilities.
 
 File: ${file.relativePath}
 Language: ${file.language}
-Lines: ${file.lines}
+Lines: ${file.lines}${roleContext}
 
 \`\`\`${file.language}
 ${numberedContent}
@@ -274,6 +302,11 @@ ${numberedContent}
 Report security vulnerabilities you find. Focus on exploitable issues — quality over quantity.
 Each finding MUST include the exact line number.
 If there are no real vulnerabilities, report an empty findings array.`;
+  }
+
+  private extractContractNameFromContent(content: string): string | null {
+    const match = content.match(/\b(?:contract|library|abstract\s+contract)\s+(\w+)/);
+    return match ? match[1] : null;
   }
 
   private normalizeSeverity(val: unknown): Finding['severity'] {
