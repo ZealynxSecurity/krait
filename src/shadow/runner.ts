@@ -293,8 +293,16 @@ async function runAudit(
     }
 
     if (filesWithFindings.size > 0) {
-      log(`    Deep analysis: ${filesWithFindings.size} files...`);
-      for (const [relPath, { file, content, findings }] of filesWithFindings) {
+      // Rank by finding count + file size, take top 8 most interesting files
+      const ranked = [...filesWithFindings.entries()]
+        .sort((a, b) => {
+          const scoreA = a[1].findings.length * 2 + a[1].file.lines / 100;
+          const scoreB = b[1].findings.length * 2 + b[1].file.lines / 100;
+          return scoreB - scoreA;
+        })
+        .slice(0, 8);
+      log(`    Deep analysis: ${ranked.length} files (of ${filesWithFindings.size} with findings)...`);
+      for (const [relPath, { file, content, findings }] of ranked) {
         try {
           const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
           const patternContext = loader.formatForPrompt(filePatterns);

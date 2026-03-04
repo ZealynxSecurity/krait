@@ -107,8 +107,8 @@ ${patternContext}
 - Focus on BUSINESS LOGIC, not generic patterns. Do NOT report: missing events, gas optimization, centralization risk, missing zero-address checks, or generic best practices.
 - Only report findings at medium severity or above. If it's not worth a medium, don't report it.
 - Quality bar: Would a senior auditor include this in a paid audit report? If not, skip it.
-- Report AT MOST 3 findings per file. If you find more than 3, keep only the highest-impact ones.
-- An empty findings array is a perfectly good result. Most files don't have deep logic bugs.`;
+- Report AT MOST 2 findings per file. If you find more than 2, keep only the highest-impact ones.
+- An empty findings array is the EXPECTED result for most files. Deep logic bugs are rare — only report if you're genuinely confident.`;
 
     const numbered = fileContent.split('\n').map((line, i) => `${i + 1}: ${line}`).join('\n');
 

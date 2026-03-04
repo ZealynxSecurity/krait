@@ -159,9 +159,17 @@ program
         }
 
         if (filesWithFindings.size > 0) {
-          const deepSpinner = ora(`  Deep analysis on ${filesWithFindings.size} files...`).start();
+          // Rank by finding count + file size, take top 8
+          const ranked = [...filesWithFindings.entries()]
+            .sort((a, b) => {
+              const scoreA = a[1].findings.length * 2 + a[1].file.lines / 100;
+              const scoreB = b[1].findings.length * 2 + b[1].file.lines / 100;
+              return scoreB - scoreA;
+            })
+            .slice(0, 8);
+          const deepSpinner = ora(`  Deep analysis on ${ranked.length} files...`).start();
           let deepTotal = 0;
-          for (const [relPath, { file, content, findings }] of filesWithFindings) {
+          for (const [relPath, { file, content, findings }] of ranked) {
             try {
               const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
               const patternContext = loader.formatForPrompt(filePatterns);
