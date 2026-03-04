@@ -84,6 +84,7 @@ export interface KraitConfig {
   deepModel: string;
   patternsDir: string;
   maxFileSizeKb: number;
+  minLines: number;
   excludePatterns: string[];
   outputFormat: 'json' | 'markdown' | 'both';
   verbose: boolean;
@@ -95,23 +96,44 @@ export const DEFAULT_CONFIG: Omit<KraitConfig, 'apiKey'> = {
   deepModel: 'claude-opus-4-20250514',
   patternsDir: 'patterns',
   maxFileSizeKb: 500,
+  minLines: 20,
   excludePatterns: [
+    // Dependencies
     '**/node_modules/**',
-    '**/test/**',
-    '**/tests/**',
-    '**/*.test.*',
-    '**/*.spec.*',
-    '**/mock/**',
-    '**/mocks/**',
     '**/lib/**',
     '**/libraries/**',
     '**/vendor/**',
+    // Test files and directories
+    '**/test/**',
+    '**/tests/**',
+    '**/root_tests/**',
+    '**/scenario_tests/**',
+    '**/forge-test/**',
+    '**/*.test.*',
+    '**/*.spec.*',
+    '**/*.t.sol',
+    '**/*_test.sol',
+    '**/*_test.rs',
+    // Mocks
+    '**/mock/**',
+    '**/mocks/**',
+    '**/Mock*.sol',
+    // Interfaces (no implementation to audit)
+    '**/interfaces/**',
+    '**/interface/**',
+    // Scripts and deployment
+    '**/script/**',
+    '**/scripts/**',
+    '**/deploy/**',
+    // Build artifacts
     '**/.git/**',
     '**/build/**',
     '**/dist/**',
     '**/artifacts/**',
     '**/cache/**',
     '**/coverage/**',
+    '**/out/**',
+    '**/typechain-types/**',
   ],
   outputFormat: 'both',
   verbose: false,

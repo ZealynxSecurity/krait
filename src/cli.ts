@@ -39,6 +39,7 @@ program
   .option('--format <format>', 'Output format: json, markdown, both', 'both')
   .option('-v, --verbose', 'Verbose output')
   .option('--patterns-dir <path>', 'Path to patterns directory')
+  .option('--min-lines <n>', 'Skip files with fewer lines than this', '20')
   .action(async (targetPath: string, options: Record<string, unknown>) => {
     const startTime = Date.now();
 
@@ -50,6 +51,7 @@ program
         verbose: options.verbose as boolean | undefined,
         outputFormat: options.format as 'json' | 'markdown' | 'both' | undefined,
         patternsDir: options.patternsDir as string | undefined,
+        minLines: options.minLines ? parseInt(options.minLines as string, 10) : undefined,
       });
 
       const projectPath = resolve(targetPath);
@@ -67,7 +69,7 @@ program
 
       // Step 2: Discover files
       spinner.start('Discovering source files...');
-      const files = await discoverFiles(projectPath, config.excludePatterns, config.maxFileSizeKb);
+      const files = await discoverFiles(projectPath, config.excludePatterns, config.maxFileSizeKb, config.minLines);
       if (files.length === 0) {
         spinner.fail('No source files found');
         process.exit(1);
