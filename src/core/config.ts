@@ -8,9 +8,17 @@ export function resolveConfig(overrides: Partial<KraitConfig> = {}): KraitConfig
     );
   }
 
+  // Strip undefined values so they don't override defaults
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value !== undefined) {
+      cleaned[key] = value;
+    }
+  }
+
   return {
     ...DEFAULT_CONFIG,
-    ...overrides,
+    ...cleaned,
     apiKey,
-  };
+  } as KraitConfig;
 }
