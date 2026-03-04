@@ -1,0 +1,246 @@
+patterns:
+  - id: "GHOST-015"
+    name: "API keys exposed in client-side JavaScript bundles"
+    category: "api-key-leakage"
+    severity: "critical"
+    description: "Server-side API keys and secrets embedded into client-side JavaScript bundles through build tools, making them publicly accessible in browser source code."
+    detection:
+      strategy: "Look for API keys, secrets, or database credentials in client-side JavaScript files or webpack bundles"
+      regex: "(?i)(api[_-]?key|secret[_-]?key|private[_-]?key|access[_-]?token).*['\"]([A-Za-z0-9_-]{20,})['\"]"
+      ast_pattern: "String literals containing API keys in client-side code or webpack DefinePlugin configurations"
+      indicators: ["process.env", "API_KEY", "SECRET_KEY", "webpack DefinePlugin", "client-side bundle", "public JavaScript"]
+    real_examples:
+      - source: "HackerOne - Multiple reports 2024-2025"
+        project: "TopEchelon, Stripo, Clario"
+        finding_id: "H1-1051029, H1-983331, H1-1066410"
+        impact: "Complete API access through leaked authentication tokens in public JavaScript files"
+        amount_lost: "Full API access compromise"
+        code_vulnerable: |
+          // Vulnerable: Direct API key in client code
+          const config = {
+            apiKey: 'sk_live_51Jxabcdefghijklmnopqrstuvwxyz123456789',
+            apiUrl: 'https://api.stripe.com/v1/'
+          };
+          
+          // Vulnerable: Webpack DefinePlugin exposing all env vars
+          new webpack.DefinePlugin({
+            'process.env': JSON.stringify(process.env) // Exposes ALL env vars!
+          })
+        code_fixed: |
+          // Fixed: Use server-side proxy endpoint
+          const config = {
+            apiUrl: '/api/payments', // Server-side proxy
+            publicKey: 'pk_live_xyz' // Only public keys on client
+          };
+          
+          // Fixed: Webpack DefinePlugin with explicit whitelist
+          new webpack.DefinePlugin({
+            'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+            'process.env.PUBLIC_API_URL': JSON.stringify(process.env.PUBLIC_API_URL)
+          })
+    false_positive_notes: "Safe when only public API keys are exposed (like Firebase public keys) or when using proper environment variable prefixes like NEXT_PUBLIC_ or REACT_APP_"
+    tags: ["api-keys", "client-side", "webpack", "secrets", "web2", "javascript", "typescript"]
+    added_date: "2026-02-11"
+    confidence: "high"
+
+  - id: "GHOST-016"
+    name: "Environment variables leak via build tools"
+    category: "api-key-leakage"
+    severity: "high"
+    description: "Build tools like Webpack EnvironmentPlugin expose all server-side environment variables to client-side bundles when configured improperly."
+    detection:
+      strategy: "Look for build configurations that pass entire process.env object to client-side plugins"
+      regex: "EnvironmentPlugin\\(\\s*process\\.env\\s*\\)|DefinePlugin.*process\\.env"
+      ast_pattern: "EnvironmentPlugin or DefinePlugin with process.env as parameter instead of specific variable whitelist"
+      indicators: ["EnvironmentPlugin(process.env)", "DefinePlugin", "shakapacker", "webpacker", "entire process.env"]
+    real_examples:
+      - source: "GHSA-96qw-h329-v5rg"
+        project: "Shakapacker, Webpacker"
+        finding_id: "CVE-SHAKAPACKER-2026"
+        impact: "All server-side environment variables including AWS keys, database credentials leaked to client bundle"
+        amount_lost: "Production credential exposure"
+        code_vulnerable: |
+          // Vulnerable: Entire process.env passed to client
+          module.exports = {
+            plugins: [
+              new webpack.EnvironmentPlugin(process.env), // Exposes ALL env vars!
+            ]
+          };
+          
+          // Vulnerable: Shakapacker default config
+          const { generateWebpackConfig } = require('shakapacker');
+          // Old shakapacker passed entire process.env by default
+        code_fixed: |
+          // Fixed: Explicit whitelist of safe variables
+          module.exports = {
+            plugins: [
+              new webpack.EnvironmentPlugin({
+                NODE_ENV: 'development',
+                PUBLIC_API_URL: null, // Explicit safe variables only
+                REACT_APP_VERSION: null
+              })
+            ]
+          };
+          
+          // Fixed: Use SHAKAPACKER_PUBLIC_ prefix convention
+          // Only SHAKAPACKER_PUBLIC_* variables exposed to client
+    false_positive_notes: "Safe when only development environment or when all environment variables are non-sensitive public values"
+    tags: ["webpack", "environment-variables", "build-tools", "shakapacker", "process.env", "web2"]
+    added_date: "2026-02-11"
+    confidence: "high"
+
+  - id: "GHOST-017"
+    name: "API keys committed to git repositories"
+    category: "api-key-leakage"
+    severity: "high"
+    description: "API keys, database credentials, and secrets accidentally committed to version control and exposed in git history or public repositories."
+    detection:
+      strategy: "Scan git history, .env files, and configuration files for hardcoded secrets and API keys"
+      regex: "(?i)(api[_-]?key|secret|password|token|credential)\\s*[:=]\\s*['\"]?([A-Za-z0-9+/]{16,})['\"]?"
+      ast_pattern: "String assignments or object properties containing API keys in configuration files"
+      indicators: [".env in git", "hardcoded secrets", "config files committed", "api_key =", "AWS_SECRET", "DATABASE_URL"]
+    real_examples:
+      - source: "GitGuardian Research 2025"
+        project: "13 Million GitHub repositories"
+        finding_id: "GITHUB-SECRETS-2025"
+        impact: "13 million API credentials exposed in public repositories through git commits"
+        amount_lost: "Massive credential exposure"
+        code_vulnerable: |
+          // Vulnerable: Hardcoded in source
+          const config = {
+            database: {
+              host: 'prod-db.company.com',
+              user: 'admin',
+              password: 'SuperSecretPassword123!' // Committed to git!
+            },
+            stripe: {
+              secretKey: 'sk_live_51Habcdefghijklmnopqrstuvwxyz' // Live key in git!
+            }
+          };
+          
+          // Vulnerable: .env file committed
+          // .env (accidentally committed)
+          AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+          AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+        code_fixed: |
+          // Fixed: Use environment variables
+          const config = {
+            database: {
+              host: process.env.DB_HOST,
+              user: process.env.DB_USER,
+              password: process.env.DB_PASSWORD
+            },
+            stripe: {
+              secretKey: process.env.STRIPE_SECRET_KEY
+            }
+          };
+          
+          // Fixed: Proper .gitignore
+          // .gitignore
+          .env
+          .env.local
+          .env.*.local
+          *.key
+          config/secrets.json
+    false_positive_notes: "Safe for development/test keys that are clearly marked as non-production, or when using secure secret management systems"
+    tags: ["git", "version-control", "secrets", "credentials", "env-files", "github", "web2"]
+    added_date: "2026-02-11"
+    confidence: "high"
+
+  - id: "GHOST-018"
+    name: "Public API keys misused on client-side"
+    category: "api-key-leakage"
+    severity: "medium"
+    description: "Public API keys intended for server-side use exposed on client-side, allowing attackers to abuse quotas, access controls, or billing."
+    detection:
+      strategy: "Look for public API keys on client-side that should be restricted to server-side use or specific domains"
+      regex: "(?i)(firebase|google|stripe|twilio).*['\"]([A-Za-z0-9_-]{20,})['\"]"
+      ast_pattern: "Client-side code using public API keys without proper domain restrictions or quotas"
+      indicators: ["Firebase API key", "Google API key", "unrestricted domain", "client-side usage", "quota abuse"]
+    real_examples:
+      - source: "HackerOne - Clario report"
+        project: "Clario, Multiple Firebase apps"
+        finding_id: "H1-1066410"
+        impact: "API quota abuse and potential access to restricted Firebase services through unrestricted public keys"
+        amount_lost: "Service abuse and billing impact"
+        code_vulnerable: |
+          // Vulnerable: Firebase key without domain restrictions
+          const firebaseConfig = {
+            apiKey: "AIzaSyAw-SpLHVTIP3IFEIkckCuEmIhnUrY9OrQ",
+            authDomain: "myapp.firebaseapp.com",
+            // No HTTP referrer restrictions configured
+          };
+          
+          // Vulnerable: Using server-side Stripe key on client
+          const stripe = Stripe('sk_live_51JxYZ...'); // Secret key on client!
+        code_fixed: |
+          // Fixed: Firebase with proper restrictions
+          const firebaseConfig = {
+            apiKey: "AIzaSyAw-SpLHVTIP3IFEIkckCuEmIhnUrY9OrQ",
+            authDomain: "myapp.firebaseapp.com"
+            // Configure HTTP referrer restrictions in Firebase console:
+            // - Add specific domains: https://myapp.com/*
+            // - Set API quotas and monitoring
+          };
+          
+          // Fixed: Use public Stripe key on client
+          const stripe = Stripe('pk_live_51JxYZ...'); // Public key only
+          // Server handles secret key operations
+    false_positive_notes: "Safe when public keys have proper domain restrictions, quotas, and are intended for client-side use (like Firebase, Maps API with restrictions)"
+    tags: ["public-keys", "firebase", "stripe", "domain-restrictions", "quota-abuse", "web2"]
+    added_date: "2026-02-11"
+    confidence: "medium"
+
+  - id: "GHOST-019"
+    name: "Secrets in backup and temporary files"
+    category: "api-key-leakage"
+    severity: "medium"
+    description: "API keys and secrets leaked through backup files, temporary configurations, or development artifacts that get accidentally committed or deployed."
+    detection:
+      strategy: "Look for secrets in backup files, temporary configs, and development artifacts"
+      regex: "\\.(bak|backup|tmp|old|dev|local)\\b.*(?i)(api[_-]?key|secret|password)"
+      ast_pattern: "Configuration or backup files containing hardcoded credentials"
+      indicators: [".env.backup", "config.bak", ".env.local", "secrets.tmp", "development configs", "forgotten files"]
+    real_examples:
+      - source: "Security research - Common patterns"
+        project: "Various web applications"
+        finding_id: "BACKUP-FILES-LEAK"
+        impact: "Production credentials exposed through forgotten backup files and development configurations"
+        amount_lost: "Credential compromise"
+        code_vulnerable: |
+          // Vulnerable: Backup files with secrets
+          // .env.backup (committed by mistake)
+          STRIPE_SECRET_KEY=sk_live_51JxYZ123...
+          DATABASE_URL=postgres://user:password@prod-db.com/db
+          
+          // config.bak.js (old config with secrets)
+          module.exports = {
+            apiKey: 'live-production-key-123',
+            dbPassword: 'production-password'
+          };
+          
+          // .env.local (development file deployed)
+          API_KEY=development-but-actually-production-key
+        code_fixed: |
+          // Fixed: Proper .gitignore and deployment practices
+          // .gitignore
+          .env*
+          *.bak
+          *.backup
+          *.tmp
+          *.old
+          config.*.js
+          secrets/
+          
+          // Fixed: Use proper secret management
+          // config.js
+          module.exports = {
+            apiKey: process.env.API_KEY,
+            dbPassword: process.env.DB_PASSWORD
+          };
+          
+          // Use secret management: AWS Secrets Manager, HashiCorp Vault, etc.
+    false_positive_notes: "Safe when backup files contain only non-production test data or when using proper secret management systems that don't store secrets in files"
+    tags: ["backup-files", "temporary-files", "development", "gitignore", "deployment", "web2"]
+    added_date: "2026-02-11"
+    confidence: "medium"

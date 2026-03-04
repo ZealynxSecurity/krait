@@ -1,0 +1,67 @@
+patterns:
+  - id: "FORGE-001"
+    name: "Missing check_program_account before unpack"
+    category: "missing-auth"
+    severity: "high"
+    description: "Account data unpacking without program ownership validation can lead to late failures and potential security bypasses in Solana programs."
+    detection:
+      strategy: "Look for account unpacking operations without preceding check_program_account() or owner validation"
+      regex: "Account::unpack\\(|unpack_from_slice\\("
+      ast_pattern: "Method call to unpack functions without ownership validation in same scope"
+      indicators: ["Account::unpack", "unpack_from_slice", "missing check_program_account", "no owner validation"]
+    real_examples:
+      - source: "Solana Foundation Token22 Code4rena Audit"
+        project: "Solana Foundation Token22"
+        finding_id: "TOKEN22-AUG-2025"
+        impact: "Late failure after state modification, potential for security bypass through ownership manipulation"
+        amount_lost: "Not exploited (caught in audit)"
+        code_vulnerable: |
+          // Vulnerable: Unpack without ownership check
+          let token_account = TokenAccount::unpack(&account_info.data.borrow())?;
+          // Ownership check happens later, after potential state changes
+        code_fixed: |
+          // Fixed: Check ownership before unpacking
+          check_program_account(&token_program.key, account_info.owner)?;
+          let token_account = TokenAccount::unpack(&account_info.data.borrow())?;
+    false_positive_notes: "Safe when account ownership is validated elsewhere in the call chain or when using Anchor's account constraints"
+    tags: ["solana", "rust", "spl-token", "account-validation", "program-ownership"]
+    added_date: "2026-02-09"
+    confidence: "high"
+
+  - id: "FORGE-002"
+    name: "Missing has_one constraint in Anchor"
+    category: "missing-auth"
+    severity: "critical"
+    description: "Authority field validation missing in Anchor account constraints allows authority bypass and unauthorized fund access."
+    detection:
+      strategy: "Look for authority fields in account structs without has_one constraints"
+      regex: "pub authority: [^,]+,"
+      ast_pattern: "Struct field named 'authority' without corresponding has_one constraint"
+      indicators: ["pub authority:", "missing has_one", "no authority validation", "anchor account struct"]
+    real_examples:
+      - source: "Sherlock Orderly Solana Vault Contest"
+        project: "Orderly Vault"
+        finding_id: "SHERLOCK-524-H1"
+        impact: "Cross-user withdrawal theft through shared vault authority allowing unauthorized withdrawals"
+        amount_lost: "$56.5K contest finding"
+        code_vulnerable: |
+          #[derive(Accounts)]
+          pub struct Withdraw<'info> {
+              #[account(mut)]
+              pub vault: Account<'info, Vault>,
+              pub authority: Signer<'info>, // Missing has_one constraint
+          }
+        code_fixed: |
+          #[derive(Accounts)]
+          pub struct Withdraw<'info> {
+              #[account(
+                  mut,
+                  has_one = authority @ ErrorCode::Unauthorized
+              )]
+              pub vault: Account<'info, Vault>,
+              pub authority: Signer<'info>,
+          }
+    false_positive_notes: "Safe when authority validation is performed manually in instruction logic or when authority is validated through other constraints"
+    tags: ["solana", "anchor", "authority-bypass", "access-control", "defi"]
+    added_date: "2026-02-09"
+    confidence: "high"

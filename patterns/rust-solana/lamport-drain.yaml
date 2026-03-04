@@ -1,0 +1,264 @@
+# Lamport Drain Vulnerability Patterns for Solana
+# Collection of account balance extraction and rent manipulation vulnerabilities
+
+patterns:
+  - id: "FORGE-001"
+    name: "Unauthorized Account Close with Lamport Extraction"
+    category: "lamport-drain"
+    severity: "high"
+    description: "Program allows unauthorized users to close accounts and extract their lamport balance to their own accounts, bypassing ownership checks."
+    detection:
+      strategy: "Look for account closing logic that doesn't verify account ownership or allows arbitrary destination accounts"
+      indicators: 
+        - "close_account"
+        - "**info.lamports.borrow_mut() = 0"
+        - "dest_account.lamports.borrow_mut()"
+        - "missing owner check in close"
+        - "arbitrary destination in close"
+      ast_pattern: "Account closure where destination account is not validated"
+    real_examples:
+      - source: "Theoretical"
+        project: "Generic Solana Program"
+        finding_id: "FORGE-001-theoretical"
+        impact: "Attacker can drain lamports from any account they can reference"
+        amount_lost: "Variable - all lamports in target accounts"
+        code_vulnerable: |
+          #[derive(Accounts)]
+          pub struct CloseAccount<'info> {
+              #[account(mut)]
+              pub account_to_close: AccountInfo<'info>,
+              #[account(mut)]
+              pub destination: AccountInfo<'info>,
+              pub authority: Signer<'info>,
+          }
+          
+          pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
+              let account_to_close = &ctx.accounts.account_to_close;
+              let destination = &ctx.accounts.destination;
+              
+              // VULNERABILITY: No ownership check on account_to_close
+              let lamports = account_to_close.lamports();
+              **account_to_close.lamports.borrow_mut() = 0;
+              **destination.lamports.borrow_mut() += lamports;
+              
+              Ok(())
+          }
+        code_fixed: |
+          #[derive(Accounts)]
+          pub struct CloseAccount<'info> {
+              #[account(mut, has_one = authority)]
+              pub account_to_close: Account<'info, UserAccount>,
+              #[account(mut)]
+              pub destination: AccountInfo<'info>,
+              pub authority: Signer<'info>,
+          }
+          
+          pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
+              let account_to_close = &ctx.accounts.account_to_close;
+              let destination = &ctx.accounts.destination;
+              
+              // FIXED: Proper ownership validation via has_one constraint
+              let lamports = account_to_close.to_account_info().lamports();
+              **account_to_close.to_account_info().lamports.borrow_mut() = 0;
+              **destination.lamports.borrow_mut() += lamports;
+              
+              Ok(())
+          }
+    false_positive_notes: "Safe when proper ownership constraints are enforced via Anchor's has_one or manual owner checks"
+    tags: ["solana", "anchor", "account-management", "lamports"]
+    added_date: "2026-02-11"
+    confidence: "high"
+
+  - id: "FORGE-002"
+    name: "Rent Exempt Bypass via Partial Lamport Extraction"
+    category: "lamport-drain"
+    severity: "medium"
+    description: "Program allows extraction of lamports that would make an account fall below rent exemption threshold, potentially causing account closure by the runtime."
+    detection:
+      strategy: "Look for lamport transfers that don't check rent exemption requirements"
+      indicators:
+        - "lamports.borrow_mut()"
+        - "no rent exemption check"
+        - "partial lamport extraction"
+        - "account.lamports() - amount"
+      ast_pattern: "Lamport transfer operations without rent exemption validation"
+    real_examples:
+      - source: "Theoretical"
+        project: "Generic DeFi Protocol"
+        finding_id: "FORGE-002-theoretical"
+        impact: "Accounts become vulnerable to runtime garbage collection, losing data"
+        amount_lost: "Rent deposits + data loss"
+        code_vulnerable: |
+          pub fn withdraw_fees(ctx: Context<WithdrawFees>, amount: u64) -> Result<()> {
+              let vault = &ctx.accounts.vault;
+              let destination = &ctx.accounts.destination;
+              
+              // VULNERABILITY: No rent exemption check
+              require!(vault.lamports() >= amount, ErrorCode::InsufficientFunds);
+              
+              **vault.to_account_info().lamports.borrow_mut() -= amount;
+              **destination.lamports.borrow_mut() += amount;
+              
+              Ok(())
+          }
+        code_fixed: |
+          pub fn withdraw_fees(ctx: Context<WithdrawFees>, amount: u64) -> Result<()> {
+              let vault = &ctx.accounts.vault;
+              let destination = &ctx.accounts.destination;
+              
+              let rent = Rent::get()?;
+              let min_rent = rent.minimum_balance(vault.to_account_info().data_len());
+              
+              // FIXED: Check rent exemption after withdrawal
+              require!(
+                  vault.lamports() >= amount + min_rent,
+                  ErrorCode::InsufficientFundsForRent
+              );
+              
+              **vault.to_account_info().lamports.borrow_mut() -= amount;
+              **destination.lamports.borrow_mut() += amount;
+              
+              Ok(())
+          }
+    false_positive_notes: "Safe when program ensures accounts remain rent exempt or when account is intentionally being closed"
+    tags: ["solana", "rent", "account-management", "lamports"]
+    added_date: "2026-02-11"
+    confidence: "medium"
+
+  - id: "FORGE-003"
+    name: "Program-Derived Account Lamport Siphoning"
+    category: "lamport-drain"
+    severity: "high"
+    description: "Program allows unauthorized extraction of lamports from PDAs without proper seed validation, enabling attackers to drain program-owned accounts."
+    detection:
+      strategy: "Look for PDA lamport transfers without proper seed derivation validation"
+      indicators:
+        - "find_program_address"
+        - "create_program_address"
+        - "pda lamport transfer"
+        - "missing bump validation"
+        - "unauthorized pda access"
+      ast_pattern: "PDA operations with lamport transfers lacking proper seed validation"
+    real_examples:
+      - source: "Theoretical"
+        project: "Staking Protocol"
+        finding_id: "FORGE-003-theoretical"
+        impact: "Attackers can create fake PDAs and drain legitimate program accounts"
+        amount_lost: "All lamports in vulnerable PDAs"
+        code_vulnerable: |
+          #[derive(Accounts)]
+          pub struct WithdrawFromPDA<'info> {
+              #[account(mut)]
+              pub pda_account: AccountInfo<'info>,
+              #[account(mut)]
+              pub destination: AccountInfo<'info>,
+              pub authority: Signer<'info>,
+          }
+          
+          pub fn withdraw_from_pda(ctx: Context<WithdrawFromPDA>, amount: u64) -> Result<()> {
+              let pda_account = &ctx.accounts.pda_account;
+              let destination = &ctx.accounts.destination;
+              
+              // VULNERABILITY: No PDA ownership validation
+              **pda_account.lamports.borrow_mut() -= amount;
+              **destination.lamports.borrow_mut() += amount;
+              
+              Ok(())
+          }
+        code_fixed: |
+          #[derive(Accounts)]
+          pub struct WithdrawFromPDA<'info> {
+              #[account(
+                  mut,
+                  seeds = [b"vault", authority.key().as_ref()],
+                  bump,
+                  owner = program_id
+              )]
+              pub pda_account: AccountInfo<'info>,
+              #[account(mut)]
+              pub destination: AccountInfo<'info>,
+              pub authority: Signer<'info>,
+          }
+          
+          pub fn withdraw_from_pda(ctx: Context<WithdrawFromPDA>, amount: u64) -> Result<()> {
+              let pda_account = &ctx.accounts.pda_account;
+              let destination = &ctx.accounts.destination;
+              
+              // FIXED: PDA validation enforced by Anchor constraints
+              **pda_account.lamports.borrow_mut() -= amount;
+              **destination.lamports.borrow_mut() += amount;
+              
+              Ok(())
+          }
+    false_positive_notes: "Safe when PDAs are properly validated using seeds and bump constraints"
+    tags: ["solana", "anchor", "pda", "program-derived-accounts", "lamports"]
+    added_date: "2026-02-11"
+    confidence: "high"
+
+  - id: "FORGE-004"
+    name: "Reallocation Attack with Lamport Manipulation"
+    category: "lamport-drain"
+    severity: "medium"
+    description: "Program allows account reallocation with arbitrary lamport adjustments, enabling attackers to extract excess lamports during resize operations."
+    detection:
+      strategy: "Look for account reallocation logic that doesn't properly handle lamport adjustments"
+      indicators:
+        - "realloc"
+        - "AccountInfo::realloc"
+        - "account resize"
+        - "lamport adjustment"
+        - "excess lamport extraction"
+      ast_pattern: "Account reallocation with manual lamport calculations"
+    real_examples:
+      - source: "Theoretical"
+        project: "Dynamic Account Program"
+        finding_id: "FORGE-004-theoretical"
+        impact: "Users can extract excess lamports when downsizing accounts"
+        amount_lost: "Difference in rent exemption amounts"
+        code_vulnerable: |
+          pub fn resize_account(ctx: Context<ResizeAccount>, new_size: usize) -> Result<()> {
+              let account = &ctx.accounts.account;
+              let user = &ctx.accounts.user;
+              
+              let rent = Rent::get()?;
+              let old_lamports = account.lamports();
+              let new_rent = rent.minimum_balance(new_size);
+              
+              // Resize the account
+              account.realloc(new_size, false)?;
+              
+              // VULNERABILITY: Always transfers excess to user, even if they didn't provide original rent
+              let excess = old_lamports.saturating_sub(new_rent);
+              **account.lamports.borrow_mut() -= excess;
+              **user.lamports.borrow_mut() += excess;
+              
+              Ok(())
+          }
+        code_fixed: |
+          pub fn resize_account(ctx: Context<ResizeAccount>, new_size: usize) -> Result<()> {
+              let account = &ctx.accounts.account;
+              let user = &ctx.accounts.user;
+              
+              let rent = Rent::get()?;
+              let old_size = account.data_len();
+              let old_rent = rent.minimum_balance(old_size);
+              let new_rent = rent.minimum_balance(new_size);
+              
+              // FIXED: Only allow rent refund to original account creator or when downsizing
+              if new_size < old_size && account.owner == &user.key() {
+                  let excess = old_rent.saturating_sub(new_rent);
+                  account.realloc(new_size, false)?;
+                  **account.lamports.borrow_mut() -= excess;
+                  **user.lamports.borrow_mut() += excess;
+              } else {
+                  // For upsizing, user must provide additional rent
+                  require!(user.lamports() >= new_rent.saturating_sub(old_rent), ErrorCode::InsufficientRent);
+                  account.realloc(new_size, false)?;
+              }
+              
+              Ok(())
+          }
+    false_positive_notes: "Safe when rent refunds are properly authorized and tracked"
+    tags: ["solana", "reallocation", "rent", "account-management", "lamports"]
+    added_date: "2026-02-11"
+    confidence: "medium"

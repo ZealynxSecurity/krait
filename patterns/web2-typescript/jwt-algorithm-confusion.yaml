@@ -1,0 +1,67 @@
+patterns:
+  - id: "GHOST-001"
+    name: "JWT algorithm confusion attack"
+    category: "crypto-bypass"
+    severity: "critical"
+    description: "JWT libraries that accept algorithm from token header can be tricked into using public key as HMAC secret, bypassing signature verification."
+    detection:
+      strategy: "Look for JWT verification that uses algorithm from token header without whitelist validation"
+      regex: "jwt\\.verify\\(|jsonwebtoken\\.verify\\("
+      ast_pattern: "JWT verification calls where algorithm parameter comes from token header"
+      indicators: ["jwt.verify", "algorithm from header", "no algorithm whitelist", "RS256 to HS256"]
+    real_examples:
+      - source: "CVE-2016-5431, CVE-2016-10555"
+        project: "node-jsonwebtoken, pyjwt"
+        finding_id: "CVE-2016-5431"
+        impact: "Complete authentication bypass by forcing asymmetric algorithms to use public key as HMAC secret"
+        amount_lost: "Authentication bypass"
+        code_vulnerable: |
+          // Vulnerable: Algorithm comes from JWT header
+          const decoded = jwt.verify(token, publicKey);
+          // Attacker can force HS256 algorithm, using publicKey as HMAC secret
+        code_fixed: |
+          // Fixed: Explicitly specify allowed algorithms
+          const decoded = jwt.verify(token, publicKey, { 
+            algorithms: ['RS256'] // Whitelist only expected algorithms
+          });
+          // Or verify algorithm explicitly:
+          const header = jwt.decode(token, {complete: true}).header;
+          if (header.alg !== 'RS256') throw new Error('Invalid algorithm');
+    false_positive_notes: "Safe when algorithm whitelist is enforced or when using libraries that don't allow algorithm confusion"
+    tags: ["jwt", "authentication", "crypto", "algorithm-confusion", "web2", "nodejs"]
+    added_date: "2026-02-09"
+    confidence: "high"
+
+  - id: "GHOST-002"
+    name: "JWT claim manipulation in URLs"
+    category: "data-exposure"
+    severity: "high"
+    description: "JWTs containing sensitive data passed in URLs can expose credentials through logs, referrers, and browser history."
+    detection:
+      strategy: "Look for JWT tokens passed as URL parameters or containing sensitive data in payload"
+      regex: "\\?.*jwt=|\\&.*jwt=|token="
+      ast_pattern: "URL construction or redirect with JWT token parameters"
+      indicators: ["jwt in URL", "token as query param", "sensitive data in JWT payload", "GET parameter"]
+    real_examples:
+      - source: "InfoSec writeup - Account Takeover via JWT"
+        project: "Various web applications"
+        finding_id: "JWT-URL-EXPOSURE"
+        impact: "Account takeover through leaked JWT credentials in server logs and browser history"
+        amount_lost: "Multiple ATO incidents"
+        code_vulnerable: |
+          // Vulnerable: JWT in URL with sensitive data
+          const resetUrl = `https://app.com/reset?token=${jwt_token}`;
+          // JWT payload: {"user": "admin", "password": "plaintext123"}
+          window.location.href = resetUrl; // Exposed in referrer headers
+        code_fixed: |
+          // Fixed: Use POST request body or secure headers
+          fetch('/reset', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${jwt_token}` },
+            body: JSON.stringify({action: 'reset'})
+          });
+          // And never put sensitive data in JWT payload
+    false_positive_notes: "Safe when JWT contains only non-sensitive claims and short expiry, or when passed in headers/POST body"
+    tags: ["jwt", "data-exposure", "url-parameters", "credentials", "web2"]
+    added_date: "2026-02-09"
+    confidence: "high"

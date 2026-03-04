@@ -1,0 +1,239 @@
+patterns:
+  - id: "FORGE-101"
+    name: "Missing is_signer check in authority-based operations"
+    category: "missing-signer-checks"
+    severity: "high"
+    description: "Functions that perform privileged operations without verifying that the authority account has actually signed the transaction, allowing anyone to impersonate authority."
+    detection:
+      strategy: "Look for authority/admin account usage without is_signer verification in Solana programs"
+      regex: "(?!.*is_signer).*authority.*AccountInfo"
+      ast_pattern: "Functions using authority accounts without checking AccountInfo.is_signer property"
+      indicators: ["authority: AccountInfo", "admin: AccountInfo", "owner: AccountInfo", "missing is_signer check"]
+    real_examples:
+      - source: "Neodyme Security Workshop"
+        project: "Solana Security Workshop Level 1"
+        finding_id: "LEVEL1-MISSING-SIGNER"
+        impact: "Anyone can withdraw funds from the wallet by pretending to be authority"
+        amount_lost: "Workshop demonstration (1.0 SOL)"
+        code_vulnerable: |
+          // Vulnerable: No signer check on wallet authority
+          pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> ProgramResult {
+              let wallet_info = &ctx.accounts.wallet;
+              let authority_info = &ctx.accounts.authority;
+              let hacker_info = &ctx.accounts.recipient;
+              
+              // No check if authority_info.is_signer!
+              **wallet_info.try_borrow_mut_lamports()? -= amount;
+              **hacker_info.try_borrow_mut_lamports()? += amount;
+              
+              Ok(())
+          }
+        code_fixed: |
+          // Fixed: Check signer before processing
+          pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> ProgramResult {
+              let wallet_info = &ctx.accounts.wallet;
+              let authority_info = &ctx.accounts.authority;
+              let recipient_info = &ctx.accounts.recipient;
+              
+              // Verify authority signed the transaction
+              if !authority_info.is_signer {
+                  return Err(ProgramError::MissingRequiredSignature);
+              }
+              
+              **wallet_info.try_borrow_mut_lamports()? -= amount;
+              **recipient_info.try_borrow_mut_lamports()? += amount;
+              
+              Ok(())
+          }
+    false_positive_notes: "Safe when using Anchor's Signer<'info> type which enforces signer checks automatically"
+    tags: ["solana", "rust", "signer-authorization", "authority-check", "defi"]
+    added_date: "2026-02-10"
+    confidence: "high"
+
+  - id: "FORGE-102"
+    name: "Missing signer check in Anchor programs with AccountInfo"
+    category: "missing-signer-checks"
+    severity: "high"
+    description: "Anchor programs using AccountInfo instead of Signer type without manual is_signer verification, allowing unauthorized access to privileged functions."
+    detection:
+      strategy: "Look for Anchor account structs with AccountInfo for authority accounts that should be signers"
+      regex: "authority:\\s*AccountInfo(?!.*is_signer)"
+      ast_pattern: "AccountInfo fields in Anchor structs for authority without is_signer check in handler"
+      indicators: ["authority: AccountInfo<'info>", "#[derive(Accounts)]", "pub mod", "missing Signer<'info>"]
+    real_examples:
+      - source: "SlowMist Security Best Practices"
+        project: "Signer Authorization Example"
+        finding_id: "SLOWMIST-SIGNER-AUTH"
+        impact: "Unauthorized users can execute privileged functions by providing arbitrary authority accounts"
+        amount_lost: "Potential unlimited (depends on function)"
+        code_vulnerable: |
+          // Vulnerable: AccountInfo without signer check
+          #[program]
+          pub mod signer_authorization_insecure {
+              use super::*;
+              
+              pub fn log_message(ctx: Context<LogMessage>) -> ProgramResult {
+                  msg!("GM {}", ctx.accounts.authority.key().to_string());
+                  Ok(())
+              }
+          }
+          
+          #[derive(Accounts)]
+          pub struct LogMessage<'info> {
+              authority: AccountInfo<'info>,  // No signer enforcement
+          }
+        code_fixed: |
+          // Fixed Option 1: Manual signer check
+          #[program]
+          pub mod signer_authorization_secure {
+              use super::*;
+              
+              pub fn log_message(ctx: Context<LogMessage>) -> ProgramResult {
+                  if !ctx.accounts.authority.is_signer {
+                      return Err(ProgramError::MissingRequiredSignature);
+                  }
+                  msg!("GM {}", ctx.accounts.authority.key().to_string());
+                  Ok(())
+              }
+          }
+          
+          #[derive(Accounts)]
+          pub struct LogMessage<'info> {
+              authority: AccountInfo<'info>,
+          }
+          
+          // Fixed Option 2: Use Signer type (preferred)
+          #[derive(Accounts)]
+          pub struct LogMessage<'info> {
+              authority: Signer<'info>,  // Automatic signer enforcement
+          }
+    false_positive_notes: "Safe when authority account doesn't need to sign (read-only operations) or when using Signer<'info> type"
+    tags: ["solana", "rust", "anchor", "signer-check", "authorization"]
+    added_date: "2026-02-10"
+    confidence: "high"
+
+  - id: "FORGE-103"
+    name: "Admin/Owner operations without signature verification"
+    category: "missing-signer-checks"
+    severity: "high"
+    description: "Administrative functions like initialize, update configs, or change ownership that don't verify the admin account has signed, enabling unauthorized configuration changes."
+    detection:
+      strategy: "Look for admin/owner operations in initialize or config functions without signer verification"
+      regex: "(initialize|update|change_owner|set_admin).*admin.*AccountInfo"
+      ast_pattern: "Administrative functions with admin accounts that don't verify is_signer"
+      indicators: ["pub fn initialize", "pub fn update", "admin: AccountInfo", "owner: AccountInfo", "no is_signer check"]
+    real_examples:
+      - source: "SlowMist Security Analysis"
+        project: "Generic Solana Program"
+        finding_id: "ADMIN-SIGNER-MISSING"
+        impact: "Attackers can initialize fake admin accounts or change configuration without proper authorization"
+        amount_lost: "Protocol compromise potential"
+        code_vulnerable: |
+          // Vulnerable: Initialize without admin signer check
+          fn init_market(accounts: &[AccountInfo]) -> ProgramResult {
+              let admin_info = &accounts[0];
+              // Without checking if signer is a legitimate administrator/creator. 
+              // Anyone can invoke this function.
+              
+              let mut market_data = Market {
+                  admin: *admin_info.key,
+                  initialized: true,
+              };
+              
+              Ok(())
+          }
+        code_fixed: |
+          // Fixed: Verify admin signature and use hardcoded admin key
+          const LEGITIMATE_ADMIN: Pubkey = pubkey!("AdminPubkeyHere123456789...");
+          
+          fn init_market(accounts: &[AccountInfo]) -> ProgramResult {
+              let admin_info = &accounts[0];
+              
+              // Check if the provided admin is the legitimate one
+              if admin_info.key != &LEGITIMATE_ADMIN {
+                  return Err(ProgramError::InvalidArgument);
+              }
+              
+              // Check if admin actually signed the transaction
+              if !admin_info.is_signer {
+                  return Err(ProgramError::MissingRequiredSignature);
+              }
+              
+              let mut market_data = Market {
+                  admin: *admin_info.key,
+                  initialized: true,
+              };
+              
+              Ok(())
+          }
+    false_positive_notes: "Safe for read-only operations or when admin verification happens through other mechanisms (e.g., PDA derivation with admin as seed)"
+    tags: ["solana", "rust", "admin-functions", "initialization", "configuration"]
+    added_date: "2026-02-10"
+    confidence: "high"
+
+  - id: "FORGE-104"
+    name: "Token operations without authority signer check"
+    category: "missing-signer-checks"
+    severity: "critical"
+    description: "Token transfers, mints, burns, or approvals that don't verify token authority has signed, allowing unauthorized token operations and potential fund theft."
+    detection:
+      strategy: "Look for SPL token operations with authority accounts that don't verify signer status"
+      regex: "(transfer|mint|burn).*authority.*AccountInfo(?!.*is_signer)"
+      ast_pattern: "SPL token instruction building with authority accounts missing signer verification"
+      indicators: ["spl_token::instruction", "authority: AccountInfo", "token operations", "no is_signer"]
+    real_examples:
+      - source: "Sec3 Security Blog"
+        project: "Token Authority Example"
+        finding_id: "SEC3-TOKEN-SIGNER"
+        impact: "Attackers can update admin to any account and perform unauthorized token operations"
+        amount_lost: "Unlimited token theft potential"
+        code_vulnerable: |
+          // Vulnerable: Token transfer without authority signer check
+          pub fn transfer_tokens(ctx: Context<TransferTokens>, amount: u64) -> ProgramResult {
+              let authority_info = &ctx.accounts.authority;
+              
+              // Missing: if !admin_info.is_signer check
+              let transfer_instruction = spl_token::instruction::transfer(
+                  &spl_token::ID,
+                  ctx.accounts.source.key,
+                  ctx.accounts.destination.key,
+                  authority_info.key,
+                  &[],
+                  amount,
+              )?;
+              
+              invoke(&transfer_instruction, &[
+                  ctx.accounts.source.clone(),
+                  ctx.accounts.destination.clone(),
+                  authority_info.clone(),
+              ])
+          }
+        code_fixed: |
+          // Fixed: Verify authority signature before token operations
+          pub fn transfer_tokens(ctx: Context<TransferTokens>, amount: u64) -> ProgramResult {
+              let authority_info = &ctx.accounts.authority;
+              
+              // Check authority signature
+              if !authority_info.is_signer {
+                  return Err(ProgramError::MissingRequiredSignature);
+              }
+              
+              let transfer_instruction = spl_token::instruction::transfer(
+                  &spl_token::ID,
+                  ctx.accounts.source.key,
+                  ctx.accounts.destination.key,
+                  authority_info.key,
+                  &[],
+                  amount,
+              )?;
+              
+              invoke(&transfer_instruction, &[
+                  ctx.accounts.source.clone(),
+                  ctx.accounts.destination.clone(),
+                  authority_info.clone(),
+              ])
+          }
+    false_positive_notes: "Safe when using PDA as authority (programmatic signing) or when authority check happens elsewhere in the call chain"
+    tags: ["solana", "rust", "spl-token", "token-operations", "fund-theft", "critical"]
+    added_date: "2026-02-10"
+    confidence: "high"

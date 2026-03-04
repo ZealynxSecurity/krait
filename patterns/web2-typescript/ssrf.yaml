@@ -1,0 +1,334 @@
+patterns:
+  - id: "GHOST-003"
+    name: "Axios path-relative URL SSRF bypass"
+    category: "ssrf"
+    severity: "high"
+    description: "Axios processes path-relative URLs as protocol-relative URLs, allowing attackers to redirect requests to external domains."
+    detection:
+      strategy: "Look for axios requests with user-controlled URL paths that could be manipulated with leading slashes"
+      regex: "axios\\.(get|post|put|delete)\\(\\s*[`'\"]?\\/\\$\\{.*\\}"
+      ast_pattern: "Axios calls with template literals or concatenation where user input starts with '/'"
+      indicators: ["axios.get(`/${", "baseURL bypass", "protocol-relative URL", "//domain.com"]
+    real_examples:
+      - source: "CVE-2024-39338"
+        project: "axios npm package"
+        finding_id: "SNYK-JS-AXIOS-7361793"
+        impact: "Server-side requests to attacker-controlled domains, potential data exfiltration"
+        amount_lost: "SSRF to external domains"
+        code_vulnerable: |
+          // Vulnerable: user input can start with '/' to bypass baseURL
+          const axios = require('axios');
+          const client = axios.create({
+            baseURL: 'https://userapi.example.com',
+          });
+          
+          // userId = '/google.com' - attacker controlled
+          client.get(`/${userId}`).then(response => {
+            // Request goes to google.com instead of userapi.example.com
+            console.log(response.data);
+          });
+        code_fixed: |
+          // Fixed: Validate and sanitize user input
+          const axios = require('axios');
+          const client = axios.create({
+            baseURL: 'https://userapi.example.com',
+          });
+          
+          // Validate userId doesn't start with '/' or contain '//'
+          if (userId.startsWith('/') || userId.includes('//')) {
+            throw new Error('Invalid userId format');
+          }
+          
+          client.get(`/users/${encodeURIComponent(userId)}`);
+    false_positive_notes: "Safe when user input is properly validated to not contain leading slashes or protocol specifiers"
+    tags: ["ssrf", "axios", "url-manipulation", "web2", "nodejs", "typescript"]
+    added_date: "2026-02-10"
+    confidence: "high"
+
+  - id: "GHOST-004"
+    name: "Localhost filtering bypass via loopback range"
+    category: "ssrf"
+    severity: "high"
+    description: "SSRF protection that only blocks 127.0.0.1 can be bypassed using other addresses in the 127.0.0.0/8 loopback range."
+    detection:
+      strategy: "Look for simple string-based localhost filtering that doesn't check the entire 127.0.0.0/8 range"
+      regex: "hostname\\s*===?\\s*['\"]127\\.0\\.0\\.1['\"]|startsWith\\(['\"]127['\"]\\)"
+      ast_pattern: "String equality checks for '127.0.0.1' or startsWith('127') without proper IP range validation"
+      indicators: ["hostname === '127.0.0.1'", "startsWith('127')", "localhost filtering", "IP range bypass"]
+    real_examples:
+      - source: "Node.js Security Blog"
+        project: "Various npm packages"
+        finding_id: "SSRF-LOOPBACK-BYPASS"
+        impact: "Bypass of SSRF protections allowing access to internal services"
+        amount_lost: "Internal service access"
+        code_vulnerable: |
+          // Vulnerable: Only checks for exact 127.0.0.1
+          function isSafeUrl(url) {
+            const parsed = new URL(url);
+            if (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') {
+              throw new Error('Localhost not allowed');
+            }
+            return true;
+          }
+          
+          // Attacker can use: 127.0.0.2, 127.1, 127.0.1, etc.
+          fetch(userUrl); // userUrl = 'http://127.0.0.2:8080/admin'
+        code_fixed: |
+          // Fixed: Check entire 127.0.0.0/8 range and other private ranges
+          const net = require('net');
+          
+          function isSafeUrl(url) {
+            const parsed = new URL(url);
+            const ip = parsed.hostname;
+            
+            // Check if it's an IP address
+            if (net.isIP(ip)) {
+              // Block entire loopback range 127.0.0.0/8
+              if (ip.startsWith('127.')) {
+                throw new Error('Loopback addresses not allowed');
+              }
+              // Also block private ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+              if (isPrivateIP(ip)) {
+                throw new Error('Private IP addresses not allowed');
+              }
+            }
+            // Block localhost variants
+            if (['localhost', 'localtest.me'].includes(ip.toLowerCase())) {
+              throw new Error('Localhost domains not allowed');
+            }
+            return true;
+          }
+    false_positive_notes: "Safe when using proper IP range checking libraries or comprehensive blocklists"
+    tags: ["ssrf", "localhost-bypass", "ip-filtering", "web2", "nodejs", "security-bypass"]
+    added_date: "2026-02-10"
+    confidence: "high"
+
+  - id: "GHOST-005"  
+    name: "DNS resolution SSRF bypass via external domains"
+    category: "ssrf"
+    severity: "high"
+    description: "SSRF protections that only check DNS resolution success without validating resolved IP addresses can be bypassed with domains that resolve to local IPs."
+    detection:
+      strategy: "Look for URL validation that resolves hostnames but doesn't check if resolved IPs are in private ranges"
+      regex: "dns\\.resolve|dns\\.lookup|dns\\.google"
+      ast_pattern: "DNS resolution calls used for validation without subsequent IP range checks"
+      indicators: ["dns.resolve", "Google DNS API", "hostname resolution", "missing IP validation"]
+    real_examples:
+      - source: "nossrf npm package vulnerability"
+        project: "nossrf package"
+        finding_id: "CVE-2025-2691"
+        impact: "SSRF protection bypass allowing requests to internal services via crafted domains"
+        amount_lost: "Internal network access"
+        code_vulnerable: |
+          // Vulnerable: Only checks if DNS resolution succeeds
+          const axios = require('axios');
+          
+          async function validateUrl(hostname) {
+            try {
+              const response = await axios.get(
+                `https://dns.google/resolve?name=${hostname}&type=A`
+              );
+              // Only checks if resolution was successful, not the resolved IP
+              if (response.data.Answer) {
+                return true; // Considers it safe
+              }
+            } catch {
+              return false;
+            }
+          }
+          
+          // Attacker uses: localtest.me (resolves to 127.0.0.1)
+          if (await validateUrl('localtest.me')) {
+            fetch(`https://localtest.me:8080/admin`); // SSRF to localhost
+          }
+        code_fixed: |
+          // Fixed: Validate resolved IP addresses are not in private ranges
+          const axios = require('axios');
+          const net = require('net');
+          
+          async function validateUrl(hostname) {
+            try {
+              const response = await axios.get(
+                `https://dns.google/resolve?name=${hostname}&type=A`
+              );
+              
+              if (response.data.Answer) {
+                // Check each resolved IP address
+                for (const answer of response.data.Answer) {
+                  const ip = answer.data;
+                  if (isPrivateOrLocalIP(ip)) {
+                    throw new Error(`Resolved IP ${ip} is in private range`);
+                  }
+                }
+                return true;
+              }
+            } catch (error) {
+              console.error('URL validation failed:', error.message);
+              return false;
+            }
+          }
+          
+          function isPrivateOrLocalIP(ip) {
+            // Check loopback, private, and reserved ranges
+            return ip.startsWith('127.') || 
+                   ip.startsWith('10.') ||
+                   /^172\.(1[6-9]|2[0-9]|3[01])\./.test(ip) ||
+                   ip.startsWith('192.168.');
+          }
+    false_positive_notes: "Safe when DNS resolution is coupled with comprehensive IP range validation"
+    tags: ["ssrf", "dns-resolution", "ip-validation", "external-domains", "web2", "nodejs"]
+    added_date: "2026-02-10"
+    confidence: "high"
+
+  - id: "GHOST-006"
+    name: "SSRF via HTTP redirect chain bypass"
+    category: "ssrf"  
+    severity: "high"
+    description: "SSRF protections that only validate initial URLs can be bypassed when HTTP clients follow redirects to internal addresses."
+    detection:
+      strategy: "Look for HTTP requests that allow redirects without validating redirect targets"
+      regex: "followRedirect.*true|maxRedirects|redirect.*follow"
+      ast_pattern: "HTTP client configuration with redirect following enabled without redirect URL validation"
+      indicators: ["followRedirect: true", "maxRedirects", "redirect chain", "no redirect validation"]
+    real_examples:
+      - source: "Doyensec Blog - SSRF Redirect Bypass"
+        project: "Various web applications"
+        finding_id: "SSRF-REDIRECT-BYPASS"
+        impact: "Bypass SSRF protections by redirecting from allowed external domains to internal services"
+        amount_lost: "Internal service access"
+        code_vulnerable: |
+          // Vulnerable: Allows redirects without validating redirect targets
+          const axios = require('axios');
+          
+          function validateUrl(url) {
+            const parsed = new URL(url);
+            // Only validates initial URL
+            if (parsed.hostname === 'localhost' || parsed.hostname.startsWith('127.')) {
+              throw new Error('Localhost not allowed');
+            }
+            return true;
+          }
+          
+          const userUrl = 'https://attacker.com/redirect'; // Passes validation
+          if (validateUrl(userUrl)) {
+            // Attacker's server responds with: 302 -> http://127.0.0.1:8080/admin
+            const response = await axios.get(userUrl, {
+              maxRedirects: 5, // Follows redirects without re-validation
+              validateStatus: () => true
+            });
+          }
+        code_fixed: |
+          // Fixed: Validate all URLs in the redirect chain
+          const axios = require('axios');
+          
+          function validateUrl(url) {
+            const parsed = new URL(url);
+            if (isPrivateOrLocalIP(parsed.hostname)) {
+              throw new Error(`URL ${url} points to private address`);
+            }
+            return true;
+          }
+          
+          // Option 1: Disable redirects entirely
+          const response = await axios.get(userUrl, {
+            maxRedirects: 0
+          });
+          
+          // Option 2: Custom redirect handler with validation
+          const axiosInstance = axios.create();
+          axiosInstance.interceptors.response.use(
+            response => response,
+            error => {
+              if (error.response?.status >= 300 && error.response?.status < 400) {
+                const redirectUrl = error.response.headers.location;
+                validateUrl(redirectUrl); // Validate redirect target
+                return axiosInstance.get(redirectUrl);
+              }
+              return Promise.reject(error);
+            }
+          );
+    false_positive_notes: "Safe when redirects are disabled or when all redirect targets are validated"
+    tags: ["ssrf", "http-redirect", "redirect-chain", "bypass", "web2", "nodejs", "axios"]
+    added_date: "2026-02-10"
+    confidence: "high"
+
+  - id: "GHOST-007"
+    name: "IP address encoding bypass for SSRF filters"
+    category: "ssrf"
+    severity: "medium"
+    description: "SSRF protections using string-based IP filtering can be bypassed with hex, octal, or decimal encodings of IP addresses."
+    detection:
+      strategy: "Look for IP address validation that uses simple string matching without normalizing different IP representations"
+      regex: "hostname\\s*===\\s*['\"]127\\.0\\.0\\.1['\"]|indexOf\\(['\"]127\\."
+      ast_pattern: "String-based IP checking without proper IP parsing and normalization"
+      indicators: ["string IP comparison", "indexOf IP check", "no IP normalization", "hex/octal encoding"]
+    real_examples:
+      - source: "Node.js Security Research"
+        project: "Various SSRF protection libraries"
+        finding_id: "IP-ENCODING-BYPASS"
+        impact: "Bypass IP blocklists using alternative IP address representations"
+        amount_lost: "Internal network access"
+        code_vulnerable: |
+          // Vulnerable: Simple string-based IP checking
+          function isSafeUrl(url) {
+            const hostname = new URL(url).hostname;
+            
+            // Blocklist check uses string matching
+            const blockedIPs = ['127.0.0.1', '192.168.1.1', '10.0.0.1'];
+            if (blockedIPs.includes(hostname)) {
+              throw new Error('IP address blocked');
+            }
+            
+            // String-based localhost check
+            if (hostname.includes('127.0.0.1')) {
+              throw new Error('Localhost blocked');  
+            }
+            
+            return true;
+          }
+          
+          // Attacker bypasses with:
+          // http://0x7f.1 (hex: 127.0.0.1)
+          // http://127.1 (shorthand: 127.0.0.1)  
+          // http://2130706433 (decimal: 127.0.0.1)
+          // http://0177.0.0.1 (octal: 127.0.0.1)
+        code_fixed: |
+          // Fixed: Normalize IP addresses before validation
+          const net = require('net');
+          
+          function normalizeIP(hostname) {
+            // Handle hex encoding (0x7f.1)
+            if (/^0x/i.test(hostname)) {
+              return convertHexIP(hostname);
+            }
+            
+            // Handle decimal notation (2130706433)
+            if (/^\d+$/.test(hostname)) {
+              return convertDecimalIP(hostname);
+            }
+            
+            // Handle octal notation (0177.0.0.1)  
+            if (/^0\d+\./.test(hostname)) {
+              return convertOctalIP(hostname);
+            }
+            
+            return hostname;
+          }
+          
+          function isSafeUrl(url) {
+            const hostname = new URL(url).hostname;
+            const normalizedIP = normalizeIP(hostname);
+            
+            // Use proper IP validation
+            if (net.isIP(normalizedIP)) {
+              if (isPrivateOrLocalIP(normalizedIP)) {
+                throw new Error('Private/local IP not allowed');
+              }
+            }
+            
+            return true;
+          }
+    false_positive_notes: "Safe when using proper IP parsing libraries that handle all encoding formats"
+    tags: ["ssrf", "ip-encoding", "hex-encoding", "octal-encoding", "bypass", "web2", "nodejs"]
+    added_date: "2026-02-10"
+    confidence: "medium"

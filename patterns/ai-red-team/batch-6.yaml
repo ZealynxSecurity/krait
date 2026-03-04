@@ -1,0 +1,504 @@
+patterns:
+- id: RAVEN-112
+  name: "V3: CLI Argument Injection (git_diff) \u2014 CRITICAL"
+  category: prompt-injection
+  severity: high
+  description: '**Expected vulnerability:** The `git_diff` function likely passes
+    the `target` argument unsanitized to `repo'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - diff()
+    - diff()
+    - repo.git
+    - git.diff
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-113
+  name: 'REVISED THREAT MODEL: 6 Attack Vectors'
+  category: misconfiguration
+  severity: high
+  description: "REVISED THREAT MODEL: 6 Attack Vectors\n\n### Vector A: Email Injection\
+    \ (via himalaya)\n**Risk: HIGH (unchanged)**\n\n| Metric | Rating |\n|--------|--------|\n\
+    | Likelihood | 4/5 \u2014 elliot@zealynx"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - zealynx.io
+    - AGENTS.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-114
+  name: 'Vector A: Email Injection (via himalaya)'
+  category: prompt-injection
+  severity: high
+  description: "Vector A: Email Injection (via himalaya)\n**Risk: HIGH (unchanged)**\n\
+    \n| Metric | Rating |\n|--------|--------|\n| Likelihood | 4/5 \u2014 elliot@zealynx"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - zealynx.io
+    - AGENTS.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-115
+  name: 'Vector B: Web Content Injection'
+  category: prompt-injection
+  severity: high
+  description: "5/5 \u2014 rules in AGENTS"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '2.5'
+    - AGENTS.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-116
+  name: prompt-injection` `
+  category: prompt-injection
+  severity: high
+  description: "prompt-injection` `#supply-chain`\n- **Zealynx Relevance:** \u26A0\
+    \uFE0F **MAXIMUM** \u2014 This is our platform being called out"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - eval()
+    - dev.to
+    - arxiv.org
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-117
+  name: "\U0001F7E0 HIGH \u2014 New Attack Research & Techniques"
+  category: misconfiguration
+  severity: high
+  description: "\U0001F7E0 HIGH \u2014 New Attack Research & Techniques\n\n### 3"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - arxiv.org
+    - '2601.21233'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-118
+  name: '3. "JustAsk: Curious Code Agents Reveal System Pro'
+  category: prompt-injection
+  severity: high
+  description: '"JustAsk: Curious Code Agents Reveal System Prompts in Frontier LLMs"
+
+    - **Source:** https://arxiv'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - arxiv.org
+    - '2601.21233'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-119
+  name: 1. Prompt Injection & Jailbreaks
+  category: prompt-injection
+  severity: high
+  description: 'Prompt Injection & Jailbreaks
+
+
+    ### 1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.1'
+    - schneider.net
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-32711
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-120
+  name: "1.1 \u2014 Agentic AI Amplifies Prompt Injection Into M"
+  category: prompt-injection
+  severity: high
+  description: "1 \u2014 Agentic AI Amplifies Prompt Injection Into Multi-Tool Kill\
+    \ Chains\n- **Source:** Christian Schneider \u2014 https://christian-schneider"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.1'
+    - schneider.net
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-32711
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-121
+  name: prompt-injection
+  category: prompt-injection
+  severity: medium
+  description: "prompt-injection #agentic-ai #owasp #kill-chain #mcp\n- **Zealynx\
+    \ relevance:** \u2B50\u2B50\u2B50\u2B50\u2B50 \u2014 Directly applicable to AI\
+    \ red team audits"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.2'
+    - datadome.co
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-122
+  name: 'Category Focus: Model Evasion Attacks'
+  category: model-evasion
+  severity: high
+  description: Vulnerability pattern extracted from research.
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - security vulnerability
+    - audit finding
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-123
+  name: 1. Gradient-Based Adversarial Attacks
+  category: model-evasion
+  severity: high
+  description: Vulnerability pattern extracted from research.
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - security vulnerability
+    - audit finding
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-124
+  name: 2. Black-Box Evasion Attacks
+  category: model-evasion
+  severity: high
+  description: Vulnerability pattern extracted from research.
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - security vulnerability
+    - audit finding
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-125
+  name: '1. Attack Mechanism: How MINJA Works'
+  category: misconfiguration
+  severity: medium
+  description: 'Attack Mechanism: How MINJA Works
+
+
+    The **MINJA (Memory INJection Attack)** framework, introduced by Dong et al'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '2503.03704'
+    - verify.io
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-126
+  name: "\U0001F4A1 IDEA: \"Side-Channel Prompt Injection\" Audit Modu"
+  category: prompt-injection
+  severity: medium
+  description: "Zealynx could offer a dedicated test module:\n- **\"AI Oracle Integrity\
+    \ Audit\"** \u2014 specifically targeting AI-powered classifiers and scoring systems\
+    \ used in DeFi (e"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - e.g
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-127
+  name: 'Blind Boolean-Based Prompt Injection (BBPI): When '
+  category: prompt-injection
+  severity: medium
+  description: "Attack Mechanism \u2014 How It Works\n\n#### 1"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.1'
+    - '1.2'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-128
+  name: "1. Attack Mechanism \u2014 How It Works"
+  category: misconfiguration
+  severity: medium
+  description: "Attack Mechanism \u2014 How It Works\n\n#### 1"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.1'
+    - '1.2'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-129
+  name: 'Breaking the Protocol: How MCP''s Architecture Turn'
+  category: misconfiguration
+  severity: medium
+  description: A first-of-its-kind rigorous security analysis by Maloyan et al
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '2601.17549'
+    - v1.0
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-130
+  name: '1. Attack Mechanism: Three Architectural Vulnerabi'
+  category: misconfiguration
+  severity: high
+  description: 'Attack Mechanism: Three Architectural Vulnerabilities
+
+
+    The paper identifies three protocol-level vulnerabilities in MCP v1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - v1.0
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-131
+  name: 3. The Tool Poisoning Attack in Detail
+  category: data-poisoning
+  severity: medium
+  description: "**Mechanism:** Attackers embed malicious instructions in MCP tool\
+    \ descriptions \u2014 the metadata that tells the LLM what a tool does"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - mcp.json
+    - raxe.ai
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium

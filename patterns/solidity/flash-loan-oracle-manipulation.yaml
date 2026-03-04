@@ -1,0 +1,97 @@
+patterns:
+  - id: "SOL-002"
+    name: "Flash loan price oracle manipulation"
+    category: "oracle-manipulation"
+    severity: "critical"
+    description: "Protocols using AMM spot prices as oracles can be exploited via flash loan attacks that temporarily manipulate pool reserves to inflate/deflate asset prices."
+    detection:
+      strategy: "Look for price calculations using AMM reserves without TWAP or other manipulation resistance"
+      regex: "getReserves\\(\\)|balanceOf\\(.*\\).*price|reserve[01].*\\*.*reserve[01]"
+      ast_pattern: "Price calculations using pair.getReserves() or token balances in same transaction as value-sensitive operations"
+      indicators: ["getReserves()", "spot price calculation", "single oracle source", "no TWAP", "flash loan vulnerable"]
+    real_examples:
+      - source: "Solodit"
+        project: "PancakeBunny"
+        finding_id: "BUNNY-2021-001"
+        impact: "Flash loan manipulation allowed minting 7M BUNNY tokens using manipulated BNB price"
+        amount_lost: "$45M"
+        code_vulnerable: |
+          // Vulnerable: Direct spot price from AMM reserves
+          function getPrice(address token) external view returns (uint256) {
+              (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
+              return (uint256(reserve1) * 1e18) / uint256(reserve0); // Manipulable
+          }
+          
+          function mintTokens(uint256 collateralAmount) external {
+              uint256 price = getPrice(collateralToken);
+              uint256 tokensToMint = collateralAmount * price / 1e18;
+              _mint(msg.sender, tokensToMint); // Exploited here
+          }
+        code_fixed: |
+          // Fixed: TWAP oracle with minimum time window
+          function consult(address pairAddress, uint256 amountIn) 
+              external view returns (uint256 amountOut) {
+              
+              uint32 timeElapsed = blockTimestamp - lastObservation.blockTimestamp;
+              require(timeElapsed >= MIN_PERIOD, "TWAP period too short");
+              
+              // Time-weighted average price calculation
+              uint256 priceAverage = (price0Cumulative - lastObs.price0Cumulative) / timeElapsed;
+              return priceAverage * amountIn / (2**112);
+          }
+          
+          // Or use Chainlink price feeds
+          function getPrice() external view returns (uint256) {
+              (, int256 price, , uint256 updatedAt, ) = priceFeed.latestRoundData();
+              require(block.timestamp - updatedAt < STALENESS_THRESHOLD, "Stale price");
+              require(price > 0, "Invalid price");
+              return uint256(price);
+          }
+    false_positive_notes: "Safe when used for non-critical operations, when combined with other price sources, or when manipulation cost exceeds potential profit"
+    tags: ["defi", "flash-loan", "oracle", "price-manipulation", "amm", "uniswap", "pancakeswap"]
+    added_date: "2026-02-09"
+    confidence: "high"
+
+  - id: "SOL-003"
+    name: "LP token valuation manipulation"
+    category: "oracle-manipulation"  
+    severity: "high"
+    description: "Using LP token value based on underlying reserve ratios can be manipulated when reserves are skewed via large trades or flash loans."
+    detection:
+      strategy: "Look for LP token value calculations using reserve ratios without manipulation protection"
+      regex: "totalSupply\\(\\)|getReserves\\(\\).*totalSupply"
+      ast_pattern: "LP token valuation using (reserve0 * reserve1) / totalSupply pattern"
+      indicators: ["LP token pricing", "reserve ratio calculation", "totalSupply", "liquidity value"]
+    real_examples:
+      - source: "Rekt.news"
+        project: "Warp Finance"
+        finding_id: "WARP-2020-001"
+        impact: "Flash loan manipulation of LP token value allowed over-borrowing against insufficient collateral"
+        amount_lost: "$7.7M"
+        code_vulnerable: |
+          // Vulnerable: LP token value based on reserves
+          function getLPTokenValue(address lpToken) public view returns (uint256) {
+              (uint256 reserve0, uint256 reserve1, ) = IUniswapV2Pair(lpToken).getReserves();
+              uint256 totalSupply = IUniswapV2Pair(lpToken).totalSupply();
+              uint256 token0Value = reserve0 * getPrice(token0);
+              uint256 token1Value = reserve1 * getPrice(token1);
+              return (token0Value + token1Value) / totalSupply; // Manipulable
+          }
+        code_fixed: |
+          // Fixed: Use fair LP pricing with manipulation checks
+          function getLPTokenValue(address lpToken) public view returns (uint256) {
+              uint256 k = sqrt(reserve0 * reserve1); // Constant product
+              uint256 totalSupply = IUniswapV2Pair(lpToken).totalSupply();
+              
+              // Use external price oracles for underlying tokens
+              uint256 token0Price = chainlinkOracle.getPrice(token0);
+              uint256 token1Price = chainlinkOracle.getPrice(token1);
+              
+              // Fair value based on external prices, not internal reserves
+              uint256 fairValue = 2 * sqrt(token0Price * token1Price) * k / totalSupply;
+              return fairValue;
+          }
+    false_positive_notes: "Safe for read-only operations or when LP tokens are not used as collateral"
+    tags: ["defi", "lp-tokens", "liquidity", "valuation", "flash-loan", "collateral"]
+    added_date: "2026-02-09"
+    confidence: "high"

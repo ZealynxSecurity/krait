@@ -1,0 +1,94 @@
+patterns:
+  - id: "SOL-TS-001"
+    name: "ERC20 blacklist deadlock in protocol mechanics"
+    category: "temporal-state"
+    severity: "medium"
+    description: "Protocol functions that transfer tokens to users can deadlock when user addresses are blacklisted by token issuers (e.g., USDC, USDT), preventing resolution of disputes or governance actions."
+    detection:
+      strategy: "Look for protocol functions that transfer tokens to user addresses without fallback mechanisms for blacklisted addresses"
+      regex: "safeTransfer\\(.*disputer\\)|safeTransfer\\(.*user\\).*onlyGovernor"
+      ast_pattern: "Functions with governance role that transfer tokens directly to user addresses"
+      indicators: ["disputer token transfer", "governance transfer to user", "no pull pattern fallback", "direct push payment"]
+    real_examples:
+      - source: "Merkl Code4rena 2025-11"
+        project: "Merkl"
+        finding_id: "L-01"
+        impact: "Governor cannot resolve valid disputes when disputer is blacklisted, creating governance deadlock"
+        amount_lost: "Governance paralysis potential"
+        code_vulnerable: |
+          function resolveDispute(bool valid) external onlyGovernor {
+            if (disputer == address(0)) revert Errors.NoDispute();
+            if (valid) {
+              IERC20(disputeToken).safeTransfer(disputer, disputeAmount); // Reverts if blacklisted
+              _revokeTree();
+            } else {
+              IERC20(disputeToken).safeTransfer(msg.sender, disputeAmount);
+              endOfDisputePeriod = _endOfDisputePeriod(uint48(block.timestamp));
+            }
+            disputer = address(0);
+            emit DisputeResolved(valid);
+          }
+        code_fixed: |
+          mapping(address => uint256) public pendingRefunds;
+          
+          function resolveDispute(bool valid) external onlyGovernor {
+            if (disputer == address(0)) revert Errors.NoDispute();
+            if (valid) {
+              pendingRefunds[disputer] += disputeAmount; // Store for withdrawal
+              _revokeTree();
+            } else {
+              IERC20(disputeToken).safeTransfer(msg.sender, disputeAmount);
+              endOfDisputePeriod = _endOfDisputePeriod(uint48(block.timestamp));
+            }
+            disputer = address(0);
+            emit DisputeResolved(valid);
+          }
+          
+          function claimRefund() external {
+            uint256 amount = pendingRefunds[msg.sender];
+            pendingRefunds[msg.sender] = 0;
+            IERC20(disputeToken).safeTransfer(msg.sender, amount);
+          }
+    false_positive_notes: "Safe when using pull patterns for user payments or when protocol controls the token contract"
+    tags: ["defi", "governance", "blacklist", "usdc", "usdt", "dispute-resolution"]
+    added_date: "2026-02-10"
+    confidence: "high"
+
+  - id: "SOL-TS-002"
+    name: "Temporal state inconsistency in dispute periods"
+    category: "temporal-state"
+    severity: "low"
+    description: "Systems with dispute/delay periods can have windows where stale state is still accessible, allowing actions at outdated rates or conditions before corrections take effect."
+    detection:
+      strategy: "Look for functions that return different values based on time windows, especially where old state remains accessible during dispute periods"
+      regex: "block\\.timestamp.*disputePeriod|endOfDisputePeriod.*return.*lastTree"
+      ast_pattern: "Functions with time-based conditionals returning different state versions"
+      indicators: ["dispute period logic", "time-gated state access", "lastTree vs tree", "temporal state branching"]
+    real_examples:
+      - source: "Merkl Code4rena 2025-11"
+        project: "Merkl"
+        finding_id: "L-05"
+        impact: "Users can claim at stale inflated rates during dispute period before corrections take effect"
+        amount_lost: "Overpayment potential"
+        code_vulnerable: |
+          function getMerkleRoot() public view returns (bytes32) {
+            if (block.timestamp >= endOfDisputePeriod && disputer == address(0))
+              return tree.merkleRoot;
+            else
+              return lastTree.merkleRoot; // Returns OLD tree during dispute
+          }
+        code_fixed: |
+          // Design issue - consider double-update pattern or emergency pause:
+          function getMerkleRoot() public view returns (bytes32) {
+            // Option 1: Immediate correction (reduces security)
+            if (block.timestamp >= endOfDisputePeriod && disputer == address(0))
+              return tree.merkleRoot;
+            else if (emergencyCorrection)
+              return tree.merkleRoot; // Allow governor to force immediate correction
+            else
+              return lastTree.merkleRoot;
+          }
+    false_positive_notes: "Intended behavior when delay periods are meant to provide security against malicious updates"
+    tags: ["defi", "governance", "dispute-period", "temporal-inconsistency", "state-timing"]
+    added_date: "2026-02-10"
+    confidence: "medium"

@@ -1,0 +1,41 @@
+patterns:
+  - id: "RAVEN-003" 
+    name: "Context window manipulation for instruction displacement"
+    category: "context-poisoning"
+    severity: "medium"
+    description: "Long context models can have safety instructions displaced through context overflow attacks with gradual trust building."
+    detection:
+      strategy: "Look for systems that don't track instruction displacement in long contexts or lack context integrity checks"
+      regex: "context_window|max_tokens|conversation_history"
+      ast_pattern: "Long context processing without instruction anchoring or integrity validation"
+      indicators: ["long context", "context overflow", "instruction displacement", "gradual poisoning"]
+    real_examples:
+      - source: "Anthropic Many-Shot Jailbreaking study"
+        project: "Claude, GPT-4, various LLMs"
+        finding_id: "MANY-SHOT-2024"
+        impact: "Systematic safety instruction bypass through context manipulation"
+        amount_lost: "Model safety compromise"
+        code_vulnerable: |
+          // Vulnerable: No context integrity tracking
+          const full_context = system_prompt + conversation_history + user_input;
+          if (full_context.length > MAX_CONTEXT) {
+            // Truncates from beginning, potentially removing safety instructions
+            full_context = full_context.slice(-MAX_CONTEXT);
+          }
+        code_fixed: |
+          // Fixed: Preserve critical instructions and detect manipulation
+          const preserved_instructions = extractCriticalInstructions(system_prompt);
+          const safe_context = buildSafeContext(
+            preserved_instructions, 
+            conversation_history, 
+            user_input,
+            MAX_CONTEXT
+          );
+          // Monitor for instruction displacement attempts
+          if (detectContextManipulation(conversation_history)) {
+            logSecurityEvent("Context manipulation detected");
+          }
+    false_positive_notes: "Normal context management for efficiency may trigger false positives when not malicious"
+    tags: ["ai-security", "context-manipulation", "instruction-displacement", "many-shot", "safety-bypass"]
+    added_date: "2026-02-09"
+    confidence: "medium"

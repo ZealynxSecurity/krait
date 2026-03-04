@@ -1,0 +1,53 @@
+patterns:
+  - id: "SOL-004"
+    name: "Callback/hook reentrancy"
+    category: "reentrancy"
+    severity: "critical"
+    description: "Token callbacks and protocol hooks create re-entry points when state updates occur after external calls, allowing manipulation of contract state during callbacks."
+    detection:
+      strategy: "Look for external calls that trigger callbacks (safeTransfer, hooks) before state is fully updated"
+      regex: "safeTransfer|safeMint|burnHook|afterSwap|onERC721Received|tokensReceived"
+      ast_pattern: "External calls with callbacks where state changes occur after the call"
+      indicators: ["protocol hooks", "ERC-777 callbacks", "safeTransfer", "callback functions", "state update after external call"]
+    real_examples:
+      - source: "CloberDEX exploit analysis"
+        project: "CloberDEX"
+        finding_id: "CLOBER-2024-001"
+        impact: "Burn hook callback allowed re-entry before reserve updates, enabling drain of additional funds"
+        amount_lost: "$501K (133.7 ETH)"
+        code_vulnerable: |
+          function _burn(address user, uint256 shareAmount) internal {
+              uint256 withdrawalA = (shareAmount * pool.reserveA) / totalShares;
+              uint256 withdrawalB = (shareAmount * pool.reserveB) / totalShares;
+              totalShares -= shareAmount;
+              
+              // External calls before state fully updated
+              bookKeyA.quote.transfer(user, withdrawalA);
+              bookKeyA.base.transfer(user, withdrawalB);
+              
+              // Hook callback with stale state - RE-ENTRY POINT
+              strategy.burnHook(user, shareAmount);
+              
+              // State update too late
+              pool.reserveA -= withdrawalA;
+              pool.reserveB -= withdrawalB;
+          }
+        code_fixed: |
+          function _burn(address user, uint256 shareAmount) internal nonReentrant {
+              uint256 withdrawalA = (shareAmount * pool.reserveA) / totalShares;
+              uint256 withdrawalB = (shareAmount * pool.reserveB) / totalShares;
+              
+              // Effects FIRST - update ALL state
+              totalShares -= shareAmount;
+              pool.reserveA -= withdrawalA;
+              pool.reserveB -= withdrawalB;
+              
+              // Interactions LAST - transfers and hooks
+              bookKeyA.quote.transfer(user, withdrawalA);
+              bookKeyA.base.transfer(user, withdrawalB);
+              strategy.burnHook(user, shareAmount);
+          }
+    false_positive_notes: "Safe when using nonReentrant modifier or when all state updates occur before any external calls. Pattern successfully caught improper try/catch callback handling in Merkl audit where return value validation occurred inside try block but genuine external failures were silently ignored."
+    tags: ["defi", "reentrancy", "hooks", "callbacks", "erc777", "erc721", "protocol-hooks"]
+    added_date: "2026-02-09"
+    confidence: "high"

@@ -1,0 +1,397 @@
+patterns:
+- id: FORGE-072
+  name: 'H-1: Missing Account Ownership Validation in `lz_r'
+  category: missing-auth
+  severity: high
+  description: 'H-1: Missing Account Ownership Validation in `lz_receive`
+
+    **File:** `oapp_lz_receive'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: account\(
+    indicators:
+    - account()
+    - transfer_token_ctx()
+    - oapp_lz_receive.rs
+    - oapp_lz_receive.rs
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-073
+  name: '[account()]'
+  category: account-confusion
+  severity: high
+  description: An attacker can provide any `user` account and their own token account
+    as `user_deposit_wallet`
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: oapp_lz_receive.rs
+    indicators:
+    - account()
+    - transfer_token_ctx()
+    - oapp_lz_receive.rs
+    - withdraw_params.token_amount
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-074
+  name: '[account('
+  category: account-confusion
+  severity: high
+  description: An attacker can provide any `user` account and their own token account
+    as `user_deposit_wallet`
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: oapp_lz_receive.rs
+    indicators:
+    - account()
+    - transfer_token_ctx()
+    - oapp_lz_receive.rs
+    - withdraw_params.token_amount
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-075
+  name: "\U0001F535 SOLANA ECOSYSTEM UPDATES"
+  category: pda-issues
+  severity: high
+  description: "\U0001F535 SOLANA ECOSYSTEM UPDATES\n\n### 5"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - v3.0
+    - www.cryptopolitan
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-076
+  name: 5. Critical Solana Validator Update v3.0.14 (Jan 1
+  category: pda-issues
+  severity: high
+  description: Critical Solana Validator Update v3
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - v3.0
+    - www.cryptopolitan
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-077
+  name: 2. Anchor Framework / Solana Program Library Updat
+  category: pda-issues
+  severity: high
+  description: 'Anchor Framework / Solana Program Library Updates
+
+
+    ### Solana Validator Client v3'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - v3.0
+    - beincrypto.com
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-078
+  name: 'No Anchor framework version updates detected this '
+  category: pda-issues
+  severity: high
+  description: No Anchor framework version updates detected this week
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - www.prnewswire
+    - 302662215.html
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-079
+  name: 'Finding 1: PDA Front-Running on Lock Escrow (H-01)'
+  category: pda-issues
+  severity: high
+  description: "Finding 1: PDA Front-Running on Lock Escrow (H-01) \u2014 \u2705 CAUGHT\n\
+    \n**My detection:** Pattern #01 (Basic Signer Bypass) + Pattern #07 (Account Reinitialization)\n\
+    \nScanning `lock_pool"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - update_settings()
+    - lock_pool.rs
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-080
+  name: 01 (Basic Signer Bypass) + Pattern
+  category: missing-auth
+  severity: high
+  description: '01 (Basic Signer Bypass) + Pattern #07 (Account Reinitialization)
+
+
+    Scanning `lock_pool'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - update_settings()
+    - lock_pool.rs
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-081
+  name: 07 (Account Reinitialization)
+  category: account-confusion
+  severity: high
+  description: '07 (Account Reinitialization)
+
+
+    Scanning `lock_pool'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - update_settings()
+    - lock_pool.rs
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-082
+  name: 'Category Studied: Missing Owner Checks (Deep Dive)'
+  category: missing-auth
+  severity: medium
+  description: '## Knowledge Mined
+
+
+    ### Sources Analyzed
+
+    - **Solana Foundation Token22 Code4rena Audit Report** (Aug-Sep 2025, $203'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - check_program_account()
+    - 203.5K
+    - 56.5K
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Code4rena
+    impact: Extracted from research
+    amount_lost: $203.5K
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $203.5K
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-083
+  name: Knowledge Base Structure Updated
+  category: pda-issues
+  severity: high
+  description: "Knowledge Base Structure Updated\n\n```\n/root/clawd/knowledge/rust/missing-owner-checks/\
+    \     (7 patterns \u2014 NEW, Feb 8)\n\u251C\u2500\u2500 README"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: README.md
+    indicators:
+    - README.md
+    - account.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-084
+  name: "04 (Account Data Matching) | High \u2014 Pattern explic"
+  category: account-confusion
+  severity: high
+  description: "04 (Account Data Matching) | High \u2014 Pattern explicitly looks\
+    \ for \"processing accounts without verifying they belong to the correct program"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - checked_add()
+    - unwrap()
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-085
+  name: 03 (Missing PDA Derivation Verification) | Very Hi
+  category: missing-auth
+  severity: high
+  description: "03 (Missing PDA Derivation Verification) | Very High \u2014 This is\
+    \ the EXACT pattern"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - security vulnerability
+    - audit finding
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-086
+  name: 03 literally says "program accepts a PDA account b
+  category: pda-issues
+  severity: high
+  description: 03 literally says "program accepts a PDA account but never re-derives
+    it to verify seeds and program_id
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - security vulnerability
+    - audit finding
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium

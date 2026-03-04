@@ -1,0 +1,42 @@
+patterns:
+  - id: "SOL-001"
+    name: "Batch transfer multiplication overflow"
+    category: "integer-overflow"
+    severity: "critical"
+    description: "Multiplication overflow in batch transfers can bypass balance checks, allowing unlimited token creation through arithmetic wraparound."
+    detection:
+      strategy: "Look for multiplication operations with user-controlled inputs in token transfer functions without SafeMath or bounds checking"
+      regex: "recipients\\.length\\s*\\*\\s*[^;]+\\s*[^S][^a][^f][^e][^M][^a][^t][^h]"
+      ast_pattern: "BinaryExpression where operator == '*' and operands include array.length and user input"
+      indicators: ["recipients.length *", "batch transfer", "multiplication without SafeMath", "uint overflow"]
+    real_examples:
+      - source: "BeautyChain exploit analysis"
+        project: "BeautyChain (BEC)"
+        finding_id: "BEC-2018-001"
+        impact: "Unlimited token minting through overflow attack, token value crashed to $0"
+        amount_lost: "$900M market cap"
+        code_vulnerable: |
+          function batchTransfer(address[] _receivers, uint256 _value) public {
+              uint cnt = _receivers.length;
+              uint256 amount = uint256(cnt) * _value;  // OVERFLOW HERE
+              require(amount >= 0 && balances[msg.sender] >= amount);
+              balances[msg.sender] = balances[msg.sender].sub(amount);
+              for (uint i = 0; i < cnt; i++) {
+                  balances[_receivers[i]] = balances[_receivers[i]].add(_value);
+              }
+          }
+        code_fixed: |
+          function batchTransfer(address[] _receivers, uint256 _value) public {
+              uint cnt = _receivers.length;
+              require(cnt > 0 && cnt <= 20); // Bounds check
+              uint256 amount = uint256(cnt).mul(_value); // SafeMath
+              require(balances[msg.sender] >= amount);
+              balances[msg.sender] = balances[msg.sender].sub(amount);
+              for (uint i = 0; i < cnt; i++) {
+                  balances[_receivers[i]] = balances[_receivers[i]].add(_value);
+              }
+          }
+    false_positive_notes: "Safe in Solidity 0.8.0+ with automatic overflow checking enabled, or when using SafeMath library"
+    tags: ["defi", "token", "arithmetic", "solidity", "erc20", "batch-operations"]
+    added_date: "2026-02-09"
+    confidence: "high"

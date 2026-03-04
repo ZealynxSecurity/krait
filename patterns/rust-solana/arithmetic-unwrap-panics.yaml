@@ -1,0 +1,63 @@
+patterns:
+  - id: "FORGE-301"
+    name: "Arithmetic operations using unwrap() that can panic"
+    category: "arithmetic-panics"
+    severity: "medium"
+    description: "Arithmetic operations like checked_add, checked_sub, checked_mul followed by unwrap() can panic on overflow/underflow instead of returning controlled errors."
+    detection:
+      strategy: "Look for checked arithmetic followed by unwrap that can panic on overflow"
+      regex: "checked_(add|sub|mul|div).*\\.unwrap\\(\\)"
+      ast_pattern: "Checked arithmetic operations followed by unwrap() calls"
+      indicators: ["checked_add", "checked_sub", "checked_mul", ".unwrap()", "overflow", "underflow"]
+    real_examples:
+      - source: "Solana Foundation Code4rena Audit"
+        project: "Token22 Confidential Transfer"
+        finding_id: "unwrap-panic-decryptable-balance"
+        impact: "Transaction panics and aborts when arithmetic overflow occurs instead of returning structured error"
+        amount_lost: "Transaction failure, no fund loss"
+        code_vulnerable: |
+          let new_decrypted_available_balance = current_available_balance
+              .checked_add(pending_balance)
+              .unwrap(); // Can panic on overflow
+        code_fixed: |
+          let new_decrypted_available_balance = current_available_balance
+              .checked_add(pending_balance)
+              .ok_or(TokenError::Overflow)?; // Return error instead of panic
+        alternative_fix: |
+          let new_decrypted_available_balance = current_available_balance
+              .saturating_add(pending_balance); // Use saturating arithmetic if appropriate
+    false_positive_notes: "Safe when overflow is mathematically impossible or when panic is the intended behavior"
+    tags: ["solana", "rust", "arithmetic", "overflow", "panic", "error-handling"]
+    added_date: "2026-02-11"
+    confidence: "high"
+
+  - id: "FORGE-302"
+    name: "Array indexing without bounds checking"
+    category: "arithmetic-panics"
+    severity: "medium"
+    description: "Direct array/vector indexing without bounds checking can panic when index is out of bounds, should use get() method with proper error handling."
+    detection:
+      strategy: "Look for direct array indexing that could panic on out-of-bounds access"
+      regex: "\\[[0-9]+\\]|\\[.*index.*\\](?!.*get\\()"
+      ast_pattern: "Direct array indexing without bounds checking"
+      indicators: ["array[index]", "vec[i]", "slice[pos]", "no bounds check"]
+    real_examples:
+      - source: "Generic Rust Best Practices"
+        project: "Array Access Patterns"
+        finding_id: "BOUNDS-CHECK-MISSING"
+        impact: "Program panics when accessing array elements beyond bounds"
+        amount_lost: "Transaction failure"
+        code_vulnerable: |
+          let accounts = &ctx.remaining_accounts;
+          let first_account = &accounts[0]; // Can panic if empty
+          let target_account = &accounts[target_index]; // Can panic if index >= len
+        code_fixed: |
+          let accounts = &ctx.remaining_accounts;
+          let first_account = accounts.get(0)
+              .ok_or(ProgramError::NotEnoughAccountKeys)?;
+          let target_account = accounts.get(target_index)
+              .ok_or(ProgramError::AccountNotFound)?;
+    false_positive_notes: "Safe when bounds are guaranteed by prior validation or when using const indices within known bounds"
+    tags: ["solana", "rust", "bounds-checking", "array-access", "panic"]
+    added_date: "2026-02-11"
+    confidence: "high"

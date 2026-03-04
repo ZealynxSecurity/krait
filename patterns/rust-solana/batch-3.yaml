@@ -1,0 +1,386 @@
+patterns:
+- id: FORGE-058
+  name: "3. Flow Blockchain \u2014 87.4B Counterfeit Tokens Dest"
+  category: pda-issues
+  severity: high
+  description: "Flow Blockchain \u2014 87"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - 87.4B
+    - www.globenewswire
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-059
+  name: "\U0001F7E1 Solana Infrastructure & Framework Updates"
+  category: pda-issues
+  severity: high
+  description: "\U0001F7E1 Solana Infrastructure & Framework Updates\n\n### 4"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - v3.0
+    - beincrypto.com
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-060
+  name: "\U0001F535 Polkadot/Substrate/ink! Updates"
+  category: pda-issues
+  severity: medium
+  description: "\U0001F535 Polkadot/Substrate/ink"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - medium.com
+    - 13.5M
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-23519
+    impact: Extracted from research
+    amount_lost: $27M
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-23519
+    impact: Extracted from research
+    amount_lost: $27M
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-061
+  name: 'Category Focus: Account Confusion Attacks'
+  category: account-confusion
+  severity: high
+  description: 'Category Focus: Account Confusion Attacks
+
+
+    **Rationale:** Account validation is fundamental to Solana security'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - id()
+    - 1.26M
+    - account.key
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-062
+  name: 1. Sysvar Account Spoofing
+  category: account-confusion
+  severity: medium
+  description: 'key == Sysvar::id()` and use checked variants
+
+
+    ### 2'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - id()
+    - account.key
+    - account.is_signer
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $56.5K
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $56.5K
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-063
+  name: 2. Account Type/Discriminator Confusion
+  category: account-confusion
+  severity: high
+  description: 'is_signer` before authority validation
+
+
+    ### 4'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - account.is_signer
+    - token_account.mint
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $56.5K
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $56.5K
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-064
+  name: '[account]` constraints don''t protect against math '
+  category: account-confusion
+  severity: medium
+  description: '[account]` constraints don''t protect against math bugs inside business
+    logic'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '0.28'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-065
+  name: '1: HIGH - Missing Deposit Token Validation'
+  category: missing-auth
+  severity: high
+  description: rs`, there's no validation that the provided `deposit_token` matches
+    the `allowed_token
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: account\(
+    indicators:
+    - account()
+    - as_ref()
+    - deposit.rs
+    - allowed_token.mint_account
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-066
+  name: '[account()]'
+  category: account-confusion
+  severity: high
+  description: '[account()]
+
+    pub deposit_token: Box<Account<''info, Mint>>, // No constraint'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: deposit_token.key
+    indicators:
+    - account()
+    - as_ref()
+    - deposit_params.token_hash
+    - allowed_token.bump
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-067
+  name: '[account('
+  category: account-confusion
+  severity: high
+  description: '[account()]
+
+    pub deposit_token: Box<Account<''info, Mint>>, // No constraint'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: deposit_token.key
+    indicators:
+    - account()
+    - as_ref()
+    - deposit_params.token_hash
+    - allowed_token.bump
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-068
+  name: 'Finding 1: Missing Deposit Token Validation (H-1) '
+  category: missing-auth
+  severity: high
+  description: "Finding 1: Missing Deposit Token Validation (H-1) \u2014 \u2705 CAUGHT\n\
+    \n**My detection:** Pattern #04 (Account Data Matching Failure) \u2014 direct\
+    \ hit\n\nScanning `deposit"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: account\(
+    indicators:
+    - account()
+    - as_ref()
+    - deposit.rs
+    - deposit_params.token_hash
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-069
+  name: "04 (Account Data Matching Failure) \u2014 direct hit"
+  category: account-confusion
+  severity: high
+  description: "04 (Account Data Matching Failure) \u2014 direct hit\n\nScanning `deposit"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: account\(
+    indicators:
+    - account()
+    - as_ref()
+    - deposit.rs
+    - deposit_params.token_hash
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-070
+  name: '[account()]'
+  category: account-confusion
+  severity: high
+  description: "[account()]\npub deposit_token: Box<Account<'info, Mint>>,\n\n#[account(\n\
+    \    seeds = [TOKEN_SEED, deposit_params"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: allowed_token.mint_account
+    indicators:
+    - account()
+    - as_ref()
+    - deposit_params.token_hash
+    - allowed_token.bump
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium
+- id: FORGE-071
+  name: 'Session: CPI Privilege Escalation Knowledge Mining'
+  category: cpi-escalation
+  severity: high
+  description: '### Sources Mined
+
+    1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - invoke()
+    - reload()
+    - 56.5K
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $56.5K
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - solana
+  - rust
+  - blockchain
+  added_date: '2026-02-09'
+  confidence: medium

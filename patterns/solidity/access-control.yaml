@@ -1,0 +1,198 @@
+# Access Control Vulnerability Patterns
+# Category: access-control
+# Last Updated: 2026-02-10
+
+- id: "SOL-AC-001"
+  name: "Missing function visibility specifier"
+  category: "access-control"
+  severity: "critical"
+  description: "Functions without explicit visibility default to public, allowing unauthorized access to sensitive operations."
+  detection:
+    strategy: "Look for functions without explicit visibility keywords, especially those with privileged operations"
+    regex: "function\\s+\\w+\\([^)]*\\)\\s*(?!external|public|internal|private)\\{"
+    ast_pattern: "FunctionDefinition where visibility is missing or null"
+    indicators: ["function without visibility", "default public access", "internal function exposed"]
+  real_examples:
+    - source: "Sigma Prime Security Blog"
+      project: "HashForEther"
+      finding_id: "Default-Visibility-Attack"
+      impact: "Direct access to internal withdrawal function bypassing access controls"
+      amount_lost: "$31M+ (Parity hack used similar pattern)"
+      code_vulnerable: |
+        contract HashForEther {
+          function withdrawWinnings() {
+            require(uint32(msg.sender) == 0);
+            _sendWinnings();
+          }
+          
+          function _sendWinnings() { // Missing visibility - defaults to public!
+            msg.sender.transfer(this.balance);
+          }
+        }
+      code_fixed: |
+        contract HashForEther {
+          function withdrawWinnings() external {
+            require(uint32(msg.sender) == 0);
+            _sendWinnings();
+          }
+          
+          function _sendWinnings() internal { // Explicit internal visibility
+            msg.sender.transfer(this.balance);
+          }
+        }
+  false_positive_notes: "Safe when function is intentionally public and properly protected with modifiers"
+  tags: ["defi", "access-control", "solidity", "visibility"]
+  added_date: "2026-02-10"
+  confidence: "high"
+
+- id: "SOL-AC-002"
+  name: "Incorrect constructor naming"
+  category: "access-control"
+  severity: "critical"
+  description: "Constructor function named incorrectly becomes a regular public function, allowing anyone to claim ownership."
+  detection:
+    strategy: "Look for functions with contract-like names that set owner/admin roles instead of proper constructor"
+    regex: "function\\s+[A-Z][a-zA-Z0-9]*\\(\\)\\s*public.*owner\\s*="
+    ast_pattern: "FunctionDefinition where name starts with capital letter and sets owner variable"
+    indicators: ["function with contract name", "owner assignment in named function", "pre-0.4.22 constructor pattern"]
+  real_examples:
+    - source: "Ethereum Blog"
+      project: "Rubixi"
+      finding_id: "Constructor-Name-Vulnerability"
+      impact: "Anyone could become contract owner and steal accumulated fees"
+      amount_lost: "Contract fees stolen"
+      code_vulnerable: |
+        pragma solidity ^0.4.15;
+        contract Missing {
+          address private owner;
+          
+          modifier onlyowner {
+            require(msg.sender==owner);
+            _;
+          }
+          
+          // Should be "Missing" but named "IamMissing" - anyone can call this!
+          function IamMissing() public {
+            owner = msg.sender;
+          }
+          
+          function withdraw() public onlyowner {
+            owner.transfer(this.balance);
+          }
+        }
+      code_fixed: |
+        pragma solidity ^0.5.0;
+        contract Missing {
+          address private owner;
+          
+          modifier onlyOwner {
+            require(msg.sender == owner);
+            _;
+          }
+          
+          constructor() public { // Proper constructor keyword
+            owner = msg.sender;
+          }
+          
+          function withdraw() external onlyOwner {
+            payable(owner).transfer(address(this).balance);
+          }
+        }
+  false_positive_notes: "Only applies to Solidity versions before 0.4.22; newer versions require constructor keyword"
+  tags: ["defi", "access-control", "solidity", "constructor", "ownership"]
+  added_date: "2026-02-10"
+  confidence: "high"
+
+- id: "SOL-AC-003"
+  name: "Missing access control on critical functions"
+  category: "access-control"
+  severity: "high"
+  description: "Critical functions like price updates, token minting, or configuration changes lack proper access control modifiers."
+  detection:
+    strategy: "Look for functions that modify critical state without onlyOwner, onlyAdmin, or role-based modifiers"
+    regex: "(function\\s+\\w*(update|set|mint|burn|withdraw|pause)\\w*\\([^)]*\\)\\s*(?:external|public)(?!.*only))"
+    ast_pattern: "FunctionDefinition with state-changing operations lacking access control modifiers"
+    indicators: ["update function without modifier", "set function without protection", "mint without access control"]
+  real_examples:
+    - source: "Smart Contract Security Blog"
+      project: "RealEstatePrice"
+      finding_id: "Missing-Access-Control-Generic"
+      impact: "Anyone can manipulate critical contract parameters"
+      amount_lost: "Potential price manipulation"
+      code_vulnerable: |
+        contract RealEstatePrice {
+          uint256 public apartmentPrice;
+          
+          constructor(uint256 _price) {
+            apartmentPrice = _price;
+          }
+          
+          function updateApartmentPrice(uint256 _price) external { // No access control!
+            apartmentPrice = _price;
+          }
+        }
+      code_fixed: |
+        contract RealEstatePrice {
+          uint256 public apartmentPrice;
+          address public owner;
+          
+          modifier onlyOwner() {
+            require(msg.sender == owner, "Not authorized");
+            _;
+          }
+          
+          constructor(uint256 _price) {
+            apartmentPrice = _price;
+            owner = msg.sender;
+          }
+          
+          function updateApartmentPrice(uint256 _price) external onlyOwner {
+            apartmentPrice = _price;
+          }
+        }
+  false_positive_notes: "Safe when function is intentionally public (e.g., user-callable functions with internal validation). Pattern successfully caught validation bypass issues in Merkl audit - validation logic that checks wrong variables or applies to wrong amounts."
+  tags: ["defi", "access-control", "solidity", "state-modification"]
+  added_date: "2026-02-10"
+  confidence: "high"
+
+- id: "SOL-AC-004"
+  name: "Broken role removal logic"
+  category: "access-control"
+  severity: "medium"
+  description: "Role removal functions that incorrectly grant unauthorized roles instead of properly removing them."
+  detection:
+    strategy: "Look for role management functions that use array manipulation without proper validation"
+    regex: "removeRole.*roles\\[.*\\]\\s*=\\s*roles\\[.*\\]"
+    ast_pattern: "Function with role removal logic using array index replacement"
+    indicators: ["removeRole function", "array element replacement", "roles[index] = roles[last]", "insufficient validation"]
+  real_examples:
+    - source: "Code4rena"
+      project: "PermissionsRegistry"
+      finding_id: "M-02-Role-Removal-Logic-Flaw"
+      impact: "Role removal grants unintended roles to users instead of removing existing ones"
+      amount_lost: "Access control bypass potential"
+      code_vulnerable: |
+        function removeRole(address user, bytes32 role) external {
+          uint256 roleIndex = getUserRoleIndex(user, role);
+          require(roleIndex < userRoles[user].length, "Role not found");
+          
+          // BUG: Replaces with last role instead of removing
+          userRoles[user][roleIndex] = userRoles[user][userRoles[user].length - 1];
+          userRoles[user].pop();
+        }
+      code_fixed: |
+        function removeRole(address user, bytes32 role) external {
+          uint256 roleIndex = getUserRoleIndex(user, role);
+          require(roleIndex < userRoles[user].length, "Role not found");
+          require(userRoles[user][roleIndex] == role, "Role mismatch");
+          
+          // Properly remove by shifting elements
+          for (uint i = roleIndex; i < userRoles[user].length - 1; i++) {
+            userRoles[user][i] = userRoles[user][i + 1];
+          }
+          userRoles[user].pop();
+        }
+  false_positive_notes: "Safe when array replacement is intentional and roles are equivalent"
+  tags: ["defi", "access-control", "solidity", "role-management"]
+  added_date: "2026-02-10"
+  confidence: "medium"

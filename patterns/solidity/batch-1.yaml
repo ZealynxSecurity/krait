@@ -1,0 +1,553 @@
+patterns:
+- id: SOL-012
+  name: "\U0001F534 1. Exploits & Hacks (Last 48h)"
+  category: misconfiguration
+  severity: high
+  description: 'Exploits & Hacks (Last 48h)
+
+
+    ### 1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.1'
+    - 12.3M
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-013
+  name: "1.1 \u2014 Address Poisoning Attack: $12.3M ETH Stolen"
+  category: misconfiguration
+  severity: high
+  description: "1 \u2014 Address Poisoning Attack: $12"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.1'
+    - 12.3M
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-014
+  name: "1.2 \u2014 Matcha Meta / SwapNet Exploit: $13.5M\u2013$16.8M"
+  category: misconfiguration
+  severity: high
+  description: "2 \u2014 Matcha Meta / SwapNet Exploit: $13"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.2'
+    - 13.5M
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-015
+  name: 1. Exploits & Hacks (Recent)
+  category: misconfiguration
+  severity: high
+  description: "Exploits & Hacks (Recent)\n\n### \U0001F534 Truebit (TRU) \u2014 $26"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - 26.6M
+    - www.coindesk
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-016
+  name: "\U0001F534 Truebit (TRU) \u2014 $26.6M Exploit (Jan 8, 2026)"
+  category: misconfiguration
+  severity: high
+  description: "\U0001F534 Truebit (TRU) \u2014 $26"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - 26.6M
+    - www.coindesk
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-017
+  name: "\U0001F534 Trust Wallet Supply Chain Attack \u2014 $7M (Dec 25, "
+  category: misconfiguration
+  severity: high
+  description: "\U0001F534 Trust Wallet Supply Chain Attack \u2014 $7M (Dec 25, 2025)\n\
+    - **Source:** Referenced in CoinTribune article above\n- **Summary:** \"Sha1-Hulud\"\
+    \ supply chain attack via tainted npm packages"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - 3.4B
+    - www.chainalysis
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-018
+  name: 'Focus Category: Approval/Allowance Bugs'
+  category: approval-bugs
+  severity: high
+  description: 'Focus Category: Approval/Allowance Bugs
+
+    *Rotated from flash loan attacks (Feb 6) per study protocol*
+
+
+    ## Patterns Extracted: 5 Comprehensive Files
+
+
+    ### 1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - permit()
+    - approve()
+    - approval.md
+    - running.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-019
+  name: 1. **Infinite Approval Vulnerability**
+  category: approval-bugs
+  severity: high
+  description: "**Infinite Approval Vulnerability** \n- **Impact:** HIGH/CRITICAL\n\
+    - **Pattern:** Users approve unlimited spending (type(uint256)"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - permit()
+    - approve()
+    - approval.md
+    - running.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-020
+  name: 3. **Permit Signature Exploitation**
+  category: misconfiguration
+  severity: high
+  description: 'md` (6,190 bytes)
+
+
+    ### 4'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - exploitation.md
+    - griefing.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Code4rena
+    impact: Extracted from research
+    amount_lost: $18
+  - source: Research file
+    project: Unknown
+    finding_id: code4rena
+    impact: Extracted from research
+    amount_lost: $18
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-021
+  name: '2. Technical Breakdown: The Vulnerability in Detai'
+  category: misconfiguration
+  severity: high
+  description: "With large amounts, the numerator grows cubically \u2014 intentionally\
+    \ making massive buys prohibitively expensive"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: 0x18ef\(
+    indicators:
+    - _getPurchasePrice()
+    - sellTRU()
+    - SafeMath.mul
+    - '509.453545333947284131'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-022
+  name: '1 attack vector. The trend line is clear: attacker'
+  category: misconfiguration
+  severity: medium
+  description: 'The trend line is clear: attackers are running out of easy targets
+    in modern, audited protocols and are turning to legacy code'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - add()
+    - '0.8'
+    - '0.8'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-023
+  name: "Subject: The AI Exploit Generation Arms Race \u2014 A1 "
+  category: misconfiguration
+  severity: high
+  description: 05558v4)](https://arxiv
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - 2507.05558v4
+    - arxiv.org
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-024
+  name: 'A1: The Agentic Exploit Generator'
+  category: misconfiguration
+  severity: high
+  description: 'A1: The Agentic Exploit Generator
+
+
+    A1, developed by Liyi Zhou (University of Sydney / UC Berkeley RDI), is an agentic
+    system that transforms any LLM into an end-to-end exploit generator'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '88.5'
+    - '3.59'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-025
+  name: 'ReX: The Foundry-Linked Exploit Synthesizer'
+  category: misconfiguration
+  severity: medium
+  description: 'ReX: The Foundry-Linked Exploit Synthesizer
+
+
+    ReX, from UNSW Sydney and CSIRO Data61, takes a complementary approach'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '4.1'
+    - '2.5'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-026
+  name: "Subject: The Anatomy of Approval Drain Attacks \u2014 S"
+  category: approval-bugs
+  severity: high
+  description: "Subject: The Anatomy of Approval Drain Attacks \u2014 SwapNet, Arbitrary\
+    \ Calls, and DeFi's Most Persistent Vulnerability Class\n\n**Date**: January 31,\
+    \ 2026\n**Sources**: [DL News](https://www"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - www.dlnews
+    - www.tradingview
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-027
+  name: "Subject: The Truebit Bonding Curve Exploit \u2014 How a"
+  category: misconfiguration
+  severity: high
+  description: com/blog/in-depth-analysis-the-truebit-incident) | [SlowMist Vulnerability
+    Analysis](https://slowmist
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - getPurchasePrice()
+    - buyTRU()
+    - blocksec.com
+    - slowmist.medium
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-028
+  name: Anticipated Findings Summary
+  category: misconfiguration
+  severity: high
+  description: 'Anticipated Findings Summary
+
+
+    **HIGH Severity (5 potential findings)**:
+
+    1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - security vulnerability
+    - audit finding
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Code4rena
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-029
+  name: Findings Studied (10+)
+  category: misconfiguration
+  severity: high
+  description: 'Findings Studied (10+)
+
+
+    ### Real-World Exploits Analyzed
+
+    1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - 7.7M
+    - '0.10'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $130M
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $130M
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-030
+  name: Real-World Exploits Analyzed
+  category: misconfiguration
+  severity: high
+  description: 'Real-World Exploits Analyzed
+
+    1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - 7.7M
+    - '0.10'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $130M
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $130M
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium
+- id: SOL-031
+  name: Audit Finding Sources
+  category: misconfiguration
+  severity: high
+  description: 'Audit Finding Sources
+
+    7'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - data.md
+    - down.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $30K
+  - source: Research file
+    project: Unknown
+    finding_id: Sherlock
+    impact: Extracted from research
+    amount_lost: $30K
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - defi
+  - smart-contracts
+  - solidity
+  added_date: '2026-02-09'
+  confidence: medium

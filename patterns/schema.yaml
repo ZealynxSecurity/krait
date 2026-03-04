@@ -1,0 +1,59 @@
+# Pattern Schema - every entry must follow this format
+
+# Example pattern:
+- id: "SOL-001"
+  name: "Unchecked return value in token transfer"
+  category: "missing-error-handling"
+  severity: "high"
+  description: "Token transfers that don't check return values can silently fail, leading to inconsistent state and potential loss of funds."
+  detection:
+    strategy: "Look for token transfer calls without checking return values or using SafeERC20"
+    regex: "\.transfer\\([^)]+\\)\\s*;"
+    ast_pattern: "CallExpression where callee.property.name == 'transfer' and parent type != 'IfStatement' and parent type != 'AssignmentExpression'"
+    indicators: ["token.transfer(", "IERC20(", "without return check", "no SafeERC20"]
+  real_examples:
+    - source: "Code4rena"
+      project: "Ribbon Finance"
+      finding_id: "C4-2021-09-ribbonv2-findings"
+      impact: "Vault could appear to successfully withdraw tokens while transfer actually failed"
+      amount_lost: "$2.3M potential"
+      code_vulnerable: |
+        // Vulnerable: no return value check
+        token.transfer(user, amount);
+        userBalance[user] -= amount; // This executes even if transfer fails
+      code_fixed: |
+        // Fixed: check return value
+        require(token.transfer(user, amount), "Transfer failed");
+        userBalance[user] -= amount;
+        
+        // Or use SafeERC20
+        IERC20(token).safeTransfer(user, amount);
+        userBalance[user] -= amount;
+  false_positive_notes: "Safe when using tokens that revert on failure (most modern tokens) or when using SafeERC20"
+  tags: ["defi", "token-handling", "solidity", "erc20"]
+  added_date: "2026-02-09"
+  confidence: "high"
+
+# Pattern format specification:
+# - id: "DOMAIN-NNN" (e.g. SOL-001, FORGE-012, GHOST-003, RAVEN-007)
+# - name: Short descriptive name
+# - category: e.g. integer-overflow, missing-auth, reentrancy, injection
+# - severity: critical|high|medium|low|info
+# - description: 1-2 sentences explaining the vulnerability pattern
+# - detection:
+#   - strategy: What to look for in code
+#   - regex: Optional regex pattern for automated scanning
+#   - ast_pattern: Optional AST/structural pattern description
+#   - indicators: ["list", "of", "code", "smells"]
+# - real_examples:
+#   - source: e.g. Solodit, Code4rena, Sherlock, CVE database
+#   - project: Project name
+#   - finding_id: Original finding reference
+#   - impact: What happened or could have happened
+#   - amount_lost: $X if exploited
+#   - code_vulnerable: | (vulnerable code example)
+#   - code_fixed: | (fixed code example)
+# - false_positive_notes: When this pattern is actually safe
+# - tags: ["defi", "access-control", "solana", "anchor"]
+# - added_date: YYYY-MM-DD
+# - confidence: high|medium|low

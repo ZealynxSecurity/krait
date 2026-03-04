@@ -1,0 +1,522 @@
+patterns:
+- id: RAVEN-132
+  name: "\U0001F4A1 IDEA: \"Promptware Kill Chain Assessment\" as a Pr"
+  category: prompt-injection
+  severity: medium
+  description: "\U0001F4A1 IDEA: \"Promptware Kill Chain Assessment\" as a Premium\
+    \ Service Offering\n\n**For Carlos:** The Promptware Kill Chain (Nassi, Schneier,\
+    \ Brodt \u2014 arXiv:2601"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '2601.09625'
+    - '9.3'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-32711
+    impact: Extracted from research
+    amount_lost: $10
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-133
+  name: 'The Promptware Kill Chain: How Prompt Injection Ev'
+  category: prompt-injection
+  severity: high
+  description: The paper argues, convincingly, that the term "prompt injection" has
+    become a dangerous catch-all that obscures the true severity of multi-step attack
+    campaigns targeting agentic AI systems
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '9.3'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-32711
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-134
+  name: 1. The Five Stages of the Promptware Kill Chain
+  category: prompt-injection
+  severity: high
+  description: 'The Five Stages of the Promptware Kill Chain
+
+
+    #### Stage 1: Initial Access (Prompt Injection)
+
+
+    The attacker''s payload enters the LLM''s context window'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - security vulnerability
+    - audit finding
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-135
+  name: 'Category: Jailbreak Techniques'
+  category: jailbreak
+  severity: high
+  description: This is the third major category in the AI red team knowledge base
+    (after Prompt Injection and Training Data Extraction)
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - overview.md
+    - jailbreaks.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-136
+  name: Attack Success Rates (most concerning)
+  category: misconfiguration
+  severity: high
+  description: '**Benchmarks lie:** Single-turn automated tests give false confidence'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - log.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-137
+  name: 5. Pickle RCE in Model Repos
+  category: misconfiguration
+  severity: high
+  description: 'Pickle RCE in Model Repos
+
+    **Supply chain:** Hugging Face models using pickle can execute arbitrary code
+    on load'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - codabench.org
+    - '2510.07192'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-138
+  name: Attack Surface Analysis
+  category: misconfiguration
+  severity: high
+  description: 'Attack Surface Analysis
+
+
+    ### Current Capabilities (Attack Vectors)
+
+    - **Email (himalaya):** Full IMAP/SMTP access to elliot@zealynx'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - zealynx.io
+    - AGENTS.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-139
+  name: Current Capabilities (Attack Vectors)
+  category: misconfiguration
+  severity: high
+  description: 'Current Capabilities (Attack Vectors)
+
+    - **Email (himalaya):** Full IMAP/SMTP access to elliot@zealynx'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - zealynx.io
+    - AGENTS.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-140
+  name: 'Threat Model: Attack Vectors'
+  category: misconfiguration
+  severity: high
+  description: 'Threat Model: Attack Vectors
+
+
+    ### 1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - carlos.test
+    - gmail.com
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-141
+  name: 1. `01-divergence-attacks.md`
+  category: misconfiguration
+  severity: high
+  description: '`01-divergence-attacks'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - attacks.md
+    - '3.5'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-142
+  name: 3. `03-membership-inference-attacks.md`
+  category: misconfiguration
+  severity: high
+  description: '`03-membership-inference-attacks'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - attacks.md
+    - attacks.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-143
+  name: 4. `04-pii-reconstruction-attacks.md`
+  category: misconfiguration
+  severity: medium
+  description: '`04-pii-reconstruction-attacks'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - attacks.md
+    - R.R
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-144
+  name: 1 and the most critical vulnerability class for LL
+  category: misconfiguration
+  severity: high
+  description: 1 and the most critical vulnerability class for LLM applications
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - injection.md
+    - injection.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-145
+  name: 'Category Focus: LLM Output Manipulation'
+  category: misconfiguration
+  severity: medium
+  description: '### Techniques Documented (6 Files Created)
+
+
+    1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - injection.md
+    - '2507.22304'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-146
+  name: Attack Pattern Evolution
+  category: misconfiguration
+  severity: medium
+  description: 'Attack Pattern Evolution
+
+    Documented progression from basic prompt injection to sophisticated output manipulation:
+
+    1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '3.5'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-147
+  name: 1. Prompt Injection & Jailbreaks
+  category: prompt-injection
+  severity: high
+  description: 'Prompt Injection & Jailbreaks
+
+
+    ### 1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.1'
+    - schneider.net
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-32711
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-148
+  name: 1.1 Agentic Prompt Injection Amplification (CRITIC
+  category: prompt-injection
+  severity: high
+  description: '1 Agentic Prompt Injection Amplification (CRITICAL)
+
+    - **Title:** "From LLM to Agentic AI: Prompt Injection Got Worse"
+
+    - **Source:** https://christian-schneider'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.1'
+    - schneider.net
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-32711
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-149
+  name: 1.3 Most LLM Jailbreaks Are "Empty"
+  category: jailbreak
+  severity: medium
+  description: '3 Most LLM Jailbreaks Are "Empty"
+
+    - **Title:** "Why Most LLM Jailbreaks Are Actually Empty"
+
+    - **Source:** https://hackernoon'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.3'
+    - hackernoon.com
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-150
+  name: "4. Blind Boolean-Based Prompt Injection (BBPI) \u2014 N"
+  category: prompt-injection
+  severity: medium
+  description: "Blind Boolean-Based Prompt Injection (BBPI) \u2014 Novel Extraction\
+    \ Technique\n- **Source:** [Daniel Hammon / Medium](https://medium"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - medium.com
+    - e.g
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-151
+  name: prompt-injection` `
+  category: prompt-injection
+  severity: medium
+  description: "prompt-injection` `#novel-technique` `#system-prompt-extraction` `#blind-injection`\n\
+    - **Zealynx Relevance:** \u2B50\u2B50\u2B50\u2B50 \u2014 Add to red team playbook"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - github.com
+    - instatunnel.my
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium

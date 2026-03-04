@@ -1,0 +1,135 @@
+patterns:
+  - id: "FORGE-201"
+    name: "Missing zeroization after cryptographic operations"
+    category: "crypto-memory-safety"
+    severity: "medium"
+    description: "Sensitive cryptographic data (keys, scalars, plaintexts) not being zeroized after use, potentially leaving secrets in memory accessible through crash dumps or memory disclosure attacks."
+    detection:
+      strategy: "Look for cryptographic operations that create sensitive data without proper cleanup"
+      regex: "decrypt.*plaintext|Scalar::random.*|private.*key"
+      ast_pattern: "Cryptographic functions that create sensitive data without calling .zeroize()"
+      indicators: ["decrypt", "plaintext", "Scalar::random", "private_key", "missing .zeroize()"]
+    real_examples:
+      - source: "Solana Foundation Code4rena Audit"
+        project: "Token22 Confidential Transfer"
+        finding_id: "plaintext-not-zeroized"
+        impact: "Decrypted confidential balances may linger in heap memory, increasing risk of recovery via crash dumps"
+        amount_lost: "Information disclosure potential"
+        code_vulnerable: |
+          fn decrypt(key: &AeKey, ciphertext: &AeCiphertext) -> Option<u64> {
+              let plaintext = Aes128GcmSiv::new(&key.0.into())
+                  .decrypt(&ciphertext.nonce.into(), ciphertext.ciphertext.as_ref());
+          
+              if let Ok(plaintext) = plaintext {
+                  let amount_bytes: [u8; 8] = plaintext.try_into().unwrap();
+                  Some(u64::from_le_bytes(amount_bytes))
+              } else {
+                  None
+              }
+              // plaintext Vec<u8> is dropped without zeroization
+          }
+        code_fixed: |
+          fn decrypt(key: &AeKey, ciphertext: &AeCiphertext) -> Option<u64> {
+              let mut plaintext = Aes128GcmSiv::new(&key.0.into())
+                  .decrypt(&ciphertext.nonce.into(), ciphertext.ciphertext.as_ref());
+          
+              if let Ok(mut plaintext) = plaintext {
+                  let amount_bytes: [u8; 8] = plaintext.try_into().unwrap();
+                  plaintext.zeroize(); // Clear sensitive data
+                  Some(u64::from_le_bytes(amount_bytes))
+              } else {
+                  None
+              }
+          }
+    false_positive_notes: "Safe when plaintext doesn't contain sensitive data or when using types that auto-zeroize on drop"
+    tags: ["solana", "rust", "cryptography", "memory-safety", "zeroization"]
+    added_date: "2026-02-11"
+    confidence: "medium"
+
+  - id: "FORGE-202"
+    name: "Ephemeral cryptographic scalars not zeroized"
+    category: "crypto-memory-safety"
+    severity: "medium"
+    description: "Cryptographic proofs create ephemeral secret scalars that should be zeroized after use to prevent recovery from memory dumps."
+    detection:
+      strategy: "Look for cryptographic proof generation with ephemeral scalars not being zeroized"
+      regex: "Scalar::random.*(?!.*zeroize)"
+      ast_pattern: "Functions creating random scalars for proofs without zeroizing them before return"
+      indicators: ["Scalar::random", "proof generation", "ephemeral", "missing zeroize"]
+    real_examples:
+      - source: "Solana Foundation Code4rena Audit"
+        project: "ZK ElGamal Proof SDK"
+        finding_id: "ephemeral-scalars-not-zeroized"
+        impact: "Ephemeral secret scalars may persist in process memory and be recoverable via operational artifacts"
+        amount_lost: "Cryptographic secret exposure"
+        code_vulnerable: |
+          pub fn new(amount: u64, bit_length: usize) -> Result<RangeProof> {
+              let a_blinding = Scalar::random(&mut OsRng);
+              let s_L: Vec<Scalar> = (0..nm).map(|_| Scalar::random(&mut OsRng)).collect();
+              let s_R: Vec<Scalar> = (0..nm).map(|_| Scalar::random(&mut OsRng)).collect();
+              let s_blinding = Scalar::random(&mut OsRng);
+              
+              // ... proof construction using scalars ...
+              
+              Ok(RangeProof { /* proof components */ })
+              // Ephemeral scalars are dropped without zeroization
+          }
+        code_fixed: |
+          pub fn new(amount: u64, bit_length: usize) -> Result<RangeProof> {
+              let mut a_blinding = Scalar::random(&mut OsRng);
+              let mut s_L: Vec<Scalar> = (0..nm).map(|_| Scalar::random(&mut OsRng)).collect();
+              let mut s_R: Vec<Scalar> = (0..nm).map(|_| Scalar::random(&mut OsRng)).collect();
+              let mut s_blinding = Scalar::random(&mut OsRng);
+              
+              // ... proof construction using scalars ...
+              
+              // Zeroize ephemeral secrets before returning
+              a_blinding.zeroize();
+              s_blinding.zeroize();
+              for scalar in s_L.iter_mut() {
+                  scalar.zeroize();
+              }
+              for scalar in s_R.iter_mut() {
+                  scalar.zeroize();
+              }
+              
+              Ok(RangeProof { /* proof components */ })
+          }
+    false_positive_notes: "Safe when scalars are not secret or when using auto-zeroizing scalar types"
+    tags: ["solana", "rust", "cryptography", "zk-proofs", "scalars", "memory-safety"]
+    added_date: "2026-02-11"
+    confidence: "medium"
+
+  - id: "FORGE-203"
+    name: "Sensitive key material derives Debug trait"
+    category: "crypto-memory-safety"
+    severity: "low"
+    description: "Cryptographic keys implementing Debug trait can accidentally leak sensitive material through logging, debug prints, or error messages."
+    detection:
+      strategy: "Look for key/secret types that derive Debug without custom implementation"
+      regex: "#\\[derive.*Debug.*\\].*struct.*Key|struct.*Key.*derive.*Debug"
+      ast_pattern: "Key/secret structs deriving Debug without custom redacting implementation"
+      indicators: ["derive(Debug)", "Key", "Secret", "AeKey", "PrivateKey", "cryptographic material"]
+    real_examples:
+      - source: "Solana Foundation Code4rena Audit"
+        project: "ZK SDK Auth Encryption"
+        finding_id: "debug-key-material"
+        impact: "AES key bytes could be emitted to logs if downstream code uses debug formatting"
+        amount_lost: "Key exposure through logging"
+        code_vulnerable: |
+          #[derive(Clone, Debug, Zeroize, Eq, PartialEq)]
+          pub struct AeKey([u8; AE_KEY_LEN]);
+          // Debug implementation will print raw key bytes
+        code_fixed: |
+          #[derive(Clone, Zeroize, Eq, PartialEq)]
+          pub struct AeKey([u8; AE_KEY_LEN]);
+          
+          impl core::fmt::Debug for AeKey {
+              fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                  f.write_str("AeKey([REDACTED])")
+              }
+          }
+    false_positive_notes: "Safe for public keys or when Debug is never used in production code"
+    tags: ["solana", "rust", "cryptography", "logging", "debug-trait", "information-disclosure"]
+    added_date: "2026-02-11"
+    confidence: "low"

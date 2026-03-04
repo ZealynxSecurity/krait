@@ -1,0 +1,104 @@
+patterns:
+- id: RAVEN-152
+  name: system-prompt-extraction` `
+  category: prompt-injection
+  severity: medium
+  description: "system-prompt-extraction` `#blind-injection`\n- **Zealynx Relevance:**\
+    \ \u2B50\u2B50\u2B50\u2B50 \u2014 Add to red team playbook"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - github.com
+    - instatunnel.my
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-153
+  name: "CHAI: Command Hijacking Against Embodied AI \u2014 When"
+  category: misconfiguration
+  severity: medium
+  description: This is not traditional prompt injection where a user types malicious
+    input
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - e.g
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-154
+  name: "Attack Mechanism \u2014 How It Works"
+  category: misconfiguration
+  severity: high
+  description: "Attack Mechanism \u2014 How It Works\n\n#### The Command Layer Vulnerability\n\
+    \nModern embodied AI systems use a three-stage pipeline:\n\n1"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - e.g
+    - e.g
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium
+- id: RAVEN-155
+  name: Attack Surface Analysis
+  category: misconfiguration
+  severity: high
+  description: 'Attack Surface Analysis
+
+
+    **Critical Vulnerabilities:**
+
+    1'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - security vulnerability
+    - audit finding
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - ai-security
+  - llm
+  - red-team
+  added_date: '2026-02-09'
+  confidence: medium

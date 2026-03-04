@@ -1,0 +1,201 @@
+# Price Manipulation Patterns - Solidity Vulnerabilities
+# Category: price-manipulation
+# Research: Mango Markets exploit, Balance ratio vulnerabilities, DEX spot price issues
+
+- id: "SOL-017"
+  name: "Price calculated from token balance ratios"
+  category: "price-manipulation"
+  severity: "critical"
+  description: "Asset prices derived from internal token balance ratios can be manipulated via flash loans or donations, causing protocol to accept inflated collateral values or execute bad liquidations."
+  detection:
+    strategy: "Look for price calculations using balanceOf() ratios without external oracle validation"
+    regex: "balanceOf\\([^)]+\\).*\\/.*balanceOf\\([^)]+\\)"
+    ast_pattern: "BinaryExpression where operator is '/' and both operands contain balanceOf calls"
+    indicators: ["balanceOf(address(this))", "price = balOut * 1e18 / balIn", "getReserves()", "no external oracle"]
+  real_examples:
+    - source: "Solodit"
+      project: "Generic DEX Pool"
+      finding_id: "Price Manipulation via Flash Loan"
+      impact: "Attacker manipulates pool balance to get favorable swap rates"
+      amount_lost: "$50M+ potential"
+      code_vulnerable: |
+        function getPrice(IERC20 tokenIn, IERC20 tokenOut) public view returns (uint256) {
+          uint256 balIn = tokenIn.balanceOf(address(this));
+          uint256 balOut = tokenOut.balanceOf(address(this));
+          return balOut * 1e18 / balIn;  // Vulnerable to manipulation
+        }
+      code_fixed: |
+        // Use external oracle instead of balance ratios
+        function getPrice(address token) public view returns (uint256) {
+          (,int256 price,,,) = chainlinkPriceFeed[token].latestRoundData();
+          require(price > 0, "Invalid price");
+          return uint256(price);
+        }
+  false_positive_notes: "Safe when prices are only used for display purposes, not financial operations"
+  tags: ["defi", "flash-loan", "oracle", "balance-manipulation"]
+  added_date: "2026-02-11"
+  confidence: "high"
+
+- id: "SOL-018"
+  name: "DEX spot price oracle without TWAP"
+  category: "price-manipulation"
+  severity: "high"
+  description: "Using instant spot prices from DEX pools as oracles is vulnerable to flash loan manipulation. Attackers can temporarily skew pool reserves to distort prices."
+  detection:
+    strategy: "Look for spot price queries from Uniswap-like DEXs without time-weighted averaging"
+    regex: "getReserves\\(\\)|slot0\\(\\).*price"
+    ast_pattern: "CallExpression where callee references DEX pool pricing without TWAP logic"
+    indicators: ["getReserves()", "slot0()", "sqrtPriceX96", "no TWAP", "instant price"]
+  real_examples:
+    - source: "Cyfrin"
+      project: "Vulnerable Lending Protocol"
+      finding_id: "SOL-AM-PMA-2"
+      impact: "Flash loan can manipulate DEX prices to over-collateralize and drain funds"
+      amount_lost: "$10M+ potential"
+      code_vulnerable: |
+        function getTokenPrice() external view returns (uint256) {
+          (uint112 reserve0, uint112 reserve1,) = pair.getReserves();
+          return reserve1 * 1e18 / reserve0; // Instant spot price - manipulable
+        }
+      code_fixed: |
+        // Use TWAP over appropriate time window
+        function getTWAPPrice(uint32 twapInterval) external view returns (uint256) {
+          uint32[] memory secondsAgos = new uint32[](2);
+          secondsAgos[0] = twapInterval;
+          secondsAgos[1] = 0;
+          
+          (int56[] memory tickCumulatives,) = pool.observe(secondsAgos);
+          int56 tickCumulativesDelta = tickCumulatives[1] - tickCumulatives[0];
+          int24 tick = int24(tickCumulativesDelta / twapInterval);
+          
+          return TickMath.getSqrtRatioAtTick(tick);
+        }
+  false_positive_notes: "Safe for very high-liquidity pools or when used only for approximate calculations"
+  tags: ["defi", "oracle", "uniswap", "twap", "dex"]
+  added_date: "2026-02-11"
+  confidence: "high"
+
+- id: "SOL-019"
+  name: "Single oracle source without fallback"
+  category: "price-manipulation"
+  severity: "medium"
+  description: "Relying on a single price oracle creates a single point of failure. If the oracle is compromised, manipulated, or goes offline, the protocol becomes vulnerable."
+  detection:
+    strategy: "Look for price feeds with only one oracle source and no backup mechanisms"
+    regex: "latestRoundData\\(\\).*require.*price"
+    ast_pattern: "Single oracle call without fallback logic or circuit breakers"
+    indicators: ["single oracle", "no fallback", "latestRoundData()", "no price validation"]
+  real_examples:
+    - source: "Immunefi"
+      project: "Mango Markets"
+      finding_id: "Oracle Manipulation Attack"
+      impact: "Attacker manipulated oracle price to inflate collateral value and drain protocol"
+      amount_lost: "$117M"
+      code_vulnerable: |
+        function getCollateralValue(address user) external view returns (uint256) {
+          uint256 amount = userCollateral[user];
+          (,int256 price,,,) = priceFeed.latestRoundData();
+          return amount * uint256(price) / 1e8; // Single oracle source
+        }
+      code_fixed: |
+        function getCollateralValue(address user) external view returns (uint256) {
+          uint256 amount = userCollateral[user];
+          
+          // Get prices from multiple sources
+          uint256 chainlinkPrice = getChainlinkPrice();
+          uint256 twapPrice = getTWAPPrice();
+          
+          // Use the lower price for conservative valuation
+          uint256 price = chainlinkPrice < twapPrice ? chainlinkPrice : twapPrice;
+          
+          // Circuit breaker: if prices diverge too much, pause operations
+          uint256 deviation = chainlinkPrice > twapPrice ? 
+            (chainlinkPrice - twapPrice) * 100 / twapPrice :
+            (twapPrice - chainlinkPrice) * 100 / chainlinkPrice;
+          require(deviation < MAX_PRICE_DEVIATION, "Price deviation too high");
+          
+          return amount * price / 1e8;
+        }
+  false_positive_notes: "Acceptable for low-risk operations or when oracle has strong reputation and decentralization"
+  tags: ["oracle", "single-point-of-failure", "defi", "chainlink"]
+  added_date: "2026-02-11"
+  confidence: "medium"
+
+- id: "SOL-020" 
+  name: "LP token pricing via underlying reserves"
+  category: "price-manipulation"
+  severity: "high"
+  description: "Valuing LP tokens by calculating underlying reserve values can be manipulated. Attackers can skew pool ratios before LP token valuation, causing over/under-valuation."
+  detection:
+    strategy: "Look for LP token pricing that fetches reserves and multiplies by market prices without considering manipulation"
+    regex: "getReserves\\(\\).*totalSupply\\(\\)"
+    ast_pattern: "LP token value calculation using reserves and totalSupply without manipulation protection"
+    indicators: ["LP token price", "getReserves()", "totalSupply()", "underlying value", "no manipulation check"]
+  real_examples:
+    - source: "Code4rena"
+      project: "Canto Solo"
+      finding_id: "C4-2022-07-canto"
+      impact: "Flash loan manipulation of reserves causes LP token price inflation"
+      amount_lost: "$5M+ potential"
+      code_vulnerable: |
+        function getLPTokenPrice() external view returns (uint256) {
+          (uint112 reserve0, uint112 reserve1,) = pair.getReserves();
+          uint256 totalSupply = pair.totalSupply();
+          
+          uint256 value0 = reserve0 * getTokenPrice(token0);
+          uint256 value1 = reserve1 * getTokenPrice(token1);
+          
+          return (value0 + value1) / totalSupply; // Manipulable via reserve changes
+        }
+      code_fixed: |
+        function getLPTokenPrice() external view returns (uint256) {
+          // Use fair LP pricing formula resistant to manipulation
+          uint256 k = getVirtualReserves(); // Use fair reserves calculation
+          uint256 totalSupply = pair.totalSupply();
+          
+          uint256 price0 = getOraclePrice(token0); // External oracle
+          uint256 price1 = getOraclePrice(token1); // External oracle
+          
+          // Fair LP price = 2 * sqrt(k * price0 * price1) / totalSupply
+          uint256 sqrtProduct = Math.sqrt(k * price0 * price1);
+          return 2 * sqrtProduct / totalSupply;
+        }
+  false_positive_notes: "Safe when LP tokens are only used for informational purposes, not as collateral"
+  tags: ["defi", "lp-tokens", "uniswap", "reserves", "fair-pricing"]
+  added_date: "2026-02-11"
+  confidence: "high"
+
+- id: "SOL-021"
+  name: "No staleness check on oracle data"
+  category: "price-manipulation"
+  severity: "medium"
+  description: "Using oracle price data without checking freshness can lead to exploitation during oracle outages. Stale prices may not reflect current market conditions."
+  detection:
+    strategy: "Look for oracle price fetches without timestamp validation or staleness checks"
+    regex: "latestRoundData\\(\\)(?!.*updatedAt)"
+    ast_pattern: "Oracle calls that ignore updatedAt timestamp in the response"
+    indicators: ["latestRoundData()", "no updatedAt check", "no staleness validation", "missing timestamp"]
+  real_examples:
+    - source: "Sherlock"
+      project: "Generic Protocol" 
+      finding_id: "Stale Oracle Price Usage"
+      impact: "Protocol continues using outdated prices during oracle downtime, enabling arbitrage"
+      amount_lost: "$2M+ potential"
+      code_vulnerable: |
+        function getLatestPrice() external view returns (uint256) {
+          (,int256 price,,,) = priceFeed.latestRoundData();
+          require(price > 0, "Invalid price");
+          return uint256(price); // No staleness check
+        }
+      code_fixed: |
+        function getLatestPrice() external view returns (uint256) {
+          (,int256 price,,uint256 updatedAt,) = priceFeed.latestRoundData();
+          require(price > 0, "Invalid price");
+          require(updatedAt > 0, "Round not complete");
+          require(block.timestamp - updatedAt < STALENESS_THRESHOLD, "Price is stale");
+          return uint256(price);
+        }
+  false_positive_notes: "Less critical for non-financial calculations or when oracle has strong uptime guarantees"
+  tags: ["oracle", "staleness", "chainlink", "validation"]
+  added_date: "2026-02-11"
+  confidence: "medium"

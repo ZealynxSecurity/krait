@@ -1,0 +1,526 @@
+patterns:
+- id: GHOST-092
+  name: auth-bypass
+  category: authentication
+  severity: high
+  description: "auth-bypass #active-exploitation #network-perimeter\n- **Zealynx Relevance:**\
+    \ MEDIUM \u2014 Relevant to clients' network perimeter security"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - ensureThis()
+    - '7.8'
+    - www.sophos
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-21509
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: cve-2026-21509
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-093
+  name: "\U0001F3AF Category Focus: Authentication Bypass Vulnerabil"
+  category: authentication
+  severity: high
+  description: "\U0001F3AF Category Focus: Authentication Bypass Vulnerabilities\n\
+    \nBuilt comprehensive attack methodologies for three critical auth bypass vectors:\n\
+    \n**1"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: diagnostic.jsp
+    indicators:
+    - '9.8'
+    - '7.3'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2024-27198
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2024-27199
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-094
+  name: code that executes directly in the MSBuild process
+  category: misconfiguration
+  severity: medium
+  description: code that executes directly in the MSBuild process context
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - RuntimeBroker.exe
+    - T1055.004
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-095
+  name: "Target: CVE-2025-29927 \u2014 Next.js Middleware Author"
+  category: authentication
+  severity: high
+  description: "Target: CVE-2025-29927 \u2014 Next"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: params.request
+    indicators:
+    - Next.js
+    - Next.js
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-29927
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-29927
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-096
+  name: 'Finding B2: Middleware Bypass via Recursion Depth '
+  category: misconfiguration
+  severity: high
+  description: '**Primary Impact:** Complete authorization bypass for any route protected
+    by Next'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: '1.1'
+    indicators:
+    - '1.1'
+    - target.com
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-097
+  name: 'Finding B6: Authorization Bypass as Primary Impact'
+  category: authentication
+  severity: high
+  description: 'Finding B6: Authorization Bypass as Primary Impact
+
+    **Severity:** Critical
+
+    **Impact:** Any middleware-based auth (session cookies, JWT validation, role checks)
+    is completely bypassed'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - pageInfo.name
+    - e.g
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-098
+  name: 'Focus: JWT Vulnerabilities & Authentication Bypass'
+  category: authentication
+  severity: high
+  description: 'Focus: JWT Vulnerabilities & Authentication Bypass
+
+
+    ### What I Built
+
+    Deep-dived JWT and Web3 authentication attack methodologies'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - bypass.md
+    - hs256.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2016-5431
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2016-10555
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-099
+  name: 2026-02-09 Morning - JWT Vulnerabilities Deep Dive
+  category: authentication
+  severity: high
+  description: '**JWT Claim Manipulation** (`/root/clawd/knowledge/web2/jwt-vulnerabilities/01-jwt-claim-manipulation'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - manipulation.md
+    - confusion.md
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2016-5431
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2016-10555
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-100
+  name: "\U0001F3AF Shadow Audit Target: CVE-2024-54150 (cjwt Librar"
+  category: authentication
+  severity: high
+  description: '**Claim Manipulation** - Direct payload modification
+
+    2'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: function\s+for
+    indicators:
+    - X.509
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2024-54150
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2024-54150
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-101
+  name: "1. CVE-2026-21858 \u2014 n8n Unauthenticated RCE (\"Ni8m"
+  category: authentication
+  severity: high
+  description: "CVE-2026-21858 \u2014 n8n Unauthenticated RCE (\"Ni8mare\")\n- **CVSS:**\
+    \ 10"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '10.0'
+    - www.indusface
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-21858
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: cve-2026-21858
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-102
+  name: "6. CVE-2026-24061 \u2014 GNU InetUtils telnetd Auth Byp"
+  category: authentication
+  severity: high
+  description: "CVE-2026-24061 \u2014 GNU InetUtils telnetd Auth Bypass\n- **CVSS:**\
+    \ 9"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '9.8'
+    - '92.57'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-24061
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: cve-2026-24061
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-103
+  name: "8. CVE-2026-0756 \u2014 GitHub Kanban MCP Command Injec"
+  category: injection
+  severity: high
+  description: "CVE-2026-0756 \u2014 GitHub Kanban MCP Command Injection\n- **Source:**\
+    \ https://cibersafety"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - cibersafety.com
+    - e.g
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-0756
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: cve-2026-0756
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-104
+  name: "1. CVE-2026-21858 \u2014 n8n Unauthenticated RCE (\"Ni8m"
+  category: authentication
+  severity: high
+  description: "CVE-2026-21858 \u2014 n8n Unauthenticated RCE (\"Ni8mare\")\n- **CVSS:**\
+    \ 10"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '10.0'
+    - www.indusface
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-21858
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: cve-2026-21858
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-105
+  name: authentication-bypass` `
+  category: authentication
+  severity: high
+  description: Any client running self-hosted n8n is at critical risk
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '1.121'
+    - www.helpnetsecurity
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-24858
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: cve-2026-24858
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-106
+  name: auth-bypass` `
+  category: authentication
+  severity: high
+  description: "auth-bypass` `#firewall` `#actively-exploited` `#fortinet`\n- **Zealynx\
+    \ Relevance:** \u2B50\u2B50 MEDIUM \u2014 Infrastructure-level risk"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - call()
+    - ensureThis()
+    - Node.js
+    - '9.8'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-22709
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: cve-2026-22709
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-107
+  name: "1: Markdown Injection \u2192 XSS in Bug Reports"
+  category: injection
+  severity: high
+  description: "domain))` \u2192 Link injection\n  - `"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - document.domain
+    - ethereum.request
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-108
+  name: '4: Authentication/Session Management Weaknesses'
+  category: authentication
+  severity: high
+  description: "4: Authentication/Session Management Weaknesses\n**Severity:** Medium\u2013\
+    High  \n**Category:** Broken Authentication (CWE-287)  \n**Confidence:** Low-Medium\
+    \  \n\n**Analysis:**\n- `bugs"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: js.map
+    indicators:
+    - bugs.immunefi
+    - Next.js
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2024-34351
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-109
+  name: 1 Markdown XSS | 4 | 5 | 2 | 11 |
+  category: injection
+  severity: high
+  description: '1 Markdown XSS | 4 | 5 | 2 | 11 |
+
+    | #2 SSRF via URLs | 3 | 5 | 2 | 10 |
+
+    | #3 IDOR on Reports | 4 | 5 | 1 | 10 |
+
+    | #4 Auth Weakness | 3 | 4 | 1 | 8 |
+
+    | #5 Next'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - Next.js
+    - '8.9'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: N/A
+    impact: See research notes
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium

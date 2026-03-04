@@ -1,0 +1,151 @@
+patterns:
+- id: GHOST-087
+  name: Unauthenticated
+  category: authentication
+  severity: high
+  description: 'Unauthenticated
+
+    **Summary:** n8n (popular workflow automation platform) disclosed FOUR critical
+    vulns in 2 weeks:
+
+    - **CVE-2026-21858 "Ni8mare"** (CVSS 10'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '10.0'
+    - '10.0'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-21858
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-21877
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-088
+  name: PreAuth
+  category: authentication
+  severity: high
+  description: 'PreAuth #SupplyChain #CVSS10
+
+    **Summary:** Critical pre-auth RCE in React Server Components (RSC) Flight protocol'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - Next.js
+    - Next.js
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-68428
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-089
+  name: 4. Google Chrome WebView Security Bypass
+  category: misconfiguration
+  severity: high
+  description: 'Google Chrome WebView Security Bypass
+
+    **Source:** [CyberPress](https://cyberpress'
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - cyberpress.org
+    - '143.0'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-69258
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2025-69259
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-090
+  name: "1. CVE-2026-21858 (Ni8mare) \u2014 n8n Unauthenticated "
+  category: authentication
+  severity: high
+  description: "CVE-2026-21858 (Ni8mare) \u2014 n8n Unauthenticated RCE\n- **CVSS:**\
+    \ 10"
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - '10.0'
+    - www.indusface
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-21858
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: cve-2026-21858
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
+- id: GHOST-091
+  name: unauthenticated
+  category: authentication
+  severity: high
+  description: unauthenticated RCE in n8n workflow automation platform
+  detection:
+    strategy: Look for patterns identified in security research and audit findings
+    regex: ''
+    indicators:
+    - v1.65
+    - '1.121'
+  real_examples:
+  - source: Research file
+    project: Unknown
+    finding_id: CVE-2026-24858
+    impact: Extracted from research
+    amount_lost: Unknown
+  - source: Research file
+    project: Unknown
+    finding_id: cve-2026-24858
+    impact: Extracted from research
+    amount_lost: Unknown
+  false_positive_notes: Review context and implementation details to avoid false positives
+  tags:
+  - web2
+  - api-security
+  - authentication
+  added_date: '2026-02-09'
+  confidence: medium
