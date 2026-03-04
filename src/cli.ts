@@ -9,6 +9,7 @@ import { resolveConfig } from './core/config.js';
 import { discoverFiles, detectDomain } from './core/file-discovery.js';
 import { PatternLoader } from './knowledge/pattern-loader.js';
 import { AIAnalyzer } from './analysis/ai-analyzer.js';
+import { deduplicateFindings } from './analysis/deduplicator.js';
 import {
   buildSummary,
   generateJsonReport,
@@ -128,9 +129,14 @@ program
         }
       }
 
-      // Step 6: Post-processing — filter low-confidence findings
-      const rawCount = allFindings.length;
-      const filteredFindings = allFindings.filter(f => {
+      // Step 6: Post-processing — deduplicate and filter
+      const dedupFindings = deduplicateFindings(allFindings);
+      if (config.verbose && dedupFindings.length < allFindings.length) {
+        console.log(chalk.gray(`\n  Dedup: ${allFindings.length} → ${dedupFindings.length} findings`));
+      }
+
+      const rawCount = dedupFindings.length;
+      const filteredFindings = dedupFindings.filter(f => {
         // Drop low-confidence findings unless they're critical/high severity
         if (f.confidence === 'low' && !['critical', 'high'].includes(f.severity)) {
           return false;
