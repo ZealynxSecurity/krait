@@ -10,6 +10,7 @@ import { discoverFiles, detectDomain } from './core/file-discovery.js';
 import { PatternLoader } from './knowledge/pattern-loader.js';
 import { AIAnalyzer } from './analysis/ai-analyzer.js';
 import { deduplicateFindings } from './analysis/deduplicator.js';
+import { postProcessFindings } from './analysis/post-processor.js';
 import {
   buildSummary,
   generateJsonReport,
@@ -82,6 +83,7 @@ program
       // Step 4: Analyze files
       const analyzer = new AIAnalyzer(config);
       const allFindings: Finding[] = [];
+      const fileContentsMap = new Map<string, string>();
 
       console.log(chalk.bold('\n  Analyzing files...'));
       for (let i = 0; i < files.length; i++) {
@@ -89,6 +91,7 @@ program
         const fileSpinner = ora(`  [${i + 1}/${files.length}] ${file.relativePath}`).start();
         try {
           const content = readFileSync(file.path, 'utf-8');
+          fileContentsMap.set(file.relativePath, content);
           const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
           const patternContext = loader.formatForPrompt(filePatterns);
           const findings = await analyzer.analyzeFile(file, content, patternContext);
@@ -129,14 +132,19 @@ program
         }
       }
 
-      // Step 6: Post-processing — deduplicate and filter
+      // Step 6: Post-processing — deduplicate, adjust confidence, filter FPs
       const dedupFindings = deduplicateFindings(allFindings);
       if (config.verbose && dedupFindings.length < allFindings.length) {
         console.log(chalk.gray(`\n  Dedup: ${allFindings.length} → ${dedupFindings.length} findings`));
       }
 
-      const rawCount = dedupFindings.length;
-      const filteredFindings = dedupFindings.filter(f => {
+      const processedFindings = postProcessFindings(dedupFindings, files, fileContentsMap);
+      if (config.verbose && processedFindings.length < dedupFindings.length) {
+        console.log(chalk.gray(`  Post-process: ${dedupFindings.length} → ${processedFindings.length} findings`));
+      }
+
+      const rawCount = processedFindings.length;
+      const filteredFindings = processedFindings.filter(f => {
         // Drop low-confidence findings unless they're critical/high severity
         if (f.confidence === 'low' && !['critical', 'high'].includes(f.severity)) {
           return false;
