@@ -178,25 +178,49 @@ Your analysis must be:
 1. PRECISE: Every finding must reference a specific line number in the code.
 2. ACTIONABLE: Every finding must include a concrete remediation.
 3. HONEST: Only report real issues you are confident about. Do NOT hallucinate vulnerabilities.
-4. PRIORITIZED: Focus on high-impact, exploitable issues first.
+4. SELECTIVE: Only report issues that a senior auditor would include in a professional audit report. Prefer fewer, higher-quality findings over volume.
 
-Severity guidelines:
-- critical: Direct loss of funds, complete access control bypass, protocol-breaking bugs
-- high: Significant financial risk, privilege escalation, important invariant violations
-- medium: Conditional exploits, griefing attacks, state manipulation with limited impact
-- low: Best practice violations, gas inefficiencies with minor security implications
-- info: Code quality, documentation, style issues with no direct security impact
+## Severity Guidelines
+
+- **critical**: Direct, unconditional loss of user funds or complete protocol takeover. The exploit path must be clear and achievable without extraordinary conditions.
+- **high**: Significant financial risk or privilege escalation that is exploitable under realistic conditions. Must have a concrete attack path.
+- **medium**: Conditional exploits requiring specific circumstances, griefing attacks with meaningful impact, or state manipulation that could cause material harm.
+- **low**: Minor issues with limited security impact. Best practice violations that have a theoretical but unlikely security consequence.
+- **info**: Code quality, gas optimization, style issues with no direct security impact.
+
+## Severity Calibration — What is NOT high/critical:
+
+- Missing zero-address validation → low (at most). Admin misconfiguration is not an exploit.
+- Missing event emissions → info. No security impact.
+- Missing input validation on admin/owner functions → low. Trusted roles are trusted.
+- Centralization risk (owner can do X) → info or low. This is a design choice, not a vulnerability.
+- Gas inefficiency or unbounded loops → low (unless it causes permanent DoS of critical functions).
+- Integer overflow/underflow in Solidity ≥0.8.0 → NOT a finding. Built-in checks revert automatically. Only report if unchecked{} blocks are used incorrectly.
+- "Missing feature" findings (no circuit breaker, no pause mechanism, no timelock) → info. Report what IS broken, not what COULD be added.
+- Using a single oracle without fallback → medium at most (not high), and only if the oracle can be manipulated.
+
+## Severity Calibration — What IS high/critical:
+
+- Reentrancy that enables fund theft (state updated after external call in a function handling value) → critical
+- Access control bypass allowing unauthorized users to call privileged functions → critical or high
+- Price/oracle manipulation with a concrete profitable attack path → high or critical
+- Rounding errors that allow value extraction (e.g., deposit/withdraw rounding exploits) → high
+- Cross-function or cross-contract reentrancy → high or critical
+- Unchecked external call return values where failure causes inconsistent state → medium or high
 
 Use the vulnerability patterns below as reference for what to look for. They are real patterns from past audits.
 
 ${patternContext}
 
-CRITICAL RULES:
+## Critical Rules:
+
 - Do NOT report issues in test files, mock contracts, or example code.
 - Do NOT report standard library usage as vulnerable unless misused.
-- If a function has proper access control (onlyOwner, etc.), do not flag it as missing access control.
+- If a function has proper access control (onlyOwner, modifier, require(msg.sender == X)), do not flag it as missing access control.
+- If the contract uses Solidity ≥0.8.0, do NOT flag arithmetic overflow/underflow unless inside unchecked{} blocks.
 - Look for the ACTUAL vulnerability, not just code that looks similar to a pattern.
-- Report the findings array. If no vulnerabilities are found, report an empty array.`;
+- When in doubt about severity, grade it LOWER. A medium is better than a false high.
+- Report the findings array. If no vulnerabilities are found, report an empty findings array — this is perfectly acceptable.`;
   }
 
   private buildFilePrompt(file: FileInfo, content: string): string {
@@ -213,8 +237,9 @@ Lines: ${file.lines}
 ${numberedContent}
 \`\`\`
 
-Report ALL security vulnerabilities you find. Each finding MUST include the exact line number.
-If there are no vulnerabilities, report an empty findings array.`;
+Report security vulnerabilities you find. Focus on exploitable issues — quality over quantity.
+Each finding MUST include the exact line number.
+If there are no real vulnerabilities, report an empty findings array.`;
   }
 
   private normalizeSeverity(val: unknown): Finding['severity'] {
