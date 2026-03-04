@@ -20,6 +20,7 @@ import { buildSummary, generateJsonReport } from '../core/reporter.js';
 import {
   parseOfficialFindings,
   compareFindings,
+  compareFindingsAI,
   CompareResult,
 } from '../core/comparator.js';
 import { Finding, Report, Domain, KraitConfig } from '../core/types.js';
@@ -43,6 +44,7 @@ export interface ShadowAuditOptions {
   verbose?: boolean;
   dryRun?: boolean;      // Just clone and show what would happen
   skipClone?: boolean;   // Use existing repos (already cloned)
+  aiMatch?: boolean;     // Use AI-assisted matching for comparison
 }
 
 /**
@@ -154,7 +156,17 @@ export async function runShadowAudit(
       ['critical', 'high', 'medium'].includes(f.severity)
     );
     log(`  Comparing ${comparableFindings.length} Krait findings (${findings.length} total, ${findings.length - comparableFindings.length} low/info filtered) vs ${officialFindings.length} official`);
-    const comparison = compareFindings(contest.name, officialFindings, comparableFindings);
+
+    let comparison: CompareResult;
+    if (options.aiMatch) {
+      log(`  Using AI-assisted matching...`);
+      comparison = await compareFindingsAI(
+        contest.name, officialFindings, comparableFindings,
+        options.apiKey, log
+      );
+    } else {
+      comparison = compareFindings(contest.name, officialFindings, comparableFindings);
+    }
 
     const result: ShadowAuditResult = {
       contestId: contest.id,

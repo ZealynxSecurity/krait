@@ -22,6 +22,7 @@ import {
   parseOfficialFindings,
   loadKraitReport,
   compareFindings,
+  compareFindingsAI,
   formatCompareResults,
 } from './core/comparator.js';
 import {
@@ -271,7 +272,9 @@ program
   .argument('<report>', 'Path to Krait JSON report')
   .argument('<findings>', 'Path to contest findings directory (with report.md)')
   .option('--json', 'Output results as JSON')
-  .action((reportPath: string, findingsPath: string, options: Record<string, unknown>) => {
+  .option('--ai-match', 'Use AI-assisted matching (more accurate)')
+  .option('--api-key <key>', 'Anthropic API key (for --ai-match)')
+  .action(async (reportPath: string, findingsPath: string, options: Record<string, unknown>) => {
     try {
       const absReport = resolve(reportPath);
       const absFindings = resolve(findingsPath);
@@ -296,7 +299,17 @@ program
 
       // Compare
       const contestName = basename(absFindings);
-      const result = compareFindings(contestName, officialFindings, kraitFindings);
+      let result;
+      if (options.aiMatch) {
+        log(chalk.gray('  Using AI-assisted matching...'));
+        result = await compareFindingsAI(
+          contestName, officialFindings, kraitFindings,
+          options.apiKey as string | undefined,
+          (msg: string) => log(chalk.gray(msg))
+        );
+      } else {
+        result = compareFindings(contestName, officialFindings, kraitFindings);
+      }
 
       if (options.json) {
         const output = {
@@ -338,6 +351,7 @@ program
   .option('--quick', 'Quick mode: Sonnet only, no cross-contract')
   .option('--dry-run', 'Show what would happen without running audits')
   .option('--skip-clone', 'Use already-cloned repos in work dir')
+  .option('--ai-match', 'Use AI-assisted matching for comparison scoring (more accurate, costs ~$0.01/contest)')
   .option('--api-key <key>', 'Anthropic API key')
   .option('--patterns-dir <path>', 'Path to patterns directory', 'patterns')
   .option('-v, --verbose', 'Verbose output')
@@ -390,6 +404,7 @@ program
         verbose: options.verbose as boolean | undefined,
         dryRun: options.dryRun as boolean | undefined,
         skipClone: options.skipClone as boolean | undefined,
+        aiMatch: options.aiMatch as boolean | undefined,
       };
 
       const results = await runBatchShadowAudit(
