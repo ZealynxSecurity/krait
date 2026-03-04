@@ -87,6 +87,78 @@ export class PatternLoader {
     return lines.join('\n');
   }
 
+  filterPatternsForFile(
+    patterns: VulnerabilityPattern[],
+    fileContent: string,
+    maxPatterns: number = 25
+  ): VulnerabilityPattern[] {
+    const contentLower = fileContent.toLowerCase();
+
+    // Score each pattern by relevance to this file's content
+    const scored = patterns.map(pattern => {
+      let score = 0;
+
+      // Check indicators against file content
+      for (const indicator of pattern.detection.indicators) {
+        if (typeof indicator === 'string' && contentLower.includes(indicator.toLowerCase())) {
+          score += 3;
+        }
+      }
+
+      // Check category-based keywords
+      const categoryKeywords = this.getCategoryKeywords(pattern.category);
+      for (const kw of categoryKeywords) {
+        if (contentLower.includes(kw)) {
+          score += 2;
+        }
+      }
+
+      // Check tags against content
+      for (const tag of pattern.tags) {
+        if (contentLower.includes(tag.toLowerCase())) {
+          score += 1;
+        }
+      }
+
+      // Boost high-severity patterns slightly (always worth checking)
+      if (pattern.severity === 'critical') score += 2;
+      if (pattern.severity === 'high') score += 1;
+
+      return { pattern, score };
+    });
+
+    // Sort by score descending, take top N
+    scored.sort((a, b) => b.score - a.score);
+
+    // Always include patterns with score > 0, up to max
+    const relevant = scored.filter(s => s.score > 0).slice(0, maxPatterns);
+
+    // If we have very few matches, include some high-severity patterns as baseline
+    if (relevant.length < 5) {
+      const baseline = scored
+        .filter(s => s.score === 0 && ['critical', 'high'].includes(s.pattern.severity))
+        .slice(0, 5 - relevant.length);
+      relevant.push(...baseline);
+    }
+
+    return relevant.map(s => s.pattern);
+  }
+
+  private getCategoryKeywords(category: string): string[] {
+    const map: Record<string, string[]> = {
+      'reentrancy': ['call{', '.call(', 'transfer(', 'send(', 'external', 'callback'],
+      'access-control': ['onlyowner', 'require(msg.sender', 'admin', 'owner', 'authorized', 'modifier'],
+      'oracle-manipulation': ['oracle', 'price', 'getprice', 'latestrounddata', 'twap', 'chainlink'],
+      'flash-loan': ['flashloan', 'flash', 'borrow', 'repay', 'callback'],
+      'integer-overflow': ['unchecked', 'type(uint', 'max', 'overflow'],
+      'missing-error-handling': ['transfer(', 'approve(', 'transferfrom(', 'return'],
+      'price-manipulation': ['price', 'oracle', 'swap', 'reserve', 'getamount', 'liquidity'],
+      'temporal-state': ['block.timestamp', 'block.number', 'deadline', 'expir'],
+      'misconfiguration': ['initialize', 'constructor', 'setup', 'config', 'set'],
+    };
+    return map[category] || [];
+  }
+
   getStats(): { total: number; byDomain: Record<string, number>; bySeverity: Record<string, number> } {
     const patterns = this.getPatterns();
     const byDomain: Record<string, number> = {};

@@ -76,8 +76,7 @@ program
       // Step 3: Select domain and patterns
       const domain = detectDomain(files) as Domain;
       const domainPatterns = loader.getPatternsByDomain(domain);
-      const patternContext = loader.formatForPrompt(domainPatterns);
-      console.log(chalk.gray(`  Domain: ${domain} (${domainPatterns.length} relevant patterns)`));
+      console.log(chalk.gray(`  Domain: ${domain} (${domainPatterns.length} domain patterns)`));
 
       // Step 4: Analyze files
       const analyzer = new AIAnalyzer(config);
@@ -89,6 +88,8 @@ program
         const fileSpinner = ora(`  [${i + 1}/${files.length}] ${file.relativePath}`).start();
         try {
           const content = readFileSync(file.path, 'utf-8');
+          const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
+          const patternContext = loader.formatForPrompt(filePatterns);
           const findings = await analyzer.analyzeFile(file, content, patternContext);
           allFindings.push(...findings);
           const findingText = findings.length > 0
@@ -111,10 +112,11 @@ program
             file: f,
             content: readFileSync(f.path, 'utf-8'),
           }));
+          const crossPatternContext = loader.formatForPrompt(domainPatterns);
           const crossFindings = await analyzer.analyzeCrossContract(
             fileContents,
             allFindings,
-            patternContext
+            crossPatternContext
           );
           allFindings.push(...crossFindings);
           crossSpinner.succeed(
