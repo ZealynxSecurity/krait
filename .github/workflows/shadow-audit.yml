@@ -1,0 +1,93 @@
+name: Shadow Audit Pipeline
+
+on:
+  # Weekly on Sundays at 06:00 UTC
+  schedule:
+    - cron: '0 6 * * 0'
+  # Manual trigger with optional contest filter
+  workflow_dispatch:
+    inputs:
+      contest:
+        description: 'Contest ID to audit (leave empty for all small/medium)'
+        required: false
+        type: string
+      quick:
+        description: 'Quick mode (Sonnet only, no cross-contract)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  shadow-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Krait
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run shadow audits
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          ARGS="--work-dir ./shadow-results --quick"
+
+          if [ -n "${{ inputs.contest }}" ]; then
+            ARGS="$ARGS --contest ${{ inputs.contest }}"
+          else
+            # Default: run small and medium contests
+            ARGS="$ARGS --difficulty small"
+          fi
+
+          node dist/cli.js shadow-audit $ARGS
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-audit-results-${{ github.run_number }}
+          path: |
+            shadow-results/shadow-result-*.json
+            shadow-results/shadow-dashboard.json
+            shadow-results/feedback-*.yaml
+            shadow-results/krait-report-*.json
+          retention-days: 90
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Shadow Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f shadow-results/shadow-dashboard.json ]; then
+            node -e "
+              const d = require('./shadow-results/shadow-dashboard.json');
+              const entries = d.entries;
+              if (entries.length === 0) { console.log('No results.'); process.exit(0); }
+              console.log('| Contest | Precision | Recall | F1 |');
+              console.log('|---------|-----------|--------|-----|');
+              for (const e of entries) {
+                console.log('| ' + e.contestName + ' | ' + (e.precision*100).toFixed(1) + '% | ' + (e.recall*100).toFixed(1) + '% | ' + (e.f1*100).toFixed(1) + '% |');
+              }
+            " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No dashboard data found." >> $GITHUB_STEP_SUMMARY
+          fi

@@ -24,6 +24,14 @@ import {
   compareFindings,
   formatCompareResults,
 } from './core/comparator.js';
+import {
+  CONTEST_REGISTRY,
+  getContestById,
+  listContests,
+} from './shadow/registry.js';
+import { runShadowAudit, runBatchShadowAudit } from './shadow/runner.js';
+import { generateFeedback, writeFeedbackReport } from './shadow/feedback.js';
+import { updateDashboard, loadDashboard, formatDashboard } from './shadow/dashboard.js';
 
 const VERSION = '0.1.0';
 
@@ -300,6 +308,143 @@ program
       console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
       process.exit(1);
     }
+  });
+
+program
+  .command('shadow-audit')
+  .description('Run shadow audits against known contest results')
+  .option('--contest <id>', 'Run a specific contest by ID')
+  .option('--difficulty <level>', 'Run contests of a specific difficulty: small, medium, large')
+  .option('--all', 'Run all contests in registry')
+  .option('--work-dir <path>', 'Working directory for cloned repos and results', 'shadow-results')
+  .option('--quick', 'Quick mode: Sonnet only, no cross-contract')
+  .option('--dry-run', 'Show what would happen without running audits')
+  .option('--skip-clone', 'Use already-cloned repos in work dir')
+  .option('--api-key <key>', 'Anthropic API key')
+  .option('--patterns-dir <path>', 'Path to patterns directory', 'patterns')
+  .option('-v, --verbose', 'Verbose output')
+  .action(async (options: Record<string, unknown>) => {
+    try {
+      console.log(chalk.bold.cyan('\n  🐍 Krait — Shadow Audit Pipeline'));
+
+      // Determine which contests to run
+      let contests = listContests();
+
+      if (options.contest) {
+        const c = getContestById(options.contest as string);
+        if (!c) {
+          console.error(chalk.red(`\n  Contest not found: ${options.contest}`));
+          console.log(chalk.gray('  Available contests:'));
+          for (const entry of contests) {
+            console.log(chalk.gray(`    ${entry.id} — ${entry.name} (${entry.difficulty})`));
+          }
+          process.exit(1);
+        }
+        contests = [c];
+      } else if (options.difficulty) {
+        contests = contests.filter(c =>
+          c.difficulty === (options.difficulty as string)
+        );
+      } else if (!options.all) {
+        // Default: small + medium
+        contests = contests.filter(c => c.difficulty !== 'large');
+      }
+
+      if (contests.length === 0) {
+        console.log(chalk.yellow('  No contests matched the filter.'));
+        process.exit(1);
+      }
+
+      console.log(chalk.gray(`  Contests: ${contests.length}`));
+      for (const c of contests) {
+        console.log(chalk.gray(`    ${c.id} — ${c.name} (${c.difficulty}, ~${c.estimatedLOC} LOC)`));
+      }
+      console.log('');
+
+      const workDir = resolve(options.workDir as string || 'shadow-results');
+      const patternsDir = resolve(options.patternsDir as string || 'patterns');
+
+      const auditOptions = {
+        workDir,
+        patternsDir,
+        apiKey: options.apiKey as string | undefined,
+        quick: options.quick as boolean | undefined,
+        verbose: options.verbose as boolean | undefined,
+        dryRun: options.dryRun as boolean | undefined,
+        skipClone: options.skipClone as boolean | undefined,
+      };
+
+      const results = await runBatchShadowAudit(
+        contests,
+        auditOptions,
+        (msg: string) => console.log(msg)
+      );
+
+      // Generate feedback for missed findings
+      const successResults = results.filter(r => !r.error);
+      for (const result of successResults) {
+        const contest = getContestById(result.contestId);
+        if (!contest) continue;
+
+        const findingsDir = join(workDir, basename(contest.findingsRepo));
+        const suggestions = generateFeedback(result.comparison, findingsDir);
+        if (suggestions.length > 0) {
+          const feedbackPath = writeFeedbackReport(suggestions, workDir, result.contestId);
+          console.log(chalk.gray(`  Feedback: ${feedbackPath} (${suggestions.length} suggestions)`));
+        }
+      }
+
+      // Update dashboard
+      if (successResults.length > 0 && !options.dryRun) {
+        const model = options.model as string || 'claude-sonnet-4-20250514';
+        const dashboard = updateDashboard(workDir, successResults, model);
+        console.log(chalk.bold('\n  Dashboard:'));
+        console.log(formatDashboard(dashboard));
+      }
+
+      // Summary
+      console.log(chalk.bold('\n  Summary:'));
+      for (const result of results) {
+        if (result.error) {
+          console.log(chalk.red(`    ${result.contestName}: ERROR — ${result.error}`));
+        } else {
+          const c = result.comparison;
+          const status = c.recall >= 0.3 ? chalk.green('PASS') : chalk.yellow('NEEDS WORK');
+          console.log(`    ${result.contestName}: P=${(c.precision * 100).toFixed(0)}% R=${(c.recall * 100).toFixed(0)}% F1=${(c.f1 * 100).toFixed(0)}% ${status}`);
+        }
+      }
+
+      console.log('');
+    } catch (err) {
+      console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('dashboard')
+  .description('Show shadow audit performance dashboard')
+  .option('--work-dir <path>', 'Directory containing dashboard data', 'shadow-results')
+  .action((options: Record<string, unknown>) => {
+    const workDir = resolve(options.workDir as string || 'shadow-results');
+    const dashboard = loadDashboard(workDir);
+
+    console.log(chalk.bold.cyan('\n  🐍 Krait — Performance Dashboard\n'));
+    console.log(formatDashboard(dashboard));
+    console.log('');
+  });
+
+program
+  .command('contests')
+  .description('List available contests in the registry')
+  .action(() => {
+    console.log(chalk.bold.cyan('\n  🐍 Krait — Contest Registry\n'));
+    const contests = listContests();
+    for (const c of contests) {
+      const findings = `${c.expectedHighs}H/${c.expectedMediums}M`;
+      console.log(`  ${chalk.bold(c.id.padEnd(25))} ${c.name.padEnd(22)} ${c.difficulty.padEnd(8)} ~${String(c.estimatedLOC).padEnd(6)} LOC  ${findings}`);
+    }
+    console.log(chalk.gray(`\n  Total: ${contests.length} contests\n`));
   });
 
 /**
