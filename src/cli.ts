@@ -128,16 +128,34 @@ program
         }
       }
 
-      // Step 6: Build report
+      // Step 6: Post-processing — filter low-confidence findings
+      const rawCount = allFindings.length;
+      const filteredFindings = allFindings.filter(f => {
+        // Drop low-confidence findings unless they're critical/high severity
+        if (f.confidence === 'low' && !['critical', 'high'].includes(f.severity)) {
+          return false;
+        }
+        // Drop info-level findings unless verbose
+        if (f.severity === 'info' && !config.verbose) {
+          return false;
+        }
+        return true;
+      });
+
+      if (rawCount !== filteredFindings.length && config.verbose) {
+        console.log(chalk.gray(`\n  Filtered: ${rawCount - filteredFindings.length} low-confidence/info findings removed`));
+      }
+
+      // Step 7: Build report
       const duration = Date.now() - startTime;
-      const summary = buildSummary(allFindings, files.length, totalLOC);
+      const summary = buildSummary(filteredFindings, files.length, totalLOC);
       const report: Report = {
         projectName,
         projectPath,
         timestamp: new Date().toISOString(),
         duration,
         summary,
-        findings: allFindings,
+        findings: filteredFindings,
         filesAnalyzed: files,
         patternsUsed: domainPatterns.length,
         model: config.model,
