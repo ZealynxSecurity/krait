@@ -143,7 +143,40 @@ program
         }
       }
 
-      // Step 5: Cross-contract analysis (unless quick mode)
+      // Step 5a: Deep analysis pass (unless quick mode)
+      if (!config.quick) {
+        const filesWithFindings = new Map<string, { file: typeof files[0]; content: string; findings: Finding[] }>();
+        for (const finding of allFindings) {
+          const file = files.find(f => f.relativePath === finding.file);
+          if (file && !filesWithFindings.has(file.relativePath)) {
+            const content = fileContentsMap.get(file.relativePath) || readFileSync(file.path, 'utf-8');
+            filesWithFindings.set(file.relativePath, {
+              file,
+              content,
+              findings: allFindings.filter(f => f.file === file.relativePath),
+            });
+          }
+        }
+
+        if (filesWithFindings.size > 0) {
+          const deepSpinner = ora(`  Deep analysis on ${filesWithFindings.size} files...`).start();
+          let deepTotal = 0;
+          for (const [relPath, { file, content, findings }] of filesWithFindings) {
+            try {
+              const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
+              const patternContext = loader.formatForPrompt(filePatterns);
+              const deepFindings = await analyzer.analyzeDeep(file, content, findings, patternContext);
+              allFindings.push(...deepFindings);
+              deepTotal += deepFindings.length;
+            } catch {
+              // continue with other files
+            }
+          }
+          deepSpinner.succeed(`  Deep analysis complete (+${deepTotal} findings)`);
+        }
+      }
+
+      // Step 5b: Cross-contract analysis (unless quick mode)
       if (!config.quick && files.length > 1) {
         const crossSpinner = ora('  Running cross-contract analysis...').start();
         try {

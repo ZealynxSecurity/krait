@@ -65,6 +65,68 @@ export class AIAnalyzer {
     return findings;
   }
 
+  /**
+   * Deep analysis pass — focuses on business logic bugs, economic attacks,
+   * and edge cases that the first pass might miss.
+   */
+  async analyzeDeep(
+    file: FileInfo,
+    fileContent: string,
+    firstPassFindings: Finding[],
+    patternContext: string
+  ): Promise<Finding[]> {
+    const projectBrief = this.projectContext ? formatContextForPrompt(this.projectContext) : '';
+
+    const existingText = firstPassFindings.length > 0
+      ? firstPassFindings.map(f => `- [${f.severity}] ${f.title} (line ${f.line})`).join('\n')
+      : 'None found in first pass.';
+
+    const systemPrompt = `You are Krait, performing a DEEP second-pass security analysis. The first pass already found generic vulnerabilities. Your job is to find what it MISSED.
+
+${projectBrief}
+
+## Focus Areas (these are the most commonly missed bug classes):
+
+1. **Fee/royalty calculation errors**: Wrong fee amounts, fees taken from wrong party, fees not distributed correctly, missing fee collection, double-counting fees. Look at EVERY arithmetic operation involving fees, royalties, or protocol revenue.
+
+2. **Token-specific edge cases**: What happens with fee-on-transfer tokens? Rebasing tokens? Low decimal tokens (e.g., USDC with 6 decimals)? Tokens that revert on zero-amount transfers? ERC777 hooks?
+
+3. **Economic/game-theoretic attacks**: Can a user exploit ordering of operations? Can someone front-run/sandwich a transaction? Flash loan attack vectors? Can someone profit from rounding in their favor?
+
+4. **State manipulation across functions**: Can calling function A before function B put the protocol in an inconsistent state? Are there functions that should be atomic but aren't?
+
+5. **Access control subtleties**: Not "missing onlyOwner" but rather — can a user bypass intended restrictions by calling a sequence of public functions? Can the owner rug users?
+
+6. **Incorrect assumptions**: What does the code assume about external contracts or inputs that might be wrong?
+
+${patternContext}
+
+## Rules:
+- Do NOT repeat findings from the first pass (listed below).
+- Every finding MUST have a concrete exploit scenario with specific steps an attacker would take. "This could be problematic" is NOT enough.
+- Focus on BUSINESS LOGIC, not generic patterns. Do NOT report: missing events, gas optimization, centralization risk, missing zero-address checks, or generic best practices.
+- Only report findings at medium severity or above. If it's not worth a medium, don't report it.
+- Quality bar: Would a senior auditor include this in a paid audit report? If not, skip it.
+- Report AT MOST 3 findings per file. If you find more than 3, keep only the highest-impact ones.
+- An empty findings array is a perfectly good result. Most files don't have deep logic bugs.`;
+
+    const numbered = fileContent.split('\n').map((line, i) => `${i + 1}: ${line}`).join('\n');
+
+    const userPrompt = `## Deep Analysis: ${file.relativePath}
+
+### First-pass findings (do NOT repeat):
+${existingText}
+
+### Code:
+\`\`\`${file.language}
+${numbered}
+\`\`\`
+
+Look specifically for business logic bugs, economic attacks, and edge cases that the first pass missed. Focus on fee calculations, token edge cases, and state manipulation.`;
+
+    return this.callClaude(systemPrompt, userPrompt, file.relativePath);
+  }
+
   async analyzeCrossContract(
     files: Array<{ file: FileInfo; content: string }>,
     perFileFindings: Finding[],

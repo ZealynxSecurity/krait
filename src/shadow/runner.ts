@@ -23,7 +23,7 @@ import {
   compareFindingsAI,
   CompareResult,
 } from '../core/comparator.js';
-import { Finding, Report, Domain, KraitConfig } from '../core/types.js';
+import { Finding, FileInfo, Report, Domain, KraitConfig } from '../core/types.js';
 
 export interface ShadowAuditResult {
   contestId: string;
@@ -274,6 +274,37 @@ async function runAudit(
       log(`    [${i + 1}/${files.length}] ${file.relativePath} (${findings.length} findings)`);
     } catch (err) {
       log(`    [${i + 1}/${files.length}] ${file.relativePath} — error`);
+    }
+  }
+
+  // Deep analysis pass (unless quick) — second pass on files that had findings
+  if (!config.quick) {
+    const filesWithFindings = new Map<string, { file: FileInfo; content: string; findings: Finding[] }>();
+    for (const finding of allFindings) {
+      const file = files.find(f => f.relativePath === finding.file);
+      if (file && !filesWithFindings.has(file.relativePath)) {
+        const content = fileContentsMap.get(file.relativePath) || readFileSync(file.path, 'utf-8');
+        filesWithFindings.set(file.relativePath, {
+          file,
+          content,
+          findings: allFindings.filter(f => f.file === file.relativePath),
+        });
+      }
+    }
+
+    if (filesWithFindings.size > 0) {
+      log(`    Deep analysis: ${filesWithFindings.size} files...`);
+      for (const [relPath, { file, content, findings }] of filesWithFindings) {
+        try {
+          const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
+          const patternContext = loader.formatForPrompt(filePatterns);
+          const deepFindings = await analyzer.analyzeDeep(file, content, findings, patternContext);
+          allFindings.push(...deepFindings);
+          log(`    Deep: ${relPath} (+${deepFindings.length} findings)`);
+        } catch {
+          log(`    Deep: ${relPath} — error`);
+        }
+      }
     }
   }
 
