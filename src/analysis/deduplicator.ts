@@ -45,7 +45,15 @@ function areDuplicates(a: Finding, b: Finding): boolean {
   // Different files, same category, similar titles (same pattern repeated)
   if (a.category === b.category && a.file !== b.file) {
     const titleSimilarity = computeTitleSimilarity(a.title, b.title);
-    if (titleSimilarity >= 0.7) return true;
+    if (titleSimilarity >= 0.5) return true;
+
+    // For oracle contracts specifically, merge findings in the same directory
+    // that have the same severity — these are typically repetitive "oracle can be manipulated"
+    if (a.category === 'oracle-manipulation' && a.severity === b.severity) {
+      const dirA = a.file.split('/').slice(0, -1).join('/');
+      const dirB = b.file.split('/').slice(0, -1).join('/');
+      if (dirA === dirB && dirA.length > 0) return true;
+    }
   }
 
   return false;

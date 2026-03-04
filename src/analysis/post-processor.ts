@@ -118,6 +118,23 @@ function isFalsePositive(finding: Finding, fileContents: Map<string, string>): b
     return true;
   }
 
+  // FP: "missing zero address validation" — not a vulnerability, just a best practice
+  if (titleLower.includes('zero address') || titleLower.includes('zero-address') ||
+      titleLower.includes('address(0)') || titleLower.includes('address zero')) {
+    return true;
+  }
+
+  // FP: "missing constructor validation" — code quality, not security
+  if (titleLower.includes('constructor lacks') || titleLower.includes('constructor missing')) {
+    return true;
+  }
+
+  // FP: "unsafe transfer" as standalone finding — usually just a style preference
+  if (titleLower.includes('unsafe transfer') && !titleLower.includes('reentrancy') &&
+      !titleLower.includes('before state') && !descLower.includes('reentrancy')) {
+    return finding.severity === 'low';
+  }
+
   return false;
 }
 

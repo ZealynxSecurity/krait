@@ -148,9 +148,12 @@ export async function runShadowAudit(
       auditPath, contest, options, log
     );
 
-    // Step 5: Compare
-    log(`  Comparing ${findings.length} Krait findings vs ${officialFindings.length} official`);
-    const comparison = compareFindings(contest.name, officialFindings, findings);
+    // Step 5: Compare (only medium+ findings — official findings are H/M only)
+    const comparableFindings = findings.filter(f =>
+      ['critical', 'high', 'medium'].includes(f.severity)
+    );
+    log(`  Comparing ${comparableFindings.length} Krait findings (${findings.length} total, ${findings.length - comparableFindings.length} low/info filtered) vs ${officialFindings.length} official`);
+    const comparison = compareFindings(contest.name, officialFindings, comparableFindings);
 
     const result: ShadowAuditResult = {
       contestId: contest.id,
