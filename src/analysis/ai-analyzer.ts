@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Finding, FileInfo, KraitConfig, VulnerabilityPattern } from '../core/types.js';
+import { summarizeContract, formatSummariesForPrompt, ContractSummary } from './contract-summarizer.js';
 
 const FINDING_TOOL: Anthropic.Tool = {
   name: 'report_findings',
@@ -61,38 +62,71 @@ export class AIAnalyzer {
   ): Promise<Finding[]> {
     if (files.length < 2) return [];
 
+    // Build structured summaries of all contracts
+    const summaries = files.map(({ file, content }) => summarizeContract(file, content));
+    const summaryText = formatSummariesForPrompt(summaries);
+
+    // Identify core contracts (most external interactions) and include their full code
+    const rankedFiles = this.rankFilesByImportance(summaries, files);
+    const coreFiles = rankedFiles.slice(0, 5); // Top 5 most interconnected
+
     const systemPrompt = `You are a senior security auditor performing cross-contract analysis.
 You have already analyzed individual files. Now analyze how these contracts INTERACT with each other.
 
 Focus on:
-- Cross-contract call safety (reentrancy across contracts, callback attacks)
-- State dependency issues (reading stale state from other contracts)
-- Trust boundary violations (contracts trusting unvalidated external data)
-- Privilege escalation through contract interactions
-- Economic attack vectors spanning multiple contracts
+- Cross-contract reentrancy (Contract A calls Contract B which calls back into A)
+- State dependency issues (reading stale or manipulable state from other contracts)
+- Trust boundary violations (contracts trusting unvalidated external data or return values)
+- Privilege escalation through contract interactions (chaining calls across contracts)
+- Economic attack vectors spanning multiple contracts (flash loans, oracle manipulation, sandwich attacks)
+- Functions that can be called by anyone on behalf of other contracts
 
 ${patternContext}
 
-IMPORTANT:
+CRITICAL RULES:
 - Only report issues that arise from CONTRACT INTERACTIONS, not single-file issues.
-- Every finding must reference a specific file and line number.
-- Be precise. No generic warnings.`;
-
-    const contractSummaries = files.map(({ file, content }) => {
-      const lines = content.split('\n');
-      const truncated = lines.length > 200
-        ? lines.slice(0, 200).join('\n') + '\n// ... truncated ...'
-        : content;
-      return `### ${file.relativePath} (${file.lines} lines)\n\`\`\`\n${truncated}\n\`\`\``;
-    }).join('\n\n');
+- Every finding MUST reference a specific file and line number.
+- Be precise. No generic warnings. Describe the concrete attack path across contracts.
+- Apply the same severity calibration as per-file analysis.`;
 
     const existingFindingsText = perFileFindings.length > 0
-      ? `\n\nAlready found per-file issues:\n${perFileFindings.map(f => `- [${f.severity}] ${f.title} at ${f.file}:${f.line}`).join('\n')}`
+      ? `\n\nAlready found per-file issues (do NOT re-report these):\n${perFileFindings.map(f => `- [${f.severity}] ${f.title} at ${f.file}:${f.line}`).join('\n')}`
       : '';
 
-    const userPrompt = `Analyze the interactions between these contracts for cross-contract vulnerabilities:\n\n${contractSummaries}${existingFindingsText}`;
+    // Build user prompt with summaries + full code of core contracts
+    const coreCodeSections = coreFiles.map(({ file, content }) => {
+      const numbered = content.split('\n').map((line, i) => `${i + 1}: ${line}`).join('\n');
+      return `### Full code: ${file.relativePath}\n\`\`\`solidity\n${numbered}\n\`\`\``;
+    }).join('\n\n');
+
+    const userPrompt = `## Contract Architecture Summary\n\n${summaryText}\n\n## Core Contract Code (most interconnected)\n\n${coreCodeSections}${existingFindingsText}\n\nAnalyze the interactions between these contracts for cross-contract vulnerabilities. Focus on attack paths that span multiple contracts.`;
 
     return this.callClaude(systemPrompt, userPrompt, 'cross-contract');
+  }
+
+  private rankFilesByImportance(
+    summaries: ContractSummary[],
+    files: Array<{ file: FileInfo; content: string }>
+  ): Array<{ file: FileInfo; content: string }> {
+    // Score files by how many external interactions they have
+    const scores = summaries.map((s, i) => {
+      let score = 0;
+      score += s.externalCalls.length * 2;
+      score += s.functions.filter(f => f.visibility === 'external' || f.visibility === 'public').length;
+      score += s.functions.filter(f => f.externalCalls.length > 0).length * 3;
+      score += s.stateVariables.length;
+      // Boost if contract name suggests it's a core contract
+      if (s.contractName.toLowerCase().includes('controller') ||
+          s.contractName.toLowerCase().includes('vault') ||
+          s.contractName.toLowerCase().includes('pool') ||
+          s.contractName.toLowerCase().includes('router')) {
+        score += 10;
+      }
+      return { index: i, score };
+    });
+
+    scores.sort((a, b) => b.score - a.score);
+    return scores.map(s => files[s.index]);
   }
 
   private async callClaude(
