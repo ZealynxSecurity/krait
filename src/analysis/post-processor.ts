@@ -10,8 +10,20 @@ export function postProcessFindings(
   fileContents: Map<string, string>
 ): Finding[] {
   return findings
-    .map(f => adjustConfidence(f, fileContents))
-    .filter(f => !isFalsePositive(f, fileContents));
+    .map(f => {
+      try {
+        return adjustConfidence(f, fileContents);
+      } catch {
+        return f; // Return unmodified if adjustment fails
+      }
+    })
+    .filter(f => {
+      try {
+        return !isFalsePositive(f, fileContents);
+      } catch {
+        return true; // Keep if FP check fails
+      }
+    });
 }
 
 function adjustConfidence(finding: Finding, fileContents: Map<string, string>): Finding {
@@ -83,8 +95,8 @@ function adjustConfidence(finding: Finding, fileContents: Map<string, string>): 
 }
 
 function isFalsePositive(finding: Finding, fileContents: Map<string, string>): boolean {
-  const titleLower = finding.title.toLowerCase();
-  const descLower = finding.description.toLowerCase();
+  const titleLower = (finding.title || '').toLowerCase();
+  const descLower = (finding.description || '').toLowerCase();
 
   // FP: "missing event emission" — not a security issue
   if (titleLower.includes('missing event') || titleLower.includes('no event')) {
@@ -128,9 +140,11 @@ function isSolidity08Plus(content: string): boolean {
 }
 
 function extractFunctionBody(lines: string[], lineNum: number): string | null {
+  if (lines.length === 0 || lineNum <= 0 || lineNum > lines.length) return null;
+
   // Walk backwards to find function start
   let start = lineNum - 1;
-  while (start > 0 && !lines[start].match(/function\s+\w+/)) {
+  while (start > 0 && lines[start] && !lines[start].match(/function\s+\w+/)) {
     start--;
   }
   if (start < 0) return null;
