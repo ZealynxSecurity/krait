@@ -55,7 +55,7 @@ program
       });
 
       const projectPath = resolve(targetPath);
-      const projectName = basename(projectPath);
+      const projectName = inferProjectName(projectPath);
 
       console.log(chalk.bold.cyan('\n  🐍 Krait Security Auditor v' + VERSION));
       console.log(chalk.gray(`  Analyzing: ${projectPath}\n`));
@@ -232,5 +232,23 @@ program
     }
     console.log('');
   });
+
+/**
+ * Infer a meaningful project name from the audit path.
+ * Avoids generic names like "src", "contracts", "solidity".
+ */
+function inferProjectName(projectPath: string): string {
+  const genericNames = new Set(['src', 'contracts', 'solidity', 'core', 'lib', 'app', 'packages']);
+  const parts = projectPath.split('/').filter(p => p.length > 0);
+
+  // Walk from the leaf upward until we find a non-generic name
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (!genericNames.has(parts[i])) {
+      return parts[i];
+    }
+  }
+
+  return parts[parts.length - 1] || 'project';
+}
 
 program.parse();
