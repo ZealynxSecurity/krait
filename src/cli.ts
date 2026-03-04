@@ -18,6 +18,12 @@ import {
   generateMarkdownReport,
 } from './core/reporter.js';
 import { Finding, Report, Domain } from './core/types.js';
+import {
+  parseOfficialFindings,
+  loadKraitReport,
+  compareFindings,
+  formatCompareResults,
+} from './core/comparator.js';
 
 const VERSION = '0.1.0';
 
@@ -231,6 +237,69 @@ program
       console.log(`    ${sev}: ${count}`);
     }
     console.log('');
+  });
+
+program
+  .command('compare')
+  .description('Compare Krait report against official contest findings')
+  .argument('<report>', 'Path to Krait JSON report')
+  .argument('<findings>', 'Path to contest findings directory (with report.md)')
+  .option('--json', 'Output results as JSON')
+  .action((reportPath: string, findingsPath: string, options: Record<string, unknown>) => {
+    try {
+      const absReport = resolve(reportPath);
+      const absFindings = resolve(findingsPath);
+
+      const log = options.json ? console.error.bind(console) : console.log.bind(console);
+
+      log(chalk.bold.cyan('\n  🐍 Krait — Shadow Audit Comparison'));
+
+      // Load Krait report
+      const kraitFindings = loadKraitReport(absReport);
+      log(chalk.gray(`  Krait report: ${kraitFindings.length} findings`));
+
+      // Parse official findings from report.md
+      const reportMd = join(absFindings, 'report.md');
+      const officialFindings = parseOfficialFindings(reportMd);
+      log(chalk.gray(`  Official findings: ${officialFindings.length} (H/M)`));
+
+      if (officialFindings.length === 0) {
+        console.log(chalk.yellow('\n  No official H/M findings found in report.md'));
+        process.exit(1);
+      }
+
+      // Compare
+      const contestName = basename(absFindings);
+      const result = compareFindings(contestName, officialFindings, kraitFindings);
+
+      if (options.json) {
+        const output = {
+          contest: result.contestName,
+          precision: result.precision,
+          recall: result.recall,
+          f1: result.f1,
+          truePositives: result.truePositives,
+          falseNegatives: result.falseNegatives,
+          falsePositives: result.falsePositives,
+          byRisk: result.byRisk,
+          matches: result.matches.map(m => ({
+            official: m.official.id,
+            officialTitle: m.official.title,
+            matched: m.matched?.id || null,
+            matchedTitle: m.matched?.title || null,
+            score: m.matchScore,
+            reason: m.matchReason,
+          })),
+        };
+        console.log(JSON.stringify(output, null, 2));
+      } else {
+        console.log(formatCompareResults(result));
+      }
+
+    } catch (err) {
+      console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
   });
 
 /**
