@@ -11,20 +11,23 @@ import { Finding } from '../core/types.js';
 export function deduplicateFindings(findings: Finding[]): Finding[] {
   if (findings.length <= 1) return findings;
 
+  // First suppress pattern flood, then deduplicate
+  const capped = suppressPatternFlood(findings);
+
   const groups: Finding[][] = [];
   const assigned = new Set<number>();
 
-  for (let i = 0; i < findings.length; i++) {
+  for (let i = 0; i < capped.length; i++) {
     if (assigned.has(i)) continue;
 
-    const group = [findings[i]];
+    const group = [capped[i]];
     assigned.add(i);
 
-    for (let j = i + 1; j < findings.length; j++) {
+    for (let j = i + 1; j < capped.length; j++) {
       if (assigned.has(j)) continue;
 
-      if (areDuplicates(findings[i], findings[j])) {
-        group.push(findings[j]);
+      if (areDuplicates(capped[i], capped[j])) {
+        group.push(capped[j]);
         assigned.add(j);
       }
     }
@@ -33,6 +36,33 @@ export function deduplicateFindings(findings: Finding[]): Finding[] {
   }
 
   return groups.map(mergeDuplicateGroup);
+}
+
+/**
+ * Cap same-category medium/low findings at 3 instances.
+ * Critical/high are always kept.
+ */
+function suppressPatternFlood(findings: Finding[]): Finding[] {
+  const categoryCounts = new Map<string, number>();
+  const result: Finding[] = [];
+
+  for (const f of findings) {
+    // Always keep critical/high
+    if (f.severity === 'critical' || f.severity === 'high') {
+      result.push(f);
+      continue;
+    }
+
+    const key = f.category;
+    const count = categoryCounts.get(key) || 0;
+    if (count < 3) {
+      result.push(f);
+      categoryCounts.set(key, count + 1);
+    }
+    // else: silently drop — too many of same category at medium/low
+  }
+
+  return result;
 }
 
 function areDuplicates(a: Finding, b: Finding): boolean {

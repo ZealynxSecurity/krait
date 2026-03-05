@@ -3,14 +3,33 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { resolve, basename, join } from 'path';
+
+// Load .env file (no dependency — just read and parse)
+function loadEnv(): void {
+  const envPath = resolve(import.meta.dirname || '.', '..', '.env');
+  if (!existsSync(envPath)) return;
+  try {
+    const content = readFileSync(envPath, 'utf-8');
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      const value = trimmed.slice(eqIdx + 1).trim();
+      if (!process.env[key]) process.env[key] = value;
+    }
+  } catch { /* ignore */ }
+}
+loadEnv();
 import { resolveConfig } from './core/config.js';
 import { discoverFiles, detectDomain } from './core/file-discovery.js';
 import { PatternLoader } from './knowledge/pattern-loader.js';
 import { AIAnalyzer } from './analysis/ai-analyzer.js';
 import { deduplicateFindings } from './analysis/deduplicator.js';
-import { postProcessFindings } from './analysis/post-processor.js';
+import { postProcessFindings, validateWithSolodit } from './analysis/post-processor.js';
 import {
   buildSummary,
   generateJsonReport,
@@ -34,6 +53,8 @@ import { runShadowAudit, runBatchShadowAudit } from './shadow/runner.js';
 import { generateFeedback, writeFeedbackReport } from './shadow/feedback.js';
 import { updateDashboard, loadDashboard, formatDashboard } from './shadow/dashboard.js';
 import { gatherProjectContext, formatContextForPrompt } from './analysis/context-gatherer.js';
+import { generatePatternsFromSolodit } from './knowledge/pattern-generator.js';
+import { SoloditClient } from './knowledge/solodit-client.js';
 
 const VERSION = '0.1.0';
 
@@ -51,11 +72,13 @@ program
   .option('--quick', 'Quick mode: Sonnet only, no cross-contract analysis')
   .option('--api-key <key>', 'Anthropic API key')
   .option('--model <model>', 'Model to use for analysis')
+  .option('--deep-model <model>', 'Model for deep analysis and cross-contract passes')
   .option('--output <path>', 'Output directory for reports', '.')
   .option('--format <format>', 'Output format: json, markdown, both', 'both')
   .option('-v, --verbose', 'Verbose output')
   .option('--patterns-dir <path>', 'Path to patterns directory')
   .option('--min-lines <n>', 'Skip files with fewer lines than this', '20')
+  .option('--solodit-key <key>', 'Solodit API key for enrichment (or set SOLODIT_API_KEY)')
   .action(async (targetPath: string, options: Record<string, unknown>) => {
     const startTime = Date.now();
 
@@ -63,11 +86,13 @@ program
       const config = resolveConfig({
         apiKey: options.apiKey as string | undefined,
         model: options.model as string | undefined,
+        deepModel: options.deepModel as string | undefined,
         quick: options.quick as boolean | undefined,
         verbose: options.verbose as boolean | undefined,
         outputFormat: options.format as 'json' | 'markdown' | 'both' | undefined,
         patternsDir: options.patternsDir as string | undefined,
         minLines: options.minLines ? parseInt(options.minLines as string, 10) : undefined,
+        soloditApiKey: options.soloditKey as string | undefined,
       });
 
       const projectPath = resolve(targetPath);
@@ -114,9 +139,31 @@ program
       const domainPatterns = loader.getPatternsByDomain(domain);
       console.log(chalk.gray(`  Domain: ${domain} (${domainPatterns.length} domain patterns)`));
 
+      // Step 4b: Solodit enrichment (always-on, graceful fallback)
+      let soloditClient: SoloditClient | null = null;
+      let soloditContextStr = '';
+      if (config.soloditApiKey) {
+        try {
+          soloditClient = new SoloditClient(config.soloditApiKey, config.verbose);
+          const soloditSpinner = ora('Fetching Solodit enrichment...').start();
+          const enrichmentFindings = await soloditClient.getEnrichmentFindings(
+            projectContext.protocolType || '',
+            projectContext.dependencies || []
+          );
+          soloditContextStr = soloditClient.formatForPrompt(enrichmentFindings);
+          soloditSpinner.succeed(`Solodit enrichment: ${enrichmentFindings.length} real-world examples loaded`);
+        } catch (err) {
+          soloditClient = null; // Disable downstream Solodit features
+          console.log(chalk.yellow(`  Solodit unavailable, continuing without enrichment: ${err instanceof Error ? err.message : err}`));
+        }
+      } else {
+        console.log(chalk.yellow('  No SOLODIT_API_KEY found — running without Solodit enrichment'));
+      }
+
       // Step 5: Analyze files
       const analyzer = new AIAnalyzer(config);
       analyzer.setProjectContext(projectContext);
+      if (soloditContextStr) analyzer.setSoloditContext(soloditContextStr);
       const allFindings: Finding[] = [];
       const fileContentsMap = new Map<string, string>();
 
@@ -214,9 +261,54 @@ program
         console.log(chalk.gray(`\n  Dedup: ${allFindings.length} → ${dedupFindings.length} findings`));
       }
 
-      const processedFindings = postProcessFindings(dedupFindings, files, fileContentsMap);
+      let processedFindings = postProcessFindings(dedupFindings, files, fileContentsMap, projectContext);
       if (config.verbose && processedFindings.length < dedupFindings.length) {
         console.log(chalk.gray(`  Post-process: ${dedupFindings.length} → ${processedFindings.length} findings`));
+      }
+
+      // Step 6b: Solodit validation (precision boost)
+      if (soloditClient) {
+        try {
+          const valSpinner = ora('Validating findings against Solodit...').start();
+          processedFindings = await validateWithSolodit(processedFindings, soloditClient);
+          const refsCount = processedFindings.filter(f => f.soloditRefs?.length).length;
+          valSpinner.succeed(`Solodit validation: ${refsCount} findings corroborated`);
+        } catch (err) {
+          if (config.verbose) console.log(chalk.yellow(`  Solodit validation skipped: ${err instanceof Error ? err.message : err}`));
+        }
+      }
+
+      // Step 6c: Solodit gap analysis (recall boost)
+      if (soloditClient && !config.quick) {
+        try {
+          const existingCategories = [...new Set(processedFindings.map(f => f.category))];
+          const gapFindings = await soloditClient.getGapFindings(
+            projectContext.protocolType || '',
+            existingCategories
+          );
+          if (gapFindings.length > 0) {
+            const gapSpinner = ora(`Gap analysis: checking ${gapFindings.length} missed patterns...`).start();
+            const gapContext = soloditClient.formatForPrompt(gapFindings, 10);
+            const fileContents = files
+              .sort((a, b) => b.lines - a.lines)
+              .slice(0, 5)
+              .map(f => ({
+                file: f,
+                content: fileContentsMap.get(f.relativePath) || readFileSync(f.path, 'utf-8'),
+              }));
+            const gapResults = await analyzer.analyzeGaps(gapContext, fileContents, processedFindings);
+            if (gapResults.length > 0) {
+              const dedupGap = deduplicateFindings([...processedFindings, ...gapResults]);
+              const newGapCount = dedupGap.length - processedFindings.length;
+              processedFindings = postProcessFindings(dedupGap, files, fileContentsMap, projectContext);
+              gapSpinner.succeed(`Gap analysis: +${newGapCount} new findings`);
+            } else {
+              gapSpinner.succeed('Gap analysis: no new findings');
+            }
+          }
+        } catch (err) {
+          if (config.verbose) console.log(chalk.yellow(`  Gap analysis skipped: ${err instanceof Error ? err.message : err}`));
+        }
       }
 
       const rawCount = processedFindings.length;
@@ -390,10 +482,12 @@ program
   .option('--all', 'Run all contests in registry')
   .option('--work-dir <path>', 'Working directory for cloned repos and results', 'shadow-results')
   .option('--quick', 'Quick mode: Sonnet only, no cross-contract')
+  .option('--deep-model <model>', 'Model for deep analysis and cross-contract passes')
   .option('--dry-run', 'Show what would happen without running audits')
   .option('--skip-clone', 'Use already-cloned repos in work dir')
   .option('--ai-match', 'Use AI-assisted matching for comparison scoring (more accurate, costs ~$0.01/contest)')
   .option('--api-key <key>', 'Anthropic API key')
+  .option('--solodit-key <key>', 'Solodit API key for enrichment (or set SOLODIT_API_KEY)')
   .option('--patterns-dir <path>', 'Path to patterns directory', 'patterns')
   .option('-v, --verbose', 'Verbose output')
   .action(async (options: Record<string, unknown>) => {
@@ -442,10 +536,12 @@ program
         patternsDir,
         apiKey: options.apiKey as string | undefined,
         quick: options.quick as boolean | undefined,
+        deepModel: options.deepModel as string | undefined,
         verbose: options.verbose as boolean | undefined,
         dryRun: options.dryRun as boolean | undefined,
         skipClone: options.skipClone as boolean | undefined,
         aiMatch: options.aiMatch as boolean | undefined,
+        soloditApiKey: (options.soloditKey as string | undefined) || process.env.SOLODIT_API_KEY || undefined,
       };
 
       const results = await runBatchShadowAudit(
@@ -519,6 +615,63 @@ program
       console.log(`  ${chalk.bold(c.id.padEnd(25))} ${c.name.padEnd(22)} ${c.difficulty.padEnd(8)} ~${String(c.estimatedLOC).padEnd(6)} LOC  ${findings}`);
     }
     console.log(chalk.gray(`\n  Total: ${contests.length} contests\n`));
+  });
+
+program
+  .command('ingest-solodit')
+  .description('Ingest solodit audit reports and generate vulnerability patterns')
+  .argument('<repo-path>', 'Path to cloned solodit/solodit_content repo')
+  .option('--output <path>', 'Output directory for generated patterns', 'patterns')
+  .option('--max-reports <n>', 'Maximum number of reports to process', '400')
+  .option('--min-cluster-size <n>', 'Minimum findings per cluster', '3')
+  .option('--dry-run', 'Show what would be generated without writing files')
+  .option('--api-key <key>', 'Anthropic API key')
+  .option('-v, --verbose', 'Verbose output')
+  .action(async (repoPath: string, options: Record<string, unknown>) => {
+    try {
+      const absRepoPath = resolve(repoPath);
+      const outputDir = resolve(options.output as string || 'patterns');
+
+      console.log(chalk.bold.cyan('\n  🐍 Krait — Solodit Ingestion'));
+      console.log(chalk.gray(`  Source: ${absRepoPath}`));
+      console.log(chalk.gray(`  Output: ${outputDir}\n`));
+
+      const apiKey = (options.apiKey as string) || process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        console.error(chalk.red('  API key required for classification. Set ANTHROPIC_API_KEY or pass --api-key'));
+        process.exit(1);
+      }
+
+      // Load existing patterns for dedup
+      const patternsDir = resolve('patterns');
+      const loader = new PatternLoader(patternsDir);
+      const existingPatterns = loader.load();
+      console.log(chalk.gray(`  Existing patterns: ${existingPatterns.length}`));
+
+      const result = await generatePatternsFromSolodit(
+        absRepoPath,
+        outputDir,
+        existingPatterns,
+        apiKey,
+        {
+          maxReports: parseInt(options.maxReports as string || '400', 10),
+          minClusterSize: parseInt(options.minClusterSize as string || '3', 10),
+          dryRun: options.dryRun as boolean | undefined,
+          verbose: options.verbose as boolean | undefined,
+        },
+        (msg) => console.log(msg)
+      );
+
+      console.log(chalk.bold('\n  Results:'));
+      console.log(`    Total findings parsed: ${result.totalFindings}`);
+      console.log(`    New patterns generated: ${result.generated}`);
+      console.log(`    Duplicates skipped: ${result.skippedDuplicates}`);
+      console.log('');
+
+    } catch (err) {
+      console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
   });
 
 /**

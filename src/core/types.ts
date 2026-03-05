@@ -18,6 +18,7 @@ export interface Finding {
   category: string;
   patternId?: string;
   codeSnippet?: string;
+  soloditRefs?: string[];
 }
 
 export interface Report {
@@ -89,6 +90,7 @@ export interface KraitConfig {
   outputFormat: 'json' | 'markdown' | 'both';
   verbose: boolean;
   quick: boolean;
+  soloditApiKey?: string;
 }
 
 export const DEFAULT_CONFIG: Omit<KraitConfig, 'apiKey'> = {

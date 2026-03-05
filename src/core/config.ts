@@ -16,9 +16,12 @@ export function resolveConfig(overrides: Partial<KraitConfig> = {}): KraitConfig
     }
   }
 
+  const soloditApiKey = (cleaned.soloditApiKey as string | undefined) || process.env.SOLODIT_API_KEY || undefined;
+
   return {
     ...DEFAULT_CONFIG,
     ...cleaned,
     apiKey,
+    ...(soloditApiKey ? { soloditApiKey } : {}),
   } as KraitConfig;
 }

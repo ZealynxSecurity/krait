@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { Finding, FileInfo, KraitConfig, VulnerabilityPattern } from '../core/types.js';
 import { summarizeContract, formatSummariesForPrompt, ContractSummary } from './contract-summarizer.js';
 import { ProjectContext, formatContextForPrompt } from './context-gatherer.js';
+import { getProtocolChecklist } from './domain-checklists.js';
 
 const FINDING_TOOL: Anthropic.Tool = {
   name: 'report_findings',
@@ -39,6 +40,7 @@ export class AIAnalyzer {
   private config: KraitConfig;
   private findingCounter = 0;
   private projectContext: ProjectContext | null = null;
+  private soloditContext = '';
 
   constructor(config: KraitConfig) {
     this.config = config;
@@ -51,6 +53,14 @@ export class AIAnalyzer {
    */
   setProjectContext(context: ProjectContext): void {
     this.projectContext = context;
+  }
+
+  /**
+   * Set pre-formatted Solodit enrichment context.
+   * This is injected into system prompts so Claude sees real-world examples.
+   */
+  setSoloditContext(context: string): void {
+    this.soloditContext = context;
   }
 
   async analyzeFile(
@@ -99,6 +109,9 @@ ${projectBrief}
 
 6. **Incorrect assumptions**: What does the code assume about external contracts or inputs that might be wrong?
 
+${this.soloditContext}
+
+${this.getChecklistContext()}
 ${patternContext}
 
 ## Rules:
@@ -124,7 +137,7 @@ ${numbered}
 
 Look specifically for business logic bugs, economic attacks, and edge cases that the first pass missed. Focus on fee calculations, token edge cases, and state manipulation.`;
 
-    return this.callClaude(systemPrompt, userPrompt, file.relativePath);
+    return this.callClaude(systemPrompt, userPrompt, file.relativePath, this.config.deepModel);
   }
 
   async analyzeCrossContract(
@@ -157,6 +170,9 @@ Focus on:
 - Economic attack vectors spanning multiple contracts (flash loans, oracle manipulation, sandwich attacks)
 - Functions that can be called by anyone on behalf of other contracts
 
+${this.soloditContext}
+
+${this.getChecklistContext()}
 ${patternContext}
 
 CRITICAL RULES:
@@ -177,7 +193,7 @@ CRITICAL RULES:
 
     const userPrompt = `## Contract Architecture Summary\n\n${summaryText}\n\n## Core Contract Code (most interconnected)\n\n${coreCodeSections}${existingFindingsText}\n\nAnalyze the interactions between these contracts for cross-contract vulnerabilities. Focus on attack paths that span multiple contracts.`;
 
-    return this.callClaude(systemPrompt, userPrompt, 'cross-contract');
+    return this.callClaude(systemPrompt, userPrompt, 'cross-contract', this.config.deepModel);
   }
 
   private rankFilesByImportance(
@@ -205,10 +221,67 @@ CRITICAL RULES:
     return scores.map(s => files[s.index]);
   }
 
+  /**
+   * Gap analysis — looks for vulnerability classes that previous passes missed,
+   * guided by Solodit findings that are common for this protocol type.
+   */
+  async analyzeGaps(
+    gapContext: string,
+    files: Array<{ file: FileInfo; content: string }>,
+    existingFindings: Finding[]
+  ): Promise<Finding[]> {
+    if (!gapContext || files.length === 0) return [];
+
+    const projectBrief = this.projectContext ? formatContextForPrompt(this.projectContext) : '';
+    const existingText = existingFindings.length > 0
+      ? existingFindings.map(f => `- [${f.severity}] ${f.title} at ${f.file}:${f.line}`).join('\n')
+      : 'None.';
+
+    const systemPrompt = `You are Krait, performing a GAP ANALYSIS pass. Professional auditors commonly find the vulnerabilities described below in protocols like this, but previous analysis passes did NOT find them.
+
+${projectBrief}
+
+${gapContext}
+
+## Already-found findings (do NOT repeat):
+${existingText}
+
+## Rules:
+- Look SPECIFICALLY for the vulnerability patterns described above. These are real bugs from real audits.
+- Every finding MUST have a concrete exploit scenario with specific steps.
+- Only report medium severity or above.
+- Report AT MOST 2 findings per file. Quality over quantity.
+- An empty findings array is perfectly acceptable — only report if genuinely confident.`;
+
+    const allGapFindings: Finding[] = [];
+    const topFiles = files.slice(0, 5);
+
+    for (const { file, content } of topFiles) {
+      const numbered = content.split('\n').map((line, i) => `${i + 1}: ${line}`).join('\n');
+      const userPrompt = `## Gap Analysis: ${file.relativePath}
+
+\`\`\`${file.language}
+${numbered}
+\`\`\`
+
+Look specifically for the vulnerability patterns from real audits described in the system prompt. Focus on what previous passes missed.`;
+
+      try {
+        const findings = await this.callClaude(systemPrompt, userPrompt, file.relativePath, this.config.deepModel);
+        allGapFindings.push(...findings);
+      } catch {
+        // Continue with other files
+      }
+    }
+
+    return allGapFindings;
+  }
+
   private async callClaude(
     systemPrompt: string,
     userPrompt: string,
-    contextLabel: string
+    contextLabel: string,
+    model?: string
   ): Promise<Finding[]> {
     const maxRetries = 3;
     let lastError: Error | null = null;
@@ -216,7 +289,7 @@ CRITICAL RULES:
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const response = await this.client.messages.create({
-          model: this.config.model,
+          model: model || this.config.model,
           max_tokens: 4096,
           system: systemPrompt,
           tools: [FINDING_TOOL],
@@ -320,6 +393,9 @@ Your analysis must be:
 
 Use the vulnerability patterns below as reference for what to look for. They are real patterns from past audits.
 
+${this.soloditContext}
+
+${this.getChecklistContext()}
 ${patternContext}
 
 ${this.projectContext ? formatContextForPrompt(this.projectContext) : ''}
@@ -364,6 +440,14 @@ ${numberedContent}
 Report security vulnerabilities you find. Focus on exploitable issues — quality over quantity.
 Each finding MUST include the exact line number.
 If there are no real vulnerabilities, report an empty findings array.`;
+  }
+
+  private getChecklistContext(): string {
+    if (!this.projectContext) return '';
+    return getProtocolChecklist(
+      this.projectContext.protocolType || '',
+      this.projectContext.dependencies || []
+    );
   }
 
   private extractContractNameFromContent(content: string): string | null {

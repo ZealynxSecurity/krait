@@ -15,7 +15,8 @@ import { PatternLoader } from '../knowledge/pattern-loader.js';
 import { AIAnalyzer } from '../analysis/ai-analyzer.js';
 import { gatherProjectContext } from '../analysis/context-gatherer.js';
 import { deduplicateFindings } from '../analysis/deduplicator.js';
-import { postProcessFindings } from '../analysis/post-processor.js';
+import { postProcessFindings, validateWithSolodit } from '../analysis/post-processor.js';
+import { SoloditClient } from '../knowledge/solodit-client.js';
 import { buildSummary, generateJsonReport } from '../core/reporter.js';
 import {
   parseOfficialFindings,
@@ -40,11 +41,13 @@ export interface ShadowAuditOptions {
   patternsDir: string;   // Path to patterns directory
   apiKey?: string;       // Anthropic API key (or env var)
   model?: string;        // Model override
+  deepModel?: string;    // Model for deep analysis / cross-contract
   quick?: boolean;       // Quick mode (Sonnet only)
   verbose?: boolean;
   dryRun?: boolean;      // Just clone and show what would happen
   skipClone?: boolean;   // Use existing repos (already cloned)
   aiMatch?: boolean;     // Use AI-assisted matching for comparison
+  soloditApiKey?: string; // Solodit API key for enrichment
 }
 
 /**
@@ -226,6 +229,7 @@ async function runAudit(
   const config = resolveConfig({
     apiKey: options.apiKey,
     model: options.model,
+    deepModel: options.deepModel,
     quick: options.quick,
     verbose: options.verbose,
     patternsDir: options.patternsDir,
@@ -259,6 +263,26 @@ async function runAudit(
   // Analyze
   const analyzer = new AIAnalyzer(config);
   analyzer.setProjectContext(projectContext);
+
+  // Solodit enrichment (always-on, graceful fallback)
+  const soloditKey = options.soloditApiKey || process.env.SOLODIT_API_KEY;
+  let soloditClient: SoloditClient | null = null;
+  if (soloditKey) {
+    try {
+      soloditClient = new SoloditClient(soloditKey, options.verbose);
+      const enrichmentFindings = await soloditClient.getEnrichmentFindings(
+        projectContext.protocolType || '',
+        projectContext.dependencies || []
+      );
+      const soloditContext = soloditClient.formatForPrompt(enrichmentFindings);
+      if (soloditContext) analyzer.setSoloditContext(soloditContext);
+      log(`    Solodit enrichment: ${enrichmentFindings.length} examples loaded`);
+    } catch (err) {
+      soloditClient = null;
+      log(`    Solodit unavailable, continuing without: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
   const allFindings: Finding[] = [];
   const fileContentsMap = new Map<string, string>();
 
@@ -336,7 +360,48 @@ async function runAudit(
 
   // Post-process
   const dedupFindings = deduplicateFindings(allFindings);
-  const processedFindings = postProcessFindings(dedupFindings, files, fileContentsMap);
+  let processedFindings = postProcessFindings(dedupFindings, files, fileContentsMap, projectContext);
+
+  // Solodit validation (injection point 2)
+  if (soloditClient) {
+    try {
+      processedFindings = await validateWithSolodit(processedFindings, soloditClient);
+      const refsCount = processedFindings.filter(f => f.soloditRefs?.length).length;
+      log(`    Solodit validation: ${refsCount} findings corroborated`);
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  // Solodit gap analysis (injection point 3)
+  if (soloditClient && !config.quick) {
+    try {
+      const existingCategories = [...new Set(processedFindings.map(f => f.category))];
+      const gapFindings = await soloditClient.getGapFindings(
+        projectContext.protocolType || '',
+        existingCategories
+      );
+      if (gapFindings.length > 0) {
+        const gapContext = soloditClient.formatForPrompt(gapFindings, 10);
+        const fileContents = files
+          .sort((a, b) => b.lines - a.lines)
+          .slice(0, 5)
+          .map(f => ({
+            file: f,
+            content: fileContentsMap.get(f.relativePath) || readFileSync(f.path, 'utf-8'),
+          }));
+        const gapResults = await analyzer.analyzeGaps(gapContext, fileContents, processedFindings);
+        if (gapResults.length > 0) {
+          const dedupGap = deduplicateFindings([...processedFindings, ...gapResults]);
+          processedFindings = postProcessFindings(dedupGap, files, fileContentsMap, projectContext);
+          log(`    Gap analysis: +${gapResults.length} new findings`);
+        }
+      }
+    } catch {
+      // Non-fatal
+    }
+  }
+
   const filteredFindings = processedFindings.filter(f => {
     if (f.confidence === 'low' && !['critical', 'high'].includes(f.severity)) return false;
     if (f.severity === 'info') return false;

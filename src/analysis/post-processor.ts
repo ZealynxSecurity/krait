@@ -1,4 +1,6 @@
 import { Finding, FileInfo } from '../core/types.js';
+import { ProjectContext } from './context-gatherer.js';
+import { SoloditClient } from '../knowledge/solodit-client.js';
 
 /**
  * Post-process findings with domain-specific heuristics to reduce false positives
@@ -7,29 +9,88 @@ import { Finding, FileInfo } from '../core/types.js';
 export function postProcessFindings(
   findings: Finding[],
   files: FileInfo[],
-  fileContents: Map<string, string>
+  fileContents: Map<string, string>,
+  projectContext?: ProjectContext
 ): Finding[] {
   return findings
     .map(f => {
       try {
-        return adjustConfidence(f, fileContents);
+        return adjustConfidence(f, fileContents, projectContext);
       } catch {
         return f; // Return unmodified if adjustment fails
       }
     })
     .filter(f => {
       try {
-        return !isFalsePositive(f, fileContents);
+        return !isFalsePositive(f, fileContents, projectContext);
       } catch {
         return true; // Keep if FP check fails
       }
     });
 }
 
-function adjustConfidence(finding: Finding, fileContents: Map<string, string>): Finding {
+function adjustConfidence(finding: Finding, fileContents: Map<string, string>, projectContext?: ProjectContext): Finding {
   const adjusted = { ...finding };
   const content = fileContents.get(finding.file) || '';
   const contentLower = content.toLowerCase();
+
+  // Vague description penalty: if description < 50 chars, downgrade confidence
+  if (finding.description.length < 50) {
+    adjusted.confidence = 'low';
+  }
+
+  // Generic title downgrade: titles that indicate low-value findings
+  const genericTitles = [
+    'missing input validation', 'gas optimization', 'lack of input validation',
+    'missing validation', 'unchecked return value', 'missing access control',
+    'potential reentrancy', 'no input validation', 'missing error handling',
+  ];
+  const titleLower = finding.title.toLowerCase();
+  if (genericTitles.some(t => titleLower.includes(t))) {
+    if (adjusted.severity === 'critical') adjusted.severity = 'high';
+    if (adjusted.severity === 'high') adjusted.severity = 'medium';
+  }
+
+  // OZ inheritance cross-reference: access-control on Ownable/AccessControl contracts
+  if (projectContext && finding.category === 'access-control') {
+    const contractName = extractContractNameFromFile(content);
+    if (contractName) {
+      const parents = projectContext.inheritanceGraph.get(contractName) || [];
+      const hasOzAccessControl = parents.some(p =>
+        p.includes('Ownable') || p.includes('AccessControl') ||
+        p.includes('Ownable2Step') || p.includes('OwnableUpgradeable')
+      );
+      if (hasOzAccessControl) {
+        adjusted.confidence = 'low';
+      }
+    }
+  }
+
+  // ReentrancyGuard inheritance: hard drop reentrancy on guarded contracts
+  if (projectContext && finding.category === 'reentrancy') {
+    const contractName = extractContractNameFromFile(content);
+    if (contractName) {
+      const parents = projectContext.inheritanceGraph.get(contractName) || [];
+      const hasReentrancyGuard = parents.some(p =>
+        p.includes('ReentrancyGuard') || p.includes('ReentrancyGuardUpgradeable')
+      );
+      if (hasReentrancyGuard) {
+        // Check if the specific function has nonReentrant
+        const lines = content.split('\n');
+        const contextStart = Math.max(0, finding.line - 5);
+        const contextEnd = Math.min(lines.length, finding.line + 2);
+        const funcContext = lines.slice(contextStart, contextEnd).join('\n').toLowerCase();
+        if (funcContext.includes('nonreentrant')) {
+          // Hard drop: set to info so it gets filtered later
+          adjusted.severity = 'info';
+          adjusted.confidence = 'low';
+        } else {
+          // Contract has guard but not on this function — still suspicious
+          adjusted.confidence = 'low';
+        }
+      }
+    }
+  }
 
   // Boost: finding matches a known high-impact pattern
   if (isHighImpactPattern(finding)) {
@@ -94,7 +155,7 @@ function adjustConfidence(finding: Finding, fileContents: Map<string, string>): 
   return adjusted;
 }
 
-function isFalsePositive(finding: Finding, fileContents: Map<string, string>): boolean {
+function isFalsePositive(finding: Finding, fileContents: Map<string, string>, projectContext?: ProjectContext): boolean {
   const titleLower = (finding.title || '').toLowerCase();
   const descLower = (finding.description || '').toLowerCase();
 
@@ -218,4 +279,62 @@ function hasValueTransfer(funcBody: string): boolean {
     funcBody.includes('.send(') ||
     funcBody.includes('safeTransfer(') ||
     funcBody.includes('.transfer(');
+}
+
+function extractContractNameFromFile(content: string): string | null {
+  const match = content.match(/\b(?:contract|library|abstract\s+contract)\s+(\w+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Validate findings against Solodit's database.
+ * Boosts confidence for findings with real-world corroboration,
+ * penalizes generic-sounding findings with no matches.
+ *
+ * This is a separate async function to avoid touching the sync postProcessFindings.
+ */
+export async function validateWithSolodit(
+  findings: Finding[],
+  soloditClient: SoloditClient
+): Promise<Finding[]> {
+  const validated: Finding[] = [];
+
+  for (const finding of findings) {
+    const adjusted = { ...finding };
+
+    // Only validate HIGH/CRITICAL — not worth API calls for lower severity
+    if (!['critical', 'high'].includes(finding.severity)) {
+      validated.push(adjusted);
+      continue;
+    }
+
+    try {
+      const result = await soloditClient.validateFinding(finding.title, finding.category);
+
+      if (result.matchCount >= 2) {
+        // Strong corroboration: boost confidence, attach refs
+        if (adjusted.confidence === 'low') adjusted.confidence = 'medium';
+        if (adjusted.confidence === 'medium') adjusted.confidence = 'high';
+        adjusted.soloditRefs = result.slugs.slice(0, 3).map(
+          slug => `https://solodit.cyfrin.io/issues/${slug}`
+        );
+      } else if (result.matchCount === 0) {
+        // No matches + generic title → penalize
+        const genericIndicators = [
+          'missing', 'lack', 'potential', 'possible', 'no validation',
+          'unchecked', 'without',
+        ];
+        const titleLower = finding.title.toLowerCase();
+        if (genericIndicators.some(g => titleLower.includes(g))) {
+          adjusted.confidence = 'low';
+        }
+      }
+    } catch {
+      // Validation failure is non-fatal — keep finding as-is
+    }
+
+    validated.push(adjusted);
+  }
+
+  return validated;
 }
