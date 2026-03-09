@@ -15,12 +15,17 @@
     "lint": "eslint src/",
     "format": "prettier --write src/"
   },
-  "keywords": ["security", "audit", "solidity", "ai", "claude"],
+  "keywords": [
+    "security",
+    "audit",
+    "solidity",
+    "ai",
+    "claude"
+  ],
   "author": "Zealynx Security",
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
     "glob": "^11.0.1",
