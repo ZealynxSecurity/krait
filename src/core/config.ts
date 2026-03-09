@@ -1,8 +1,9 @@
 import { KraitConfig, DEFAULT_CONFIG } from './types.js';
 
 export function resolveConfig(overrides: Partial<KraitConfig> = {}): KraitConfig {
+  const isDryRun = overrides.dryRun === true;
   const apiKey = overrides.apiKey || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  if (!apiKey && !isDryRun) {
     throw new Error(
       'Anthropic API key required. Set ANTHROPIC_API_KEY env var or pass --api-key flag.'
     );

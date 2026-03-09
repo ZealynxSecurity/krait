@@ -39,16 +39,27 @@ export function deduplicateFindings(findings: Finding[]): Finding[] {
 }
 
 /**
- * Cap same-category medium/low findings at 3 instances.
- * Critical/high are always kept.
+ * Cap findings per category to prevent pattern flooding.
+ * HIGH findings: max 3 per category (reentrancy in 5 files doesn't need 5 HIGHs).
+ * MEDIUM/LOW: max 3 per category.
+ * CRITICAL: always kept.
  */
 function suppressPatternFlood(findings: Finding[]): Finding[] {
   const categoryCounts = new Map<string, number>();
   const result: Finding[] = [];
 
-  for (const f of findings) {
-    // Always keep critical/high
-    if (f.severity === 'critical' || f.severity === 'high') {
+  // Sort so highest-severity + highest-confidence findings survive the cap
+  const sorted = [...findings].sort((a, b) => {
+    const sevOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+    const confOrder = { high: 0, medium: 1, low: 2 };
+    const sevDiff = (sevOrder[a.severity] || 3) - (sevOrder[b.severity] || 3);
+    if (sevDiff !== 0) return sevDiff;
+    return (confOrder[a.confidence] || 1) - (confOrder[b.confidence] || 1);
+  });
+
+  for (const f of sorted) {
+    // Always keep critical
+    if (f.severity === 'critical') {
       result.push(f);
       continue;
     }
@@ -59,23 +70,31 @@ function suppressPatternFlood(findings: Finding[]): Finding[] {
       result.push(f);
       categoryCounts.set(key, count + 1);
     }
-    // else: silently drop — too many of same category at medium/low
+    // else: silently drop — too many of same category
   }
 
   return result;
 }
 
 function areDuplicates(a: Finding, b: Finding): boolean {
-  // Same file, overlapping lines, same category
+  // Same file, same category — check line overlap OR title similarity
+  // This catches duplicates from different analysis passes (first pass + deep)
+  // that describe the same issue at different granularity
   if (a.file === b.file && a.category === b.category) {
-    const overlap = Math.abs(a.line - b.line) <= 10;
+    const overlap = Math.abs(a.line - b.line) <= 30;
     if (overlap) return true;
+    // Same file, same category, similar titles — likely the same bug from different passes
+    const titleSim = computeTitleSimilarity(a.title, b.title);
+    if (titleSim >= 0.35) return true;
   }
 
   // Different files, same category, similar titles (same pattern repeated)
   if (a.category === b.category && a.file !== b.file) {
     const titleSimilarity = computeTitleSimilarity(a.title, b.title);
-    if (titleSimilarity >= 0.5) return true;
+    // Lower threshold for HIGH findings in same category — "Reentrancy in withdraw"
+    // vs "Reentrancy in deposit" should merge (different function names drop similarity)
+    const threshold = (a.severity === 'high' || b.severity === 'high') ? 0.35 : 0.5;
+    if (titleSimilarity >= threshold) return true;
 
     // For oracle contracts specifically, merge findings in the same directory
     // that have the same severity — these are typically repetitive "oracle can be manipulated"

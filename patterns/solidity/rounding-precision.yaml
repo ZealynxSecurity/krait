@@ -1,0 +1,112 @@
+# Rounding & Precision Vulnerability Patterns
+# Category: rounding
+# Last Updated: 2026-03-05
+
+- id: "SOL-ROUND-001"
+  name: "Rounding direction favors attacker over protocol"
+  category: "rounding"
+  severity: "high"
+  description: "Division operations round down by default in Solidity. When rounding should favor the protocol (e.g., fewer shares on deposit, more assets on withdrawal), incorrect rounding direction allows value extraction."
+  detection:
+    strategy: "Look for share/asset conversions in vault-like contracts where rounding direction matters — deposits should round down shares, withdrawals should round up assets owed"
+    indicators: ["shares", "assets", "deposit", "withdraw", "redeem", "mint", "mulDiv", "division"]
+  real_examples:
+    - source: "Code4rena / ERC4626 audits"
+      project: "Multiple vault protocols"
+      finding_id: "rounding-direction"
+      impact: "Attacker repeatedly deposits and withdraws to extract 1 wei per round, draining vault over many transactions"
+      code_vulnerable: |
+        function withdraw(uint256 assets) external returns (uint256 shares) {
+            shares = assets * totalSupply / totalAssets; // rounds DOWN — user burns fewer shares
+            _burn(msg.sender, shares);
+            token.transfer(msg.sender, assets);
+        }
+      code_fixed: |
+        function withdraw(uint256 assets) external returns (uint256 shares) {
+            shares = (assets * totalSupply + totalAssets - 1) / totalAssets; // rounds UP
+            _burn(msg.sender, shares);
+            token.transfer(msg.sender, assets);
+        }
+  false_positive_notes: "Only a real issue in vault/pool contracts where the rounding direction matters economically. Not relevant for display/UI calculations."
+  tags: ["defi", "rounding", "solidity", "arithmetic", "erc4626"]
+  added_date: "2026-03-05"
+  confidence: "high"
+
+- id: "SOL-ROUND-002"
+  name: "Division before multiplication causes precision loss"
+  category: "rounding"
+  severity: "high"
+  description: "Performing division before multiplication in integer arithmetic causes premature truncation and significant precision loss. The result can be orders of magnitude wrong."
+  detection:
+    strategy: "Look for expressions where a division result is subsequently multiplied, especially with large numbers or token amounts"
+    indicators: ["/ ", "* ", "division", "multiply", "precision", "truncat"]
+  real_examples:
+    - source: "Sherlock / Code4rena"
+      project: "Various DeFi"
+      finding_id: "div-before-mul"
+      impact: "Calculated amounts are significantly less than intended, causing loss of funds or incorrect reward distribution"
+      code_vulnerable: |
+        uint256 rewardPerToken = totalRewards / totalStaked; // truncates to 0 if totalStaked > totalRewards
+        uint256 userReward = rewardPerToken * userStake;
+      code_fixed: |
+        uint256 userReward = totalRewards * userStake / totalStaked; // multiply first, then divide
+  false_positive_notes: "Safe if values are guaranteed to be large enough that truncation is negligible (< 1 wei)."
+  tags: ["defi", "rounding", "solidity", "arithmetic"]
+  added_date: "2026-03-05"
+  confidence: "high"
+
+- id: "SOL-ROUND-003"
+  name: "First depositor share inflation attack"
+  category: "rounding"
+  severity: "critical"
+  description: "In ERC4626 vaults or similar share-based systems, the first depositor can manipulate the share price by: (1) depositing 1 wei to get 1 share, (2) directly transferring a large amount to the vault, (3) now 1 share = large amount. Subsequent depositors get 0 shares due to rounding."
+  detection:
+    strategy: "Look for vault/pool contracts with share minting where the first deposit has no minimum share check or virtual offset"
+    indicators: ["totalSupply", "totalAssets", "shares", "mint", "deposit", "ERC4626"]
+  real_examples:
+    - source: "Code4rena / OpenZeppelin"
+      project: "ERC4626 implementations"
+      finding_id: "share-inflation"
+      impact: "First depositor steals funds from all subsequent depositors through rounding manipulation"
+      code_vulnerable: |
+        function deposit(uint256 assets) external returns (uint256 shares) {
+            if (totalSupply == 0) {
+                shares = assets; // first depositor gets 1:1
+            } else {
+                shares = assets * totalSupply / totalAssets(); // rounds to 0 if inflated
+            }
+            _mint(msg.sender, shares);
+        }
+      code_fixed: |
+        function deposit(uint256 assets) external returns (uint256 shares) {
+            shares = assets * (totalSupply + 1) / (totalAssets() + 1); // virtual offset prevents inflation
+            _mint(msg.sender, shares);
+        }
+  false_positive_notes: "Safe if the contract uses OpenZeppelin's ERC4626 with virtual shares/assets offset, or if there is a minimum deposit requirement."
+  tags: ["defi", "rounding", "solidity", "erc4626", "arithmetic"]
+  added_date: "2026-03-05"
+  confidence: "high"
+
+- id: "SOL-ROUND-004"
+  name: "Accumulated rounding error in iterative calculations"
+  category: "rounding"
+  severity: "medium"
+  description: "When rounding occurs inside a loop or across multiple sequential operations, small rounding errors accumulate and can become significant. Especially problematic in reward distribution, fee accumulation, or rebalancing logic."
+  detection:
+    strategy: "Look for division operations inside loops, or sequential fee/reward calculations that each introduce rounding"
+    indicators: ["for", "while", "loop", "accumulate", "distribute", "each", "per user"]
+  real_examples:
+    - source: "Sherlock"
+      project: "Various"
+      finding_id: "accumulated-rounding"
+      impact: "Remaining dust in contract grows over time, or total distributed amount doesn't match expected total"
+      code_vulnerable: |
+        for (uint i = 0; i < users.length; i++) {
+            uint256 share = totalReward / users.length; // truncates each iteration
+            token.transfer(users[i], share);
+        }
+        // remaining dust stuck in contract: totalReward % users.length
+  false_positive_notes: "Acceptable if the dust amount is provably bounded and insignificant (< $0.01)."
+  tags: ["defi", "rounding", "solidity", "arithmetic"]
+  added_date: "2026-03-05"
+  confidence: "medium"

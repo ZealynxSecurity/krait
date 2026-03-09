@@ -32,17 +32,19 @@ export interface SoloditSearchFilters {
 }
 
 interface SoloditApiResponse {
-  data?: {
-    items?: Array<{
-      title?: string;
-      slug?: string;
-      impact?: string;
-      tags?: string[];
-      body?: string;
-      protocol_category?: string;
-      quality_score?: number;
-    }>;
-    total?: number;
+  findings?: Array<{
+    title?: string;
+    slug?: string;
+    impact?: string;
+    tags?: string[];
+    body?: string;
+    protocolCategory?: string;
+    qualityScore?: number;
+  }>;
+  metadata?: {
+    totalResults?: number;
+    currentPage?: number;
+    totalPages?: number;
   };
 }
 
@@ -102,17 +104,28 @@ export class SoloditClient {
 
     await this.waitForRateLimit();
 
-    const body: Record<string, unknown> = {
+    // Build the nested filters object matching Solodit's actual API format
+    const apiFilters: Record<string, unknown> = {};
+    if (filters.keywords) apiFilters.keywords = filters.keywords;
+    if (filters.impact?.length) apiFilters.impact = filters.impact.map(i => i.toUpperCase());
+    if (filters.tags?.length) apiFilters.tags = filters.tags.map(t => ({ value: t }));
+    if (filters.protocolCategory?.length) apiFilters.protocolCategory = filters.protocolCategory.map(c => ({ value: c }));
+    if (filters.qualityScore != null) apiFilters.qualityScore = filters.qualityScore;
+    if (filters.sortField) apiFilters.sortField = filters.sortField;
+    if (filters.sortDirection) apiFilters.sortDirection = filters.sortDirection;
+    // Default sort by quality
+    if (!apiFilters.sortField) apiFilters.sortField = 'Quality';
+    if (!apiFilters.sortDirection) apiFilters.sortDirection = 'Desc';
+
+    const body = {
       page: filters.page ?? 1,
       pageSize: filters.pageSize ?? pageSize,
-      sortField: filters.sortField ?? 'quality_score',
-      sortDirection: filters.sortDirection ?? 'desc',
+      filters: apiFilters,
     };
-    if (filters.keywords) body.keywords = filters.keywords;
-    if (filters.impact?.length) body.impact = filters.impact;
-    if (filters.tags?.length) body.tags = filters.tags;
-    if (filters.protocolCategory?.length) body.protocolCategory = filters.protocolCategory;
-    if (filters.qualityScore != null) body.qualityScore = filters.qualityScore;
+
+    if (this.verbose) {
+      console.error(`  Solodit API request: ${JSON.stringify(body).slice(0, 200)}`);
+    }
 
     const response = await fetch(`${SOLODIT_API_BASE}/findings`, {
       method: 'POST',
@@ -131,7 +144,7 @@ export class SoloditClient {
     }
 
     const json = (await response.json()) as SoloditApiResponse;
-    const items = json.data?.items ?? [];
+    const items = json.findings ?? [];
 
     const findings: SoloditFinding[] = items.map(item => ({
       title: item.title ?? '',
@@ -139,8 +152,8 @@ export class SoloditClient {
       impact: item.impact ?? '',
       tags: item.tags ?? [],
       body: item.body ?? '',
-      protocolCategory: item.protocol_category ?? '',
-      qualityScore: item.quality_score ?? 0,
+      protocolCategory: item.protocolCategory ?? '',
+      qualityScore: item.qualityScore ?? 0,
     }));
 
     this.cache.set(cacheKey, findings);
@@ -158,21 +171,19 @@ export class SoloditClient {
   ): Promise<SoloditFinding[]> {
     const mapping = this.getProtocolMapping(protocolType, dependencies);
 
-    // Primary search: by protocol category + HIGH/CRITICAL impact
+    // Primary search: by protocol category + HIGH impact
     const primary = await this.search({
       protocolCategory: mapping.categories,
-      impact: ['High', 'Critical'],
-      qualityScore: 70,
+      impact: ['High'],
       pageSize: 15,
     });
 
     if (primary.length >= 10) return primary;
 
-    // Supplement with keyword search if not enough results
+    // Supplement with keyword search (HIGH + MEDIUM) if not enough results
     const keywordSearch = await this.search({
       keywords: mapping.keywords.slice(0, 3).join(' '),
-      impact: ['High', 'Critical'],
-      qualityScore: 60,
+      impact: ['High', 'Medium'],
       pageSize: 15 - primary.length,
     });
 
@@ -204,7 +215,7 @@ export class SoloditClient {
     try {
       const results = await this.search({
         keywords,
-        impact: ['High', 'Critical', 'Medium'],
+        impact: ['High', 'Medium'],
         pageSize: 10,
       });
 
@@ -232,8 +243,7 @@ export class SoloditClient {
 
     const results = await this.search({
       protocolCategory: mapping.categories,
-      impact: ['High', 'Critical'],
-      qualityScore: 75,
+      impact: ['High'],
       pageSize: 20,
     });
 
@@ -397,6 +407,15 @@ export class SoloditClient {
         console.error(`  Solodit rate limit: waiting ${Math.ceil(waitMs / 1000)}s...`);
       }
       await new Promise(resolve => setTimeout(resolve, waitMs));
+    }
+
+    // Minimum 3s between requests to stay well under the rate limit
+    if (this.requestTimestamps.length > 0) {
+      const lastRequest = this.requestTimestamps[this.requestTimestamps.length - 1];
+      const elapsed = now - lastRequest;
+      if (elapsed < 3000) {
+        await new Promise(resolve => setTimeout(resolve, 3000 - elapsed));
+      }
     }
   }
 }

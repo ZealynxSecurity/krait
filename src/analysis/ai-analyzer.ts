@@ -1,8 +1,30 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { Finding, FileInfo, KraitConfig, VulnerabilityPattern } from '../core/types.js';
+import { Finding, FileInfo, KraitConfig, VulnerabilityPattern, ArchitectureAnalysis, FundFlow } from '../core/types.js';
 import { summarizeContract, formatSummariesForPrompt, ContractSummary } from './contract-summarizer.js';
 import { ProjectContext, formatContextForPrompt } from './context-gatherer.js';
 import { getProtocolChecklist } from './domain-checklists.js';
+import { formatArchitectureForSystemPrompt, formatArchitectureForFilePrompt } from './architecture-pass.js';
+import { getHeuristicsForFile, formatHeuristicsForPrompt } from '../knowledge/audit-heuristics.js';
+import { ResponseCache } from '../core/cache.js';
+import { BatchGroup } from '../core/file-scorer.js';
+
+/**
+ * Shared false-positive avoidance rules injected into ALL analysis prompts.
+ * The main buildSystemPrompt has these inline; deep/cross/gap prompts were missing them.
+ */
+const FP_AVOIDANCE = `## False Positive Avoidance (CRITICAL — apply to every finding):
+
+- Do NOT report missing zero-address validation — it's a best practice, not a vulnerability.
+- Do NOT report integer overflow/underflow in Solidity ≥0.8.0 unless inside unchecked{} blocks.
+- Do NOT report centralization risk (owner can do X) — this is a design choice.
+- Do NOT report missing event emissions, gas optimizations, or floating pragmas.
+- Do NOT report "missing feature" findings (no circuit breaker, no pause, no timelock).
+- Every finding MUST have a concrete 3-step exploit scenario: (1) attacker does X, (2) this causes Y, (3) resulting in Z loss/damage.
+- If you cannot articulate a specific exploit path, do NOT report the finding.
+- When in doubt about severity, grade LOWER. A medium is better than a false high.
+- Do NOT report first-depositor/share-inflation attacks if the contract uses OpenZeppelin's virtual offset, _decimalsOffset, or has minimum deposit checks. Check the code before reporting.
+- Do NOT report "donation attack" unless you verify the contract uses balanceOf() for accounting (not internal tracking) AND lacks protection.
+- Each finding must describe a DIFFERENT bug. Do not report the same underlying issue (e.g., "first depositor") as multiple findings from different analysis angles.`;
 
 const FINDING_TOOL: Anthropic.Tool = {
   name: 'report_findings',
@@ -16,6 +38,7 @@ const FINDING_TOOL: Anthropic.Tool = {
           type: 'object',
           properties: {
             title: { type: 'string', description: 'Short descriptive title of the vulnerability' },
+            file: { type: 'string', description: 'File path where the vulnerability exists (required for batch analysis)' },
             severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low', 'info'] },
             confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
             line: { type: 'number', description: 'Line number where the vulnerability exists' },
@@ -40,11 +63,25 @@ export class AIAnalyzer {
   private config: KraitConfig;
   private findingCounter = 0;
   private projectContext: ProjectContext | null = null;
+  private architectureContext: ArchitectureAnalysis | null = null;
   private soloditContext = '';
+  private cache: ResponseCache | null = null;
 
   constructor(config: KraitConfig) {
     this.config = config;
-    this.client = new Anthropic({ apiKey: config.apiKey });
+    // Only create the Anthropic client if we're not in dry-run mode
+    if (!config.dryRun) {
+      this.client = new Anthropic({ apiKey: config.apiKey });
+    } else {
+      this.client = null as unknown as Anthropic;
+    }
+  }
+
+  /**
+   * Attach a response cache. When set, callClaude checks cache before API calls.
+   */
+  setCache(cache: ResponseCache): void {
+    this.cache = cache;
   }
 
   /**
@@ -63,7 +100,66 @@ export class AIAnalyzer {
     this.soloditContext = context;
   }
 
+  /**
+   * Set architecture context from the architecture pass.
+   * This gives Claude protocol-level understanding (fund flows, invariants, roles).
+   */
+  setArchitectureContext(context: ArchitectureAnalysis): void {
+    this.architectureContext = context;
+  }
+
   async analyzeFile(
+    file: FileInfo,
+    fileContent: string,
+    patternContext: string
+  ): Promise<Finding[]> {
+    const heuristics = getHeuristicsForFile(fileContent);
+    const heuristicContext = formatHeuristicsForPrompt(heuristics);
+    const systemPrompt = this.buildSystemPrompt(patternContext, heuristicContext);
+    const userPrompt = this.buildFilePrompt(file, fileContent);
+
+    const findings = await this.callClaude(systemPrompt, userPrompt, file.relativePath);
+    return findings;
+  }
+
+  /**
+   * Analyze a batch of small files in a single API call.
+   * Files are combined into one prompt with clear separators.
+   */
+  async analyzeBatch(
+    batch: BatchGroup,
+    patternContext: string
+  ): Promise<Finding[]> {
+    const systemPrompt = this.buildSystemPrompt(patternContext);
+
+    // Build combined prompt with all files in the batch
+    const sections = batch.files.map(file => {
+      const content = batch.contents.get(file.relativePath) || '';
+      const numbered = content.split('\n').map((line, i) => `${i + 1}: ${line}`).join('\n');
+      return `### File: ${file.relativePath} (${file.lines} lines)\n\`\`\`${file.language}\n${numbered}\n\`\`\``;
+    }).join('\n\n');
+
+    const fileList = batch.files.map(f => f.relativePath).join(', ');
+
+    const userPrompt = `Analyze these ${batch.files.length} small files for security vulnerabilities.
+
+IMPORTANT: For each finding, include the \`file\` field with the exact file path where the vulnerability exists.
+
+${sections}
+
+Report findings with exact file paths and line numbers. Empty findings array is fine.`;
+
+    const knownFiles = batch.files.map(f => f.relativePath);
+    return this.callClaude(systemPrompt, userPrompt, 'batch', undefined, knownFiles);
+  }
+
+  /**
+   * Run first-pass analysis twice and merge results for consensus.
+   * Findings appearing in both runs get boosted confidence.
+   * Findings appearing in only one run keep original confidence.
+   * This fights non-determinism in LLM output.
+   */
+  async analyzeFileWithConsensus(
     file: FileInfo,
     fileContent: string,
     patternContext: string
@@ -71,8 +167,47 @@ export class AIAnalyzer {
     const systemPrompt = this.buildSystemPrompt(patternContext);
     const userPrompt = this.buildFilePrompt(file, fileContent);
 
-    const findings = await this.callClaude(systemPrompt, userPrompt, file.relativePath);
-    return findings;
+    // Run two passes
+    const [run1, run2] = await Promise.all([
+      this.callClaude(systemPrompt, userPrompt, file.relativePath),
+      this.callClaude(systemPrompt, userPrompt, file.relativePath),
+    ]);
+
+    // Merge: match findings across runs by line proximity + category
+    const merged: Finding[] = [];
+    const used2 = new Set<number>();
+
+    for (const f1 of run1) {
+      let matched = false;
+      for (let j = 0; j < run2.length; j++) {
+        if (used2.has(j)) continue;
+        const f2 = run2[j];
+        if (f1.category === f2.category && Math.abs(f1.line - f2.line) <= 15) {
+          // Consensus: boost confidence, keep the more detailed one
+          const best = f1.description.length >= f2.description.length ? { ...f1 } : { ...f2 };
+          best.confidence = 'high';
+          // Keep the lower line number (more precise)
+          best.line = Math.min(f1.line, f2.line);
+          merged.push(best);
+          used2.add(j);
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        // Only in run1 — keep but don't boost
+        merged.push(f1);
+      }
+    }
+
+    // Add findings only in run2
+    for (let j = 0; j < run2.length; j++) {
+      if (!used2.has(j)) {
+        merged.push(run2[j]);
+      }
+    }
+
+    return merged;
   }
 
   /**
@@ -120,24 +255,225 @@ ${patternContext}
 - Focus on BUSINESS LOGIC, not generic patterns. Do NOT report: missing events, gas optimization, centralization risk, missing zero-address checks, or generic best practices.
 - Only report findings at medium severity or above. If it's not worth a medium, don't report it.
 - Quality bar: Would a senior auditor include this in a paid audit report? If not, skip it.
-- Report AT MOST 2 findings per file. If you find more than 2, keep only the highest-impact ones.
-- An empty findings array is the EXPECTED result for most files. Deep logic bugs are rare — only report if you're genuinely confident.`;
+
+${FP_AVOIDANCE}`;
 
     const numbered = fileContent.split('\n').map((line, i) => `${i + 1}: ${line}`).join('\n');
+
+    // Add function inventory so deep pass knows which functions to examine
+    const functionInventory = file.lines > 150 ? this.extractFunctionInventory(fileContent) : '';
+
+    // Identify which functions already have findings
+    const coveredLines = new Set(firstPassFindings.map(f => f.line));
+    const uncoveredNote = functionInventory ? this.identifyUncoveredFunctions(fileContent, firstPassFindings) : '';
 
     const userPrompt = `## Deep Analysis: ${file.relativePath}
 
 ### First-pass findings (do NOT repeat):
 ${existingText}
-
+${functionInventory}${uncoveredNote}
 ### Code:
 \`\`\`${file.language}
 ${numbered}
 \`\`\`
 
-Look specifically for business logic bugs, economic attacks, and edge cases that the first pass missed. Focus on fee calculations, token edge cases, and state manipulation.`;
+IMPORTANT: Systematically analyze each uncovered function listed above. For each one:
+1. Read the function body line by line
+2. Trace every arithmetic operation — is the fee/price/amount computed correctly?
+3. Check: are all payments/transfers accounted for? Does the protocol collect its share?
+4. What happens with edge-case inputs (zero, max, low-decimal tokens)?
+5. Can a caller exploit the function's interaction with other contract functions?`;
 
     return this.callClaude(systemPrompt, userPrompt, file.relativePath, this.config.deepModel);
+  }
+
+  /**
+   * Function-level targeted analysis — analyzes individual uncovered functions
+   * that the first + deep pass missed entirely.
+   *
+   * For large files, Claude tends to focus on the first few functions and skip
+   * ones later in the file. This pass extracts each uncovered function with
+   * surrounding context and analyzes it individually.
+   */
+  async analyzeUncoveredFunctions(
+    file: FileInfo,
+    fileContent: string,
+    existingFindings: Finding[],
+    patternContext: string
+  ): Promise<Finding[]> {
+    const functions = this.extractFunctionsWithBodies(fileContent);
+    if (functions.length === 0) return [];
+
+    // Find which functions already have findings (by line range overlap)
+    const coveredRanges = existingFindings
+      .filter(f => f.file === file.relativePath)
+      .map(f => ({ start: f.line - 5, end: (f.endLine || f.line) + 5 }));
+
+    const uncovered = functions.filter(fn => {
+      // Skip trivial functions (setters, getters, pure view with < 5 lines)
+      if (fn.bodyLines < 5) return false;
+      // Skip internal/private
+      if (fn.visibility === 'internal' || fn.visibility === 'private') return false;
+      // Check if any finding covers this function's line range
+      return !coveredRanges.some(r => fn.startLine >= r.start && fn.startLine <= r.end);
+    });
+
+    if (uncovered.length === 0) return [];
+
+    // Extract state variables and imports for context
+    const stateContext = this.extractStateContext(fileContent);
+    const projectBrief = this.projectContext ? formatContextForPrompt(this.projectContext) : '';
+
+    const allFindings: Finding[] = [];
+
+    // Batch uncovered functions into groups of 3 to reduce API calls
+    const batches: typeof uncovered[] = [];
+    for (let i = 0; i < uncovered.length; i += 3) {
+      batches.push(uncovered.slice(i, i + 3));
+    }
+
+    for (const batch of batches) {
+      const funcSections = batch.map(fn => {
+        const lines = fileContent.split('\n');
+        const body = lines.slice(fn.startLine - 1, fn.endLine).map(
+          (line, i) => `${fn.startLine + i}: ${line}`
+        ).join('\n');
+        return `### ${fn.name}() — line ${fn.startLine} (${fn.visibility}, ${fn.mutability})\n\`\`\`solidity\n${body}\n\`\`\``;
+      }).join('\n\n');
+
+      const systemPrompt = `You are Krait, performing TARGETED function-level analysis. Previous analysis passes looked at this file but did NOT find issues in these specific functions. Your job is to examine each function carefully for bugs.
+
+${projectBrief}
+
+${patternContext}
+
+${FP_AVOIDANCE}
+
+## Rules:
+- Analyze EACH function below independently.
+- Focus on: incorrect arithmetic, wrong recipients, fee errors, token edge cases, state inconsistency.
+- Every finding MUST have a concrete exploit scenario.
+- Only report medium severity or above.
+- An empty findings array is expected if the functions are correct.`;
+
+      const userPrompt = `## Targeted Analysis: ${file.relativePath}
+
+### Contract context (state variables and key types):
+\`\`\`solidity
+${stateContext}
+\`\`\`
+
+### Functions to analyze (these had NO findings in previous passes):
+
+${funcSections}
+
+Check each function for: incorrect fee/price math, wrong transfer amounts/recipients, type casting overflow, token compatibility issues, state that should be updated but isn't.`;
+
+      try {
+        const findings = await this.callClaude(systemPrompt, userPrompt, file.relativePath, this.config.deepModel);
+        allFindings.push(...findings);
+      } catch {
+        // Continue with other batches
+      }
+    }
+
+    return allFindings;
+  }
+
+  /**
+   * Extract function definitions with their bodies from Solidity source.
+   */
+  private extractFunctionsWithBodies(content: string): Array<{
+    name: string;
+    startLine: number;
+    endLine: number;
+    bodyLines: number;
+    visibility: string;
+    mutability: string;
+  }> {
+    const lines = content.split('\n');
+    const functions: Array<{
+      name: string; startLine: number; endLine: number;
+      bodyLines: number; visibility: string; mutability: string;
+    }> = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const match = lines[i].match(/function\s+(\w+)\s*\(/);
+      if (!match) continue;
+      const trimmed = lines[i].trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+
+      const name = match[1];
+      // Build context from function signature only (up to opening brace)
+      let contextEnd = i;
+      for (let k = i; k < Math.min(i + 12, lines.length); k++) {
+        contextEnd = k;
+        if (lines[k].includes('{')) break;
+      }
+      const context = lines.slice(i, contextEnd + 1).join(' ');
+      const visibility = context.includes('external') ? 'external' :
+        context.includes('public') ? 'public' :
+        context.includes('internal') ? 'internal' :
+        context.includes('private') ? 'private' : 'public';
+      const mutability = context.includes('view') ? 'view' :
+        context.includes('pure') ? 'pure' : 'mutable';
+
+      // Find function body end by brace matching
+      let braceCount = 0;
+      let started = false;
+      let endLine = i;
+      for (let j = i; j < lines.length; j++) {
+        for (const ch of lines[j]) {
+          if (ch === '{') { braceCount++; started = true; }
+          if (ch === '}') braceCount--;
+        }
+        if (started && braceCount === 0) {
+          endLine = j;
+          break;
+        }
+      }
+
+      functions.push({
+        name,
+        startLine: i + 1,
+        endLine: endLine + 1,
+        bodyLines: endLine - i + 1,
+        visibility,
+        mutability,
+      });
+    }
+
+    return functions;
+  }
+
+  /**
+   * Extract state variables, imports, and key type definitions for context.
+   */
+  private extractStateContext(content: string): string {
+    const lines = content.split('\n');
+    const contextLines: string[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Imports
+      if (trimmed.startsWith('import ')) {
+        contextLines.push(trimmed);
+        continue;
+      }
+      // Contract declaration
+      if (trimmed.match(/^(contract|abstract contract|library)\s+/)) {
+        contextLines.push(trimmed);
+        continue;
+      }
+      // State variables (indented, not inside functions)
+      if (trimmed.match(/^\s*(mapping|uint\d*|int\d*|address|bool|bytes\d*|string|enum|struct|event|error|modifier)\b/) ||
+          trimmed.match(/^\s*(public|private|internal|immutable|constant)\s/)) {
+        contextLines.push(trimmed);
+      }
+    }
+
+    // Cap at 50 lines to keep context manageable
+    return contextLines.slice(0, 50).join('\n');
   }
 
   async analyzeCrossContract(
@@ -179,7 +515,13 @@ CRITICAL RULES:
 - Only report issues that arise from CONTRACT INTERACTIONS, not single-file issues.
 - Every finding MUST reference a specific file and line number.
 - Be precise. No generic warnings. Describe the concrete attack path across contracts.
-- Apply the same severity calibration as per-file analysis.`;
+- Every hop in the attack path must be verified for callability and access control.
+- Max 3 hops in any attack chain — more is likely not exploitable in practice.
+- Report AT MOST 2 cross-contract findings. Quality over quantity.
+- An empty findings array is the EXPECTED result. Most contract interactions are safe.
+- Apply the same severity calibration as per-file analysis.
+
+${FP_AVOIDANCE}`;
 
     const existingFindingsText = perFileFindings.length > 0
       ? `\n\nAlready found per-file issues (do NOT re-report these):\n${perFileFindings.map(f => `- [${f.severity}] ${f.title} at ${f.file}:${f.line}`).join('\n')}`
@@ -251,7 +593,9 @@ ${existingText}
 - Every finding MUST have a concrete exploit scenario with specific steps.
 - Only report medium severity or above.
 - Report AT MOST 2 findings per file. Quality over quantity.
-- An empty findings array is perfectly acceptable — only report if genuinely confident.`;
+- An empty findings array is perfectly acceptable — only report if genuinely confident.
+
+${FP_AVOIDANCE}`;
 
     const allGapFindings: Finding[] = [];
     const topFiles = files.slice(0, 5);
@@ -277,19 +621,144 @@ Look specifically for the vulnerability patterns from real audits described in t
     return allGapFindings;
   }
 
+  /**
+   * Flow-based analysis — traces critical fund flows end-to-end across contracts.
+   * Replaces generic cross-contract analysis with targeted flow tracing.
+   */
+  async analyzeFlows(
+    flows: FundFlow[],
+    files: Array<{ file: FileInfo; content: string }>,
+    perFileFindings: Finding[],
+    architectureContext: ArchitectureAnalysis,
+    patternContext: string
+  ): Promise<Finding[]> {
+    if (flows.length === 0 || files.length < 2) return [];
+
+    const projectBrief = this.projectContext ? formatContextForPrompt(this.projectContext) : '';
+    const existingText = perFileFindings.length > 0
+      ? perFileFindings.map(f => `- [${f.severity}] ${f.title} at ${f.file}:${f.line}`).join('\n')
+      : 'None.';
+
+    const allFindings: Finding[] = [];
+
+    // Analyze top 3 flows by risk
+    const topFlows = flows.slice(0, 3);
+
+    for (const flow of topFlows) {
+      // Find files involved in this flow
+      const involvedFiles = files.filter(({ file, content }) => {
+        const contractMatch = content.match(/contract\s+(\w+)/);
+        const contractName = contractMatch ? contractMatch[1] : '';
+        return flow.contracts.some(c =>
+          c === contractName ||
+          c.toLowerCase() === contractName.toLowerCase() ||
+          file.relativePath.toLowerCase().includes(c.toLowerCase())
+        );
+      });
+
+      // If we can't find the files, skip this flow
+      if (involvedFiles.length === 0) continue;
+
+      // Cap at 4 files per flow to manage token costs
+      const flowFiles = involvedFiles.slice(0, 4);
+
+      const codeSections = flowFiles.map(({ file, content }) => {
+        const numbered = content.split('\n').map((line, i) => `${i + 1}: ${line}`).join('\n');
+        return `### ${file.relativePath}\n\`\`\`solidity\n${numbered}\n\`\`\``;
+      }).join('\n\n');
+
+      const invariantsText = architectureContext.invariants.length > 0
+        ? `\nInvariants that must hold:\n${architectureContext.invariants.map(i => `- ${i}`).join('\n')}`
+        : '';
+
+      const systemPrompt = `You are a senior security auditor tracing a critical fund flow end-to-end across multiple contracts.
+
+${projectBrief}
+
+## Already-found findings (do NOT repeat):
+${existingText}
+
+## Rules:
+- Trace the SPECIFIC flow described below step by step through the code.
+- At each step, verify: amounts correct, recipients correct, state consistent.
+- Focus on what goes WRONG at boundaries between contracts.
+- Every finding MUST reference specific file:line.
+- Report AT MOST 2 findings per flow. Only report genuine bugs.
+- An empty findings array is the EXPECTED result.
+
+${FP_AVOIDANCE}`;
+
+      const userPrompt = `## Trace the "${flow.name}" flow end-to-end
+
+**Flow**: ${flow.description}
+**Contracts involved**: ${flow.contracts.join(' → ')}
+**Risk notes**: ${flow.riskNotes}
+${invariantsText}
+
+${codeSections}
+
+ANALYSIS METHOD — for each step in this flow:
+1. Find the entry function. What parameters does the user control?
+2. For EACH arithmetic operation: write out the formula. Is the denominator correct? Can it be zero? Does it round in the protocol's favor?
+3. For EACH transfer/payment: who is the recipient? Is it the correct address? What is the amount — is it the pre-fee or post-fee value?
+4. For EACH external call: what does the called contract return? Is the return value checked? Can the called contract revert and brick this flow?
+5. After ALL state changes: does the sum of outflows equal inflows? Are any tokens stuck or unaccounted for?
+6. At boundaries: what happens with amount=0, amount=1, amount=MAX, first user, last user?
+
+Only report bugs where you can identify the SPECIFIC line where the math is wrong, the SPECIFIC recipient that is incorrect, or the SPECIFIC state that becomes inconsistent. Do not report generic concerns.`;
+
+      try {
+        const knownFiles = flowFiles.map(f => f.file.relativePath);
+        const findings = await this.callClaude(
+          systemPrompt, userPrompt, 'flow-' + flow.name, this.config.deepModel, knownFiles
+        );
+        allFindings.push(...findings);
+      } catch {
+        // Continue with other flows
+      }
+    }
+
+    return allFindings;
+  }
+
   private async callClaude(
     systemPrompt: string,
     userPrompt: string,
     contextLabel: string,
-    model?: string
+    model?: string,
+    knownFiles?: string[]
   ): Promise<Finding[]> {
+    const useModel = model || this.config.model;
+
+    // Dry-run guard: return empty findings without calling the API
+    if (this.config.dryRun) {
+      return [];
+    }
+
+    // Check cache before API call
+    if (this.cache && !this.config.noCache) {
+      const cacheKey = this.cache.computeKey(systemPrompt, userPrompt, useModel);
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        // Re-assign finding IDs from counter for continuity
+        const findings = cached.map(f => {
+          this.findingCounter++;
+          return { ...f, id: `KRAIT-${String(this.findingCounter).padStart(3, '0')}` };
+        });
+        if (this.config.verbose) {
+          console.error(`  [cache hit] ${contextLabel} (${findings.length} findings)`);
+        }
+        return findings;
+      }
+    }
+
     const maxRetries = 3;
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const response = await this.client.messages.create({
-          model: model || this.config.model,
+          model: useModel,
           max_tokens: 4096,
           system: systemPrompt,
           tools: [FINDING_TOOL],
@@ -297,7 +766,15 @@ Look specifically for the vulnerability patterns from real audits described in t
           messages: [{ role: 'user', content: userPrompt }],
         });
 
-        return this.extractFindings(response, contextLabel);
+        const findings = this.extractFindings(response, contextLabel, knownFiles);
+
+        // Write to cache after successful API call
+        if (this.cache && !this.config.noCache) {
+          const cacheKey = this.cache.computeKey(systemPrompt, userPrompt, useModel);
+          this.cache.set(cacheKey, findings, useModel);
+        }
+
+        return findings;
       } catch (err: unknown) {
         lastError = err instanceof Error ? err : new Error(String(err));
         if (this.isRateLimitError(err)) {
@@ -317,7 +794,8 @@ Look specifically for the vulnerability patterns from real audits described in t
 
   private extractFindings(
     response: Anthropic.Message,
-    contextLabel: string
+    contextLabel: string,
+    knownFiles?: string[]
   ): Finding[] {
     const findings: Finding[] = [];
 
@@ -327,9 +805,26 @@ Look specifically for the vulnerability patterns from real audits described in t
         if (Array.isArray(input.findings)) {
           for (const raw of input.findings) {
             this.findingCounter++;
-            const file = contextLabel === 'cross-contract'
-              ? String(raw.file || contextLabel)
-              : contextLabel;
+            let file: string;
+            if (contextLabel === 'batch') {
+              // Validate returned file path against known batch files
+              const reportedFile = String(raw.file || '');
+              if (knownFiles && knownFiles.includes(reportedFile)) {
+                file = reportedFile;
+              } else if (knownFiles && knownFiles.length > 0) {
+                // Try partial match (Claude might return just filename or relative variant)
+                const match = knownFiles.find(kf =>
+                  kf.endsWith(reportedFile) || reportedFile.endsWith(kf)
+                );
+                file = match || knownFiles[0];
+              } else {
+                file = reportedFile || contextLabel;
+              }
+            } else if (contextLabel === 'cross-contract') {
+              file = String(raw.file || contextLabel);
+            } else {
+              file = contextLabel;
+            }
 
             findings.push({
               id: `KRAIT-${String(this.findingCounter).padStart(3, '0')}`,
@@ -354,44 +849,47 @@ Look specifically for the vulnerability patterns from real audits described in t
     return findings;
   }
 
-  private buildSystemPrompt(patternContext: string): string {
-    return `You are Krait, an expert security auditor AI. You analyze smart contract and application code for vulnerabilities.
+  private buildSystemPrompt(patternContext: string, heuristicContext?: string): string {
+    return `You are Krait, an expert security auditor AI. Your job is to find bugs that LOSE MONEY or BREAK PROTOCOL LOGIC — not generic code quality issues.
 
-Your analysis must be:
-1. PRECISE: Every finding must reference a specific line number in the code.
-2. ACTIONABLE: Every finding must include a concrete remediation.
-3. HONEST: Only report real issues you are confident about. Do NOT hallucinate vulnerabilities.
-4. SELECTIVE: Only report issues that a senior auditor would include in a professional audit report. Prefer fewer, higher-quality findings over volume.
+## How to Analyze
+
+Read the code like an attacker would:
+1. **Trace the money**: Follow every token transfer, fee calculation, and balance update. Check the arithmetic. Does the fee get taken from the right amount? Does the recipient get the right share? Is the protocol fee sent to the right address?
+2. **Trace the state**: After each function, is the contract state consistent? Can calling functions in an unexpected order break invariants?
+3. **Think about edge cases**: What happens with zero amounts? With tokens that have 6 decimals instead of 18? With fee-on-transfer tokens? With the first/last depositor?
+4. **Check trust boundaries**: What can untrusted callers control? Can a callback recipient exploit the calling function?
+
+## What to Look For (PRIORITY ORDER — spend most analysis time on #1-#4):
+
+1. **Incorrect fee/royalty/reward math** → HIGH/CRITICAL. Fee on wrong base, double-counting, fee not collected, fee sent to wrong address, spec mismatch (e.g., bps denominator wrong).
+2. **Token handling edge cases** → HIGH/MEDIUM. Fee-on-transfer tokens breaking accounting, low-decimal tokens causing precision loss, zero-value transfers reverting, rebasing tokens breaking cached balances.
+3. **Rounding/precision errors** → HIGH/MEDIUM. Two distinct sub-classes:
+   (a) **Rounding direction**: In dual-conversion systems (deposit↔withdraw, mint↔burn, wrap↔unwrap), check that EACH direction rounds in the protocol's favor. If both round down, mint(small) can cost 0. This is different from share inflation.
+   (b) **Share inflation**: First depositor donating tokens to inflate share price. Only report if no virtual offset protection exists.
+4. **Business logic flaws** → HIGH/MEDIUM. Functions callable in wrong order, missing invariant checks, flash loan fee bypass, protocol fee not distributed, state inconsistency after partial failure.
+5. **Unsafe external interactions** → HIGH if exploitable. Unchecked return values causing state corruption, callbacks enabling state manipulation, arbitrary calls allowing theft.
+6. **Silent overflow in type casting** → HIGH. Even in Solidity 0.8+, explicit type casts like uint128(value) silently truncate without reverting. This is NOT caught by 0.8+ overflow protection.
+7. **Access control** → HIGH if actually bypassable. Only report if a specific unauthorized call path exists — not "this function should have onlyOwner."
+8. **Reentrancy** → ONLY if state is modified after an external call AND the reentrancy enables concrete value extraction. Do NOT report reentrancy if: the function has nonReentrant, or the contract inherits ReentrancyGuard, or there is no state change after the external call, or the reentrancy doesn't lead to profit for the attacker.
 
 ## Severity Guidelines
 
-- **critical**: Direct, unconditional loss of user funds or complete protocol takeover. The exploit path must be clear and achievable without extraordinary conditions.
-- **high**: Significant financial risk or privilege escalation that is exploitable under realistic conditions. Must have a concrete attack path.
-- **medium**: Conditional exploits requiring specific circumstances, griefing attacks with meaningful impact, or state manipulation that could cause material harm.
-- **low**: Minor issues with limited security impact. Best practice violations that have a theoretical but unlikely security consequence.
-- **info**: Code quality, gas optimization, style issues with no direct security impact.
+- **critical**: Direct, unconditional loss of user funds. Clear exploit path, no extraordinary conditions needed.
+- **high**: Significant financial risk exploitable under realistic conditions. Concrete attack path required.
+- **medium**: Conditional exploits, griefing with meaningful impact, or state manipulation causing material harm.
+- **low**: Minor issues, theoretical concerns. Best practice violations with unlikely security consequence.
 
-## Severity Calibration — What is NOT high/critical:
+## What is NOT a finding (do NOT report):
 
-- Missing zero-address validation → low (at most). Admin misconfiguration is not an exploit.
-- Missing event emissions → info. No security impact.
-- Missing input validation on admin/owner functions → low. Trusted roles are trusted.
-- Centralization risk (owner can do X) → info or low. This is a design choice, not a vulnerability.
-- Gas inefficiency or unbounded loops → low (unless it causes permanent DoS of critical functions).
-- Integer overflow/underflow in Solidity ≥0.8.0 → NOT a finding. Built-in checks revert automatically. Only report if unchecked{} blocks are used incorrectly.
-- "Missing feature" findings (no circuit breaker, no pause mechanism, no timelock) → info. Report what IS broken, not what COULD be added.
-- Using a single oracle without fallback → medium at most (not high), and only if the oracle can be manipulated.
+- Missing zero-address validation, missing events, centralization risk, gas optimization
+- Integer overflow/underflow in Solidity ≥0.8.0 (UNLESS inside unchecked{} blocks or via explicit type casting like uint128())
+- Missing features (no pause, no timelock, no circuit breaker)
+- Admin can do X (trusted roles are trusted)
+- Generic reentrancy where no concrete value extraction is possible
+- "Potential" issues without a concrete exploit scenario
 
-## Severity Calibration — What IS high/critical:
-
-- Reentrancy that enables fund theft (state updated after external call in a function handling value) → critical
-- Access control bypass allowing unauthorized users to call privileged functions → critical or high
-- Price/oracle manipulation with a concrete profitable attack path → high or critical
-- Rounding errors that allow value extraction (e.g., deposit/withdraw rounding exploits) → high
-- Cross-function or cross-contract reentrancy → high or critical
-- Unchecked external call return values where failure causes inconsistent state → medium or high
-
-Use the vulnerability patterns below as reference for what to look for. They are real patterns from past audits.
+${this.architectureContext ? formatArchitectureForSystemPrompt(this.architectureContext) : ''}
 
 ${this.soloditContext}
 
@@ -400,15 +898,14 @@ ${patternContext}
 
 ${this.projectContext ? formatContextForPrompt(this.projectContext) : ''}
 
-## Critical Rules:
+${heuristicContext || ''}
 
-- Do NOT report issues in test files, mock contracts, or example code.
-- Do NOT report standard library usage as vulnerable unless misused.
-- If a function has proper access control (onlyOwner, modifier, require(msg.sender == X)), do not flag it as missing access control.
-- If the contract uses Solidity ≥0.8.0, do NOT flag arithmetic overflow/underflow unless inside unchecked{} blocks.
-- Look for the ACTUAL vulnerability, not just code that looks similar to a pattern.
-- When in doubt about severity, grade it LOWER. A medium is better than a false high.
-- Report the findings array. If no vulnerabilities are found, report an empty findings array — this is perfectly acceptable.`;
+## Output Rules:
+
+- Every finding MUST have a concrete exploit scenario: attacker does X → causes Y → extracts Z.
+- Every finding MUST reference the exact line number.
+- Quality over quantity. An empty findings array is perfectly acceptable and EXPECTED for clean code.
+- When in doubt about severity, grade LOWER.`;
   }
 
   private buildFilePrompt(file: FileInfo, content: string): string {
@@ -427,19 +924,228 @@ ${this.projectContext ? formatContextForPrompt(this.projectContext) : ''}
       }
     }
 
-    return `Analyze the following ${file.language} file for security vulnerabilities.
+    // Detect what the file does and generate targeted analysis hints
+    const analysisHints = this.detectFileAnalysisHints(content);
+
+    // Architecture-level context for this specific file
+    const archFileContext = this.architectureContext
+      ? formatArchitectureForFilePrompt(this.architectureContext, file, content)
+      : '';
+
+    // For large files, extract function inventory so Claude analyzes each one
+    const functionInventory = file.lines > 150 ? this.extractFunctionInventory(content) : '';
+
+    return `Analyze this ${file.language} file for security vulnerabilities.
 
 File: ${file.relativePath}
-Language: ${file.language}
-Lines: ${file.lines}${roleContext}
-
+Lines: ${file.lines}${roleContext}${archFileContext}
+${analysisHints}${functionInventory}
 \`\`\`${file.language}
 ${numberedContent}
 \`\`\`
 
-Report security vulnerabilities you find. Focus on exploitable issues — quality over quantity.
-Each finding MUST include the exact line number.
-If there are no real vulnerabilities, report an empty findings array.`;
+INSTRUCTIONS:
+1. Read EVERY function listed above. Do not skip functions in the middle or end of the file.
+2. For each function: trace token flows, check arithmetic, verify recipients and amounts.
+3. Check for edge cases: zero amounts, first/last user, type casting truncation, low-decimal tokens.
+4. Only then consider reentrancy, access control, etc.
+
+Report findings with exact line numbers. Empty findings array is fine.`;
+  }
+
+  /**
+   * Detect what a file does and return targeted analysis hints.
+   * This tells Claude what to focus on for THIS specific file.
+   */
+  private detectFileAnalysisHints(content: string): string {
+    const lower = content.toLowerCase();
+    const hints: string[] = [];
+
+    // Fee/royalty logic
+    if (lower.includes('fee') || lower.includes('royalt') || lower.includes('bps') ||
+        lower.includes('commission') || lower.includes('protocol fee')) {
+      hints.push('- This file has FEE/ROYALTY logic. Check: Is the fee calculated on the correct base amount (before or after other deductions)? Is the fee sent to the correct recipient? Is the fee denominator correct (bps = /10000)?');
+    }
+
+    // Flash loan logic
+    if (lower.includes('flashloan') || lower.includes('flash loan') || lower.includes('flashfee')) {
+      hints.push('- This file has FLASH LOAN logic. Check: Is the flash loan fee calculated correctly? Is the fee taken from the right address? Can the flash loan mechanism be used to bypass fees in other functions?');
+    }
+
+    // Token transfer logic
+    if (lower.includes('transferfrom') || lower.includes('safetransferfrom') || lower.includes('safetransfer')) {
+      hints.push('- This file transfers tokens. Check: Does it handle fee-on-transfer tokens (actual received != amount)? Does it handle zero-amount transfers? Does it handle low-decimal tokens?');
+    }
+
+    // Virtual reserves / AMM math
+    if (lower.includes('reserve') || lower.includes('getamount') || lower.includes('quote')) {
+      hints.push('- This file has RESERVE/AMM math. Check: Can reserves be manipulated? Is there silent overflow in reserve updates (uint128 casting)? Does the price calculation handle edge cases?');
+    }
+
+    // Share/vault/wrapper math
+    if (lower.includes('totalsupply') && (lower.includes('totalassets') || lower.includes('share') ||
+        lower.includes('wrapper') || lower.includes('wrapped') ||
+        (lower.includes('deposit') && lower.includes('withdraw') && lower.includes('mint')))) {
+      hints.push('- This file has SHARE/VAULT/WRAPPER math. Check SEPARATELY: (1) ROUNDING DIRECTION: In dual-conversion functions (deposit↔withdraw, mint↔burn, wrap↔unwrap), does each direction round in the protocol\'s favor? If both round DOWN, mint(1 wei) can cost 0 tokens — this is exploitable. (2) FIRST DEPOSITOR: Can the first depositor inflate share price via donation? Division by zero when supply is 0?');
+    }
+
+    // Callback patterns
+    if (lower.includes('onerc721received') || lower.includes('onerc1155received') ||
+        lower.includes('callback') || lower.includes('fallback')) {
+      hints.push('- This file has CALLBACK patterns. Check: Is state consistent before callbacks? Can callback recipients manipulate state?');
+    }
+
+    // Type casting
+    if (lower.includes('uint128(') || lower.includes('uint96(') || lower.includes('uint64(') ||
+        lower.includes('uint32(') || lower.includes('int128(')) {
+      hints.push('- This file has EXPLICIT TYPE CASTS (uint128, etc). These silently truncate in Solidity 0.8+ — check if values can exceed the target type range.');
+    }
+
+    // Owner/execute patterns
+    if (lower.includes('execute') || lower.includes('multicall') || lower.includes('delegatecall')) {
+      hints.push('- This file has ARBITRARY EXECUTION logic. Check: Can the caller steal tokens via crafted call data? Can approved tokens be drained?');
+    }
+
+    // ERC2981 royalty — external call trusting return value
+    if (lower.includes('royaltyinfo') || lower.includes('erc2981') || lower.includes('royalty')) {
+      hints.push('- This file calls ERC2981 royaltyInfo(). Check: What if the NFT returns an excessive royalty (e.g., 100%)? Can a malicious NFT contract drain the pool/buyer by claiming all proceeds as royalty? Is the royalty amount bounded?');
+    }
+
+    // Flash loan fee distribution
+    if (lower.includes('flashloan') || lower.includes('flashfee')) {
+      hints.push('- FLASH LOAN FEE DISTRIBUTION: Does the flash loan fee get split correctly? Is the protocol fee portion sent to the factory/treasury? Or does it all stay in the pool?');
+    }
+
+    // ETH transfers to arbitrary addresses (revert risk)
+    if ((lower.includes('.call{value') || lower.includes('.transfer(') || lower.includes('.send(')) &&
+        (lower.includes('royalt') || lower.includes('recipient') || lower.includes('receiver'))) {
+      hints.push('- This file sends ETH to external addresses. Check: What if the recipient is a contract that reverts (no receive/fallback)? Does this brick the entire function (sell, buy, etc.)?');
+    }
+
+    // Zero-amount transfer edge case
+    if (lower.includes('changefee') || (lower.includes('fee') && lower.includes('transfer'))) {
+      hints.push('- FEE TRANSFER EDGE CASE: What happens when the fee amount is zero? Some ERC20 tokens revert on transfer(0). Does this brick the function?');
+    }
+
+    // CREATE2 / deterministic deployment
+    if (lower.includes('create2') || lower.includes('clonedeterministic') || lower.includes('salt')) {
+      hints.push('- This file uses deterministic deployment. Check: Can an attacker predict the address and front-run creation? Can they deploy a malicious contract at the expected address?');
+    }
+
+    // Ownership transfer + token approval
+    if (lower.includes('transferownership') || lower.includes('setowner') ||
+        (lower.includes('owner') && lower.includes('approve'))) {
+      hints.push('- This file has OWNERSHIP logic. Check: After ownership transfer, are token approvals still valid? Can the old owner exploit stale approvals?');
+    }
+
+    if (hints.length === 0) return '';
+    return '\n**File-specific analysis focus:**\n' + hints.join('\n') + '\n';
+  }
+
+  /**
+   * Extract a function inventory from the file so Claude knows what to analyze.
+   * For large files, Claude tends to focus on the first few functions and skip
+   * functions later in the file (flashLoan, changeFeeQuote, etc).
+   */
+  private extractFunctionInventory(content: string): string {
+    const funcRegex = /function\s+(\w+)\s*\(([^)]*)\)[^{]*(?:external|public|internal|private)?[^{]*/g;
+    const functions: Array<{ name: string; line: number; visibility: string; mutability: string }> = [];
+    const lines = content.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      // Match function name — params may span multiple lines so just match the start
+      const match = lines[i].match(/function\s+(\w+)\s*\(/);
+      if (!match) continue;
+      // Skip comments
+      const trimmed = lines[i].trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+
+      const name = match[1];
+      // Build context from function signature only (up to opening brace)
+      let sigEnd = i;
+      for (let k = i; k < Math.min(i + 12, lines.length); k++) {
+        sigEnd = k;
+        if (lines[k].includes('{')) break;
+      }
+      const context = lines.slice(i, sigEnd + 1).join(' ');
+      const visibility = context.includes('external') ? 'external' :
+        context.includes('public') ? 'public' :
+        context.includes('internal') ? 'internal' :
+        context.includes('private') ? 'private' : 'public';
+      const mutability = context.includes('view') ? 'view' :
+        context.includes('pure') ? 'pure' : 'mutable';
+
+      functions.push({ name, line: i + 1, visibility, mutability });
+    }
+
+    if (functions.length < 3) return '';
+
+    // Categorize functions by risk level
+    const stateChanging = functions.filter(f => f.mutability === 'mutable' && f.visibility !== 'private' && f.visibility !== 'internal');
+    const viewFuncs = functions.filter(f => f.mutability !== 'mutable');
+
+    let inventory = '\n**Functions in this file (analyze EACH state-changing function):**\n';
+    for (const f of stateChanging) {
+      inventory += `- \`${f.name}()\` (line ${f.line}, ${f.visibility}) — STATE-CHANGING, must analyze\n`;
+    }
+    if (viewFuncs.length > 0) {
+      // Flag view functions that compute prices/fees/quotes — bugs here affect callers
+      const criticalViews = viewFuncs.filter(f =>
+        /quote|price|fee|rate|amount|balance|value|convert|preview/i.test(f.name)
+      );
+      const otherViews = viewFuncs.filter(f =>
+        !/quote|price|fee|rate|amount|balance|value|convert|preview/i.test(f.name)
+      );
+      if (criticalViews.length > 0) {
+        for (const f of criticalViews) {
+          inventory += `- \`${f.name}()\` (line ${f.line}, view) — COMPUTES PRICES/FEES, check math carefully\n`;
+        }
+      }
+      if (otherViews.length > 0) {
+        inventory += `- Plus ${otherViews.length} other view/pure functions: ${otherViews.map(f => f.name + '()').join(', ')}\n`;
+      }
+    }
+
+    return inventory;
+  }
+
+  /**
+   * Identify which functions have NO findings from the first pass.
+   * Returns a focused instruction for the deep pass.
+   */
+  private identifyUncoveredFunctions(content: string, findings: Finding[]): string {
+    const lines = content.split('\n');
+    const funcStarts: Array<{ name: string; line: number; endLine: number }> = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const match = lines[i].match(/function\s+(\w+)\s*\(/);
+      if (!match) continue;
+      const trimmed = lines[i].trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+
+      // Find end of function (brace counting)
+      let braceCount = 0;
+      let started = false;
+      let endLine = i;
+      for (let j = i; j < lines.length; j++) {
+        for (const ch of lines[j]) {
+          if (ch === '{') { braceCount++; started = true; }
+          if (ch === '}') braceCount--;
+        }
+        if (started && braceCount === 0) { endLine = j; break; }
+      }
+      funcStarts.push({ name: match[1], line: i + 1, endLine: endLine + 1 });
+    }
+
+    // A function is "covered" if any finding falls within its line range
+    const uncovered = funcStarts.filter(func => {
+      return !findings.some(f => f.line >= func.line && f.line <= func.endLine);
+    });
+
+    if (uncovered.length === 0) return '';
+
+    return `\n**UNCOVERED functions (zero findings from first pass — prioritize these):**\n` +
+      uncovered.map(f => `- \`${f.name}()\` lines ${f.line}-${f.endLine}`).join('\n') + '\n';
   }
 
   private getChecklistContext(): string {

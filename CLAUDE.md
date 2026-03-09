@@ -208,6 +208,8 @@ Patterns are NOT used for regex matching. They are formatted and included in the
 
 Be direct. Skip theory. Show working code and results. When something doesn't work, say so and fix it.
 
+**Always give brutally honest, back-to-reality feedback.** When asked to evaluate progress, features, or results — don't sugarcoat. Compare claims against actual data. Call out when we're building features before fixing the core, when metrics are misleading, when we're optimizing for the wrong thing. The owner needs tough truth, not comfortable narratives. This applies to everything we build, not just Krait.
+
 ## Related Resources
 
 - Old patterns to copy: `ZealynxSecurity/agent-training` repo, `patterns/` directory

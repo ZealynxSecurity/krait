@@ -1,0 +1,102 @@
+# Fee Calculation Vulnerability Patterns
+# Category: fee-calculation
+# Last Updated: 2026-03-05
+
+- id: "SOL-FEE-001"
+  name: "Fee calculated on wrong base amount"
+  category: "fee-calculation"
+  severity: "high"
+  description: "Protocol fee is calculated on the gross amount instead of the net amount (or vice versa), leading to incorrect fee collection. Common in swap/transfer functions where fee should be taken before or after the main operation."
+  detection:
+    strategy: "Look for fee calculations where the base amount may not match the intended semantics — e.g., fee taken on input amount but transfer uses input amount minus fee, or fee taken on already-reduced amount"
+    indicators: ["fee", "amount * fee", "amount - fee", "bps", "protocol fee", "royalty"]
+  real_examples:
+    - source: "Code4rena"
+      project: "Caviar"
+      finding_id: "H-01"
+      impact: "Users pay incorrect fees, protocol collects more/less than intended"
+      code_vulnerable: |
+        uint256 fee = inputAmount * feeBps / 10000;
+        uint256 outputAmount = getAmountOut(inputAmount); // fee not deducted from input
+        token.transfer(user, outputAmount);
+        token.transfer(feeRecipient, fee);
+      code_fixed: |
+        uint256 fee = inputAmount * feeBps / 10000;
+        uint256 netInput = inputAmount - fee;
+        uint256 outputAmount = getAmountOut(netInput); // fee deducted before calculation
+        token.transfer(user, outputAmount);
+        token.transfer(feeRecipient, fee);
+  false_positive_notes: "Verify whether the protocol intends the fee to be on gross or net. Some protocols intentionally fee on gross."
+  tags: ["defi", "fee-calculation", "solidity", "arithmetic"]
+  added_date: "2026-03-05"
+  confidence: "high"
+
+- id: "SOL-FEE-002"
+  name: "Fee double-counting or fee-on-fee"
+  category: "fee-calculation"
+  severity: "high"
+  description: "Fee is applied multiple times to the same operation — e.g., a buy fee and a sell fee both applied during a single swap, or fee deducted and then fee calculated again on the reduced amount."
+  detection:
+    strategy: "Look for multiple fee deductions in the same function or code path, especially in swap/transfer flows"
+    indicators: ["fee", "double fee", "fee on fee", "net amount", "gross amount"]
+  real_examples:
+    - source: "Sherlock"
+      project: "Various DeFi"
+      finding_id: "fee-double-count"
+      impact: "Users lose more value than intended, or protocol accounting becomes inconsistent"
+      code_vulnerable: |
+        uint256 fee1 = amount * buyFee / 10000;
+        uint256 afterFee = amount - fee1;
+        uint256 fee2 = afterFee * protocolFee / 10000; // second fee on already-reduced amount
+        uint256 finalAmount = afterFee - fee2;
+  false_positive_notes: "Multiple fees may be intentional (e.g., platform fee + creator royalty). Verify against protocol spec."
+  tags: ["defi", "fee-calculation", "solidity"]
+  added_date: "2026-03-05"
+  confidence: "high"
+
+- id: "SOL-FEE-003"
+  name: "Fee sent to wrong recipient or not collected"
+  category: "fee-calculation"
+  severity: "high"
+  description: "Calculated fee is not actually transferred to the fee recipient, is sent to the wrong address, or is left in the contract without accounting."
+  detection:
+    strategy: "Look for fee calculations that are computed but not transferred, or transferred to an incorrect recipient"
+    indicators: ["feeRecipient", "protocolFee", "treasury", "fee transfer", "fee collection"]
+  real_examples:
+    - source: "Code4rena"
+      project: "Various"
+      finding_id: "fee-not-collected"
+      impact: "Protocol loses revenue, or fees accumulate in contract without withdrawal mechanism"
+      code_vulnerable: |
+        uint256 fee = amount * feeBps / 10000;
+        uint256 netAmount = amount - fee;
+        token.transfer(recipient, netAmount);
+        // fee stays in contract but no accounting or withdrawal
+  false_positive_notes: "Some protocols intentionally accumulate fees for batch withdrawal. Check for a separate fee collection function."
+  tags: ["defi", "fee-calculation", "solidity"]
+  added_date: "2026-03-05"
+  confidence: "medium"
+
+- id: "SOL-FEE-004"
+  name: "Fee calculation violates protocol specification"
+  category: "fee-calculation"
+  severity: "medium"
+  description: "The implemented fee logic does not match what the protocol documentation or comments describe. Common when fee basis points are applied incorrectly (e.g., using 100 instead of 10000 as denominator for bps)."
+  detection:
+    strategy: "Look for fee calculations with unusual denominators, or where the math doesn't produce the described fee percentage"
+    indicators: ["bps", "10000", "1000", "100", "percent", "fee rate"]
+  real_examples:
+    - source: "Sherlock"
+      project: "Various"
+      finding_id: "fee-spec-mismatch"
+      impact: "Fees are orders of magnitude higher or lower than intended"
+      code_vulnerable: |
+        // @dev 3% fee (300 bps)
+        uint256 fee = amount * 300 / 100; // Wrong! This is 300%, not 3%
+      code_fixed: |
+        // @dev 3% fee (300 bps)
+        uint256 fee = amount * 300 / 10000; // Correct: 300 bps = 3%
+  false_positive_notes: "Double-check the protocol's intended fee denomination before flagging."
+  tags: ["defi", "fee-calculation", "solidity", "arithmetic"]
+  added_date: "2026-03-05"
+  confidence: "medium"

@@ -13,6 +13,8 @@ import { resolveConfig } from '../core/config.js';
 import { discoverFiles, detectDomain } from '../core/file-discovery.js';
 import { PatternLoader } from '../knowledge/pattern-loader.js';
 import { AIAnalyzer } from '../analysis/ai-analyzer.js';
+import { runArchitecturePass } from '../analysis/architecture-pass.js';
+import { summarizeContract } from '../analysis/contract-summarizer.js';
 import { gatherProjectContext } from '../analysis/context-gatherer.js';
 import { deduplicateFindings } from '../analysis/deduplicator.js';
 import { postProcessFindings, validateWithSolodit } from '../analysis/post-processor.js';
@@ -24,7 +26,10 @@ import {
   compareFindingsAI,
   CompareResult,
 } from '../core/comparator.js';
-import { Finding, FileInfo, Report, Domain, KraitConfig } from '../core/types.js';
+import { Finding, FileInfo, Report, Domain, KraitConfig, ArchitectureAnalysis } from '../core/types.js';
+import { ResponseCache } from '../core/cache.js';
+import { scoreFileComplexity, batchSmallFiles } from '../core/file-scorer.js';
+import { runMultiAgentPipeline } from '../agents/multi-agent.js';
 
 export interface ShadowAuditResult {
   contestId: string;
@@ -47,7 +52,9 @@ export interface ShadowAuditOptions {
   dryRun?: boolean;      // Just clone and show what would happen
   skipClone?: boolean;   // Use existing repos (already cloned)
   aiMatch?: boolean;     // Use AI-assisted matching for comparison
+  noCache?: boolean;     // Disable response caching
   soloditApiKey?: string; // Solodit API key for enrichment
+  multiAgent?: boolean;  // Use multi-agent pipeline (default: true)
 }
 
 /**
@@ -264,6 +271,16 @@ async function runAudit(
   const analyzer = new AIAnalyzer(config);
   analyzer.setProjectContext(projectContext);
 
+  // Attach cache unless disabled
+  let cache: ResponseCache | null = null;
+  if (!options.noCache) {
+    cache = new ResponseCache(projectPath);
+    analyzer.setCache(cache);
+    if (cache.size() > 0) {
+      log(`    Cache: ${cache.size()} entries from previous runs`);
+    }
+  }
+
   // Solodit enrichment (always-on, graceful fallback)
   const soloditKey = options.soloditApiKey || process.env.SOLODIT_API_KEY;
   let soloditClient: SoloditClient | null = null;
@@ -283,78 +300,205 @@ async function runAudit(
     }
   }
 
-  const allFindings: Finding[] = [];
-  const fileContentsMap = new Map<string, string>();
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+  // Architecture pass (unless quick mode)
+  let architectureContext: ArchitectureAnalysis | null = null;
+  if (!config.quick) {
     try {
-      const content = readFileSync(file.path, 'utf-8');
-      fileContentsMap.set(file.relativePath, content);
-      const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
-      const patternContext = loader.formatForPrompt(filePatterns);
-      const findings = await analyzer.analyzeFile(file, content, patternContext);
-      allFindings.push(...findings);
-      log(`    [${i + 1}/${files.length}] ${file.relativePath} (${findings.length} findings)`);
+      const Anthropic = (await import('@anthropic-ai/sdk')).default;
+      const archClient = new Anthropic({ apiKey: config.apiKey });
+      const fileContentsForArch = new Map<string, string>();
+      for (const file of files) {
+        fileContentsForArch.set(file.relativePath, readFileSync(file.path, 'utf-8'));
+      }
+      const summaries = files.map(f => {
+        const content = fileContentsForArch.get(f.relativePath)!;
+        return summarizeContract(f, content);
+      });
+
+      architectureContext = await runArchitecturePass(
+        archClient, files, fileContentsForArch, summaries,
+        config.model, cache, options.verbose
+      );
+
+      if (architectureContext.protocolSummary) {
+        analyzer.setArchitectureContext(architectureContext);
+        log(`    Architecture: ${architectureContext.protocolSummary.slice(0, 60)}...`);
+        log(`    Fund flows: ${architectureContext.fundFlows.length}, Invariants: ${architectureContext.invariants.length}`);
+      }
     } catch (err) {
-      log(`    [${i + 1}/${files.length}] ${file.relativePath} — error`);
+      log(`    Architecture pass failed (continuing without): ${err instanceof Error ? err.message : err}`);
     }
   }
 
-  // Deep analysis pass (unless quick) — second pass on files that had findings
-  if (!config.quick) {
-    const filesWithFindings = new Map<string, { file: FileInfo; content: string; findings: Finding[] }>();
-    for (const finding of allFindings) {
-      const file = files.find(f => f.relativePath === finding.file);
-      if (file && !filesWithFindings.has(file.relativePath)) {
-        const content = fileContentsMap.get(file.relativePath) || readFileSync(file.path, 'utf-8');
-        filesWithFindings.set(file.relativePath, {
-          file,
-          content,
-          findings: allFindings.filter(f => f.file === file.relativePath),
-        });
+  const allFindings: Finding[] = [];
+  const fileContentsMap = new Map<string, string>();
+  for (const file of files) {
+    fileContentsMap.set(file.relativePath, readFileSync(file.path, 'utf-8'));
+  }
+
+  // Score files for analysis strategy
+  const fileScores = files.map(file => {
+    const content = fileContentsMap.get(file.relativePath)!;
+    return scoreFileComplexity(file, content);
+  });
+
+  const analyzeFiles = fileScores.filter(s => s.decision === 'analyze');
+  const skipFiles = fileScores.filter(s => s.decision === 'skip');
+  const batchFileScores = fileScores.filter(s => s.decision === 'batch');
+  const batches = batchSmallFiles(batchFileScores.map(s => s.file), fileContentsMap);
+
+  if (skipFiles.length > 0) {
+    log(`    Skipped: ${skipFiles.length} files`);
+  }
+  if (batches.length > 0) {
+    log(`    Batched: ${batchFileScores.length} small files into ${batches.length} groups`);
+  }
+
+  const useMultiAgent = options.multiAgent !== false;
+
+  if (useMultiAgent) {
+    // ─── Multi-Agent Pipeline ───
+    log(`    Multi-agent pipeline: Detector → Reasoner → Critic → Ranker`);
+    const analyzableFiles = fileScores
+      .filter(s => s.decision !== 'skip')
+      .map(s => s.file);
+
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const maClient = new Anthropic({ apiKey: config.apiKey });
+
+    try {
+      const { findings: maFindings, stats } = await runMultiAgentPipeline(
+        maClient,
+        analyzableFiles,
+        fileContentsMap,
+        loader,
+        domainPatterns,
+        config.model,
+        cache,
+        {
+          architectureContext,
+          projectContext,
+          soloditContext: soloditClient ? undefined : undefined,
+          verbose: options.verbose,
+          config,
+        },
+      );
+      allFindings.push(...maFindings);
+      log(`    Multi-agent: ${stats.detectCandidates} candidates → ${stats.reasonerExploitable} exploitable → ${stats.finalFindings} findings`);
+    } catch (err) {
+      log(`    Multi-agent pipeline failed: ${err instanceof Error ? err.message : err}`);
+      // Fall back to legacy per-file analysis
+      log(`    Falling back to legacy per-file analysis...`);
+      const fallbackAnalyzer = new AIAnalyzer(config);
+      fallbackAnalyzer.setProjectContext(projectContext);
+      if (architectureContext) fallbackAnalyzer.setArchitectureContext(architectureContext);
+      if (cache) fallbackAnalyzer.setCache(cache);
+
+      for (const file of analyzableFiles) {
+        try {
+          const content = fileContentsMap.get(file.relativePath)!;
+          const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
+          const patternContext = loader.formatForPrompt(filePatterns);
+          const findings = await fallbackAnalyzer.analyzeFile(file, content, patternContext);
+          allFindings.push(...findings);
+        } catch {
+          // continue
+        }
+      }
+      log(`    Legacy fallback: ${allFindings.length} findings`);
+    }
+  } else {
+    // ─── Legacy Single-Pass Pipeline ───
+    // Analyze individual files
+    for (let i = 0; i < analyzeFiles.length; i++) {
+      const { file } = analyzeFiles[i];
+      try {
+        const content = fileContentsMap.get(file.relativePath)!;
+        const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
+        const patternContext = loader.formatForPrompt(filePatterns);
+        const findings = await analyzer.analyzeFile(file, content, patternContext);
+        allFindings.push(...findings);
+        log(`    [${i + 1}/${analyzeFiles.length + batches.length}] ${file.relativePath} (${findings.length} findings)`);
+      } catch (err) {
+        log(`    [${i + 1}/${analyzeFiles.length + batches.length}] ${file.relativePath} — error`);
       }
     }
 
-    if (filesWithFindings.size > 0) {
-      // Rank by finding count + file size, take top 8 most interesting files
-      const ranked = [...filesWithFindings.entries()]
-        .sort((a, b) => {
-          const scoreA = a[1].findings.length * 2 + a[1].file.lines / 100;
-          const scoreB = b[1].findings.length * 2 + b[1].file.lines / 100;
-          return scoreB - scoreA;
-        })
-        .slice(0, 8);
-      log(`    Deep analysis: ${ranked.length} files (of ${filesWithFindings.size} with findings)...`);
-      for (const [relPath, { file, content, findings }] of ranked) {
-        try {
-          const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
-          const patternContext = loader.formatForPrompt(filePatterns);
-          const deepFindings = await analyzer.analyzeDeep(file, content, findings, patternContext);
-          allFindings.push(...deepFindings);
-          log(`    Deep: ${relPath} (+${deepFindings.length} findings)`);
-        } catch {
-          log(`    Deep: ${relPath} — error`);
+    // Analyze batched files
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      try {
+        const patternContext = loader.formatForPrompt(domainPatterns);
+        const findings = await analyzer.analyzeBatch(batch, patternContext);
+        allFindings.push(...findings);
+        log(`    [${analyzeFiles.length + i + 1}/${analyzeFiles.length + batches.length}] batch (${findings.length} findings)`);
+      } catch {
+        log(`    [${analyzeFiles.length + i + 1}/${analyzeFiles.length + batches.length}] batch — error`);
+      }
+    }
+
+    // Deep analysis pass (unless quick) — uses file scores
+    if (!config.quick) {
+      const analyzedScores = fileScores.filter(s => s.decision !== 'skip');
+      const allFileData = analyzedScores.map(s => {
+        const content = fileContentsMap.get(s.file.relativePath)!;
+        const findings = allFindings.filter(f => f.file === s.file.relativePath);
+        const deepScore = s.score + findings.length * 3;
+        return { file: s.file, content, findings, score: deepScore };
+      });
+
+      const deepLimit = analyzedScores.length <= 8 ? analyzedScores.length : 5;
+      const ranked = allFileData
+        .sort((a, b) => b.score - a.score)
+        .slice(0, deepLimit);
+
+      if (ranked.length > 0) {
+        log(`    Deep analysis: ${ranked.length} files (top by complexity)...`);
+        for (const { file, content, findings } of ranked) {
+          try {
+            const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
+            const patternContext = loader.formatForPrompt(filePatterns);
+            const deepFindings = await analyzer.analyzeDeep(file, content, findings, patternContext);
+            allFindings.push(...deepFindings);
+            log(`    Deep: ${file.relativePath} (+${deepFindings.length} findings)`);
+          } catch {
+            log(`    Deep: ${file.relativePath} — error`);
+          }
         }
       }
     }
-  }
 
-  // Cross-contract (unless quick)
-  if (!config.quick && files.length > 1) {
-    try {
+    // Flow-based analysis or cross-contract fallback (unless quick)
+    if (!config.quick && files.length > 1) {
       const fileContents = files.map(f => ({
         file: f,
-        content: readFileSync(f.path, 'utf-8'),
+        content: fileContentsMap.get(f.relativePath) || readFileSync(f.path, 'utf-8'),
       }));
-      const crossPatternContext = loader.formatForPrompt(domainPatterns);
-      const crossFindings = await analyzer.analyzeCrossContract(
-        fileContents, allFindings, crossPatternContext
-      );
-      allFindings.push(...crossFindings);
-      log(`    Cross-contract: ${crossFindings.length} findings`);
-    } catch {
-      log(`    Cross-contract analysis failed`);
+
+      if (architectureContext && architectureContext.fundFlows.length > 0) {
+        try {
+          const crossPatternContext = loader.formatForPrompt(domainPatterns);
+          const flowFindings = await analyzer.analyzeFlows(
+            architectureContext.fundFlows, fileContents, allFindings,
+            architectureContext, crossPatternContext
+          );
+          allFindings.push(...flowFindings);
+          log(`    Flow analysis: ${flowFindings.length} findings from ${Math.min(3, architectureContext.fundFlows.length)} flows`);
+        } catch {
+          log(`    Flow analysis failed`);
+        }
+      } else {
+        try {
+          const crossPatternContext = loader.formatForPrompt(domainPatterns);
+          const crossFindings = await analyzer.analyzeCrossContract(
+            fileContents, allFindings, crossPatternContext
+          );
+          allFindings.push(...crossFindings);
+          log(`    Cross-contract: ${crossFindings.length} findings`);
+        } catch {
+          log(`    Cross-contract analysis failed`);
+        }
+      }
     }
   }
 
@@ -403,10 +547,19 @@ async function runAudit(
   }
 
   const filteredFindings = processedFindings.filter(f => {
-    if (f.confidence === 'low' && !['critical', 'high'].includes(f.severity)) return false;
+    // Drop low-confidence LOW/INFO
+    if (f.confidence === 'low' && ['low', 'info'].includes(f.severity)) return false;
     if (f.severity === 'info') return false;
+    // For larger codebases (>10 files), require medium+ confidence for medium severity
+    // This prevents death-by-a-thousand-cuts FP flooding
+    if (files.length > 10 && f.confidence === 'low' && f.severity === 'medium') return false;
     return true;
   });
+
+  // Reassign sequential IDs after all filtering
+  for (let i = 0; i < filteredFindings.length; i++) {
+    filteredFindings[i].id = `KRAIT-${String(i + 1).padStart(3, '0')}`;
+  }
 
   // Build report
   const projectName = contest.id;
@@ -422,6 +575,14 @@ async function runAudit(
     patternsUsed: domainPatterns.length,
     model: config.model,
   };
+
+  // Log cache stats
+  if (cache) {
+    const cacheStats = cache.getStats();
+    if (cacheStats.hits > 0 || cacheStats.misses > 0) {
+      log(`    Cache: ${cacheStats.hits} hits, ${cacheStats.misses} misses`);
+    }
+  }
 
   // Save report
   const reportPath = join(options.workDir, `krait-report-${contest.id}.json`);

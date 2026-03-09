@@ -5,3 +5,6 @@ dist/
 .DS_Store
 coverage/
 test-repos/
+shadow-results/
+krait-report-*
+.krait-cache/

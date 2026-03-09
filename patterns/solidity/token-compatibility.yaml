@@ -1,0 +1,104 @@
+# Token Compatibility Vulnerability Patterns
+# Category: token-compatibility
+# Last Updated: 2026-03-05
+
+- id: "SOL-TOK-001"
+  name: "Fee-on-transfer token incompatibility"
+  category: "token-compatibility"
+  severity: "high"
+  description: "Protocol assumes token.transfer(amount) delivers exactly 'amount' to the recipient. Fee-on-transfer tokens (like USDT with fee enabled, or deflationary tokens) deliver less than the specified amount, causing accounting discrepancies."
+  detection:
+    strategy: "Look for patterns where the contract records the transfer amount rather than measuring the actual balance change after transfer"
+    indicators: ["transfer(", "transferFrom(", "balanceOf", "amount", "deposit", "safeTransferFrom"]
+  real_examples:
+    - source: "Code4rena"
+      project: "Multiple protocols"
+      finding_id: "fee-on-transfer"
+      impact: "Protocol accounting becomes incorrect. Users can withdraw more than deposited. Last withdrawer gets less."
+      code_vulnerable: |
+        function deposit(uint256 amount) external {
+            token.transferFrom(msg.sender, address(this), amount);
+            balances[msg.sender] += amount; // assumes full amount received
+        }
+      code_fixed: |
+        function deposit(uint256 amount) external {
+            uint256 before = token.balanceOf(address(this));
+            token.transferFrom(msg.sender, address(this), amount);
+            uint256 received = token.balanceOf(address(this)) - before;
+            balances[msg.sender] += received; // actual amount received
+        }
+  false_positive_notes: "Safe if protocol explicitly documents it only supports standard ERC20 tokens and validates on whitelist."
+  tags: ["defi", "token-compatibility", "solidity", "erc20"]
+  added_date: "2026-03-05"
+  confidence: "high"
+
+- id: "SOL-TOK-002"
+  name: "Low-decimal token precision loss"
+  category: "token-compatibility"
+  severity: "high"
+  description: "Protocol math assumes 18 decimals but some tokens have fewer (USDC/USDT: 6 decimals, WBTC: 8 decimals). Division operations can lose significant value with low-decimal tokens."
+  detection:
+    strategy: "Look for hardcoded 1e18 or 10**18 in token amount calculations, or divisions that would truncate to zero with 6-decimal tokens"
+    indicators: ["1e18", "10**18", "decimals", "1e6", "precision", "normalize"]
+  real_examples:
+    - source: "Sherlock"
+      project: "Various"
+      finding_id: "low-decimals"
+      impact: "Calculations return 0 for small amounts, or users lose significant value due to truncation"
+      code_vulnerable: |
+        // With USDC (6 decimals), amount of 100 USDC = 100e6
+        uint256 shares = amount * 1e18 / totalAssets; // if totalAssets >> amount, shares = 0
+      code_fixed: |
+        uint256 shares = amount * 10**decimals() / totalAssets; // use actual decimals
+  false_positive_notes: "Safe if the protocol only supports 18-decimal tokens and enforces this in deposit functions."
+  tags: ["defi", "token-compatibility", "solidity", "arithmetic"]
+  added_date: "2026-03-05"
+  confidence: "high"
+
+- id: "SOL-TOK-003"
+  name: "Token that reverts on zero-value transfer"
+  category: "token-compatibility"
+  severity: "medium"
+  description: "Some ERC20 tokens (e.g., LEND) revert on zero-value transfers. If protocol logic can result in a transfer of 0 tokens, the entire transaction reverts, potentially causing DoS."
+  detection:
+    strategy: "Look for transfer calls where the amount could be zero (e.g., calculated fees, reward distributions, or conditional transfers without zero-check)"
+    indicators: ["transfer(", "safeTransfer(", "fee", "reward", "amount"]
+  real_examples:
+    - source: "Code4rena"
+      project: "Various"
+      finding_id: "zero-transfer-revert"
+      impact: "Transaction reverts when transfer amount is zero, causing denial of service for legitimate operations"
+      code_vulnerable: |
+        uint256 reward = totalRewards * userShare / totalShares;
+        token.safeTransfer(user, reward); // reverts if reward = 0
+      code_fixed: |
+        uint256 reward = totalRewards * userShare / totalShares;
+        if (reward > 0) token.safeTransfer(user, reward);
+  false_positive_notes: "Only relevant for tokens that actually revert on zero transfer. Most standard tokens handle zero gracefully."
+  tags: ["defi", "token-compatibility", "solidity", "erc20"]
+  added_date: "2026-03-05"
+  confidence: "medium"
+
+- id: "SOL-TOK-004"
+  name: "Rebasing token balance inconsistency"
+  category: "token-compatibility"
+  severity: "high"
+  description: "Rebasing tokens (like stETH, AMPL) change balances automatically. Protocols that cache balances or use internal accounting without re-reading actual balances will have inconsistent state after a rebase."
+  detection:
+    strategy: "Look for cached token balances that are not re-read before use, especially in vault/pool contracts"
+    indicators: ["balanceOf", "totalSupply", "cached", "stored balance", "rebase", "stETH"]
+  real_examples:
+    - source: "Sherlock"
+      project: "Various"
+      finding_id: "rebasing-token"
+      impact: "Protocol accounting drifts from actual token balances, leading to insolvency or stuck funds"
+      code_vulnerable: |
+        mapping(address => uint256) public deposits;
+        function deposit(uint256 amount) external {
+            token.transferFrom(msg.sender, address(this), amount);
+            deposits[msg.sender] += amount; // after positive rebase, actual balance > sum(deposits)
+        }
+  false_positive_notes: "Safe if protocol explicitly does not support rebasing tokens and enforces a whitelist."
+  tags: ["defi", "token-compatibility", "solidity", "erc20"]
+  added_date: "2026-03-05"
+  confidence: "medium"

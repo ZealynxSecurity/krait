@@ -141,7 +141,10 @@ export class PatternLoader {
       relevant.push(...baseline);
     }
 
-    return relevant.map(s => s.pattern);
+    // Category diversity enforcement:
+    // Cap reentrancy patterns at 2 per file (they crowd out useful patterns)
+    // Ensure logic-heavy categories get priority
+    return this.enforceCategoryDiversity(relevant.map(s => s.pattern), maxPatterns);
   }
 
   private getCategoryKeywords(category: string): string[] {
@@ -155,8 +158,55 @@ export class PatternLoader {
       'price-manipulation': ['price', 'oracle', 'swap', 'reserve', 'getamount', 'liquidity'],
       'temporal-state': ['block.timestamp', 'block.number', 'deadline', 'expir'],
       'misconfiguration': ['initialize', 'constructor', 'setup', 'config', 'set'],
+      'fee-calculation': ['fee', 'royalty', 'bps', 'percent', 'protocolfee', 'basisfee', 'commission'],
+      'token-compatibility': ['decimals', 'safetransfer', 'balanceof', 'allowance', 'ierc20', 'safeapprove'],
+      'rounding': ['div', 'mul', 'precision', 'wad', '1e18', 'round', 'mulDiv'],
+      'external-call': ['delegatecall', 'staticcall', '.call(', 'address('],
+      'create2': ['salt', 'factory', 'clone', 'create2', 'minimal proxy'],
+      'signature': ['ecrecover', 'eip712', 'nonce', 'signature', 'permit'],
+      'frontrunning': ['deadline', 'slippage', 'minamount', 'minout', 'maxslippage'],
+      'denial-of-service': ['loop', 'array', 'push', 'gasleft', 'unbounded'],
     };
     return map[category] || [];
+  }
+
+  /**
+   * Enforce category diversity in pattern selection.
+   * Caps overrepresented categories (reentrancy, access-control) to make room
+   * for underrepresented but high-value categories (fee, rounding, token-compat).
+   */
+  private enforceCategoryDiversity(patterns: VulnerabilityPattern[], max: number): VulnerabilityPattern[] {
+    const maxPerCategory: Record<string, number> = {
+      'reentrancy': 2,
+      'access-control': 3,
+      'oracle-manipulation': 2,
+      'price-manipulation': 2,
+    };
+
+    const categoryCounts = new Map<string, number>();
+    const result: VulnerabilityPattern[] = [];
+    const deferred: VulnerabilityPattern[] = [];
+
+    for (const p of patterns) {
+      const cap = maxPerCategory[p.category];
+      const count = categoryCounts.get(p.category) || 0;
+
+      if (cap !== undefined && count >= cap) {
+        deferred.push(p); // Save for later if we have room
+        continue;
+      }
+
+      result.push(p);
+      categoryCounts.set(p.category, count + 1);
+    }
+
+    // Fill remaining slots with deferred patterns if under max
+    for (const p of deferred) {
+      if (result.length >= max) break;
+      result.push(p);
+    }
+
+    return result.slice(0, max);
   }
 
   getStats(): { total: number; byDomain: Record<string, number>; bySeverity: Record<string, number> } {
@@ -205,14 +255,35 @@ export class PatternLoader {
   private isValidPattern(entry: unknown): boolean {
     if (typeof entry !== 'object' || entry === null) return false;
     const obj = entry as Record<string, unknown>;
-    return (
-      typeof obj.id === 'string' &&
-      typeof obj.name === 'string' &&
-      typeof obj.category === 'string' &&
-      typeof obj.severity === 'string' &&
-      typeof obj.description === 'string' &&
-      typeof obj.detection === 'object' &&
-      Array.isArray(obj.tags)
-    );
+
+    // Basic structure check
+    if (
+      typeof obj.id !== 'string' ||
+      typeof obj.name !== 'string' ||
+      typeof obj.category !== 'string' ||
+      typeof obj.severity !== 'string' ||
+      typeof obj.description !== 'string' ||
+      typeof obj.detection !== 'object' ||
+      !Array.isArray(obj.tags)
+    ) {
+      return false;
+    }
+
+    // Quality gate: reject low-quality patterns
+    if (obj.name.length < 10) return false;
+    if (obj.description.length < 20) return false;
+
+    // Reject patterns with numeric-only indicators (garbage from batch imports)
+    const detection = obj.detection as Record<string, unknown>;
+    if (Array.isArray(detection.indicators)) {
+      const numericOnly = detection.indicators.filter(
+        (ind: unknown) => typeof ind === 'string' && /^[\d.,\s%$]+$/.test(ind.trim())
+      );
+      if (numericOnly.length > detection.indicators.length / 2 && detection.indicators.length > 2) {
+        return false;
+      }
+    }
+
+    return true;
   }
 }

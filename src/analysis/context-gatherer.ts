@@ -78,6 +78,14 @@ export async function gatherProjectContext(
     context.keyParameters = extractKeyParameters(readmeContent);
   }
 
+  // Code-based fallback for protocol type when README is sparse
+  if (!context.protocolType || context.protocolType === 'DeFi Protocol') {
+    const codeHints = inferProtocolTypeFromCode(files);
+    if (codeHints) {
+      context.protocolType = codeHints;
+    }
+  }
+
   // 2. Scope file
   context.scopeFiles = readScopeFile(projectRoot);
 
@@ -212,6 +220,40 @@ export function formatContextForPrompt(context: ProjectContext): string {
 
 // --- Internal helpers ---
 
+/**
+ * Infer protocol type from contract names, imports, and code keywords
+ * when README doesn't provide enough signal.
+ */
+function inferProtocolTypeFromCode(files: FileInfo[]): string | null {
+  const typeSignals: Record<string, number> = {};
+  const codeKeywords: Record<string, string[]> = {
+    'DEX / AMM': ['swap', 'pool', 'router', 'pair', 'liquidity', 'amm'],
+    'Lending / Borrowing': ['lend', 'borrow', 'collateral', 'liquidat', 'interest', 'vault'],
+    'NFT / Marketplace': ['nft', 'erc721', 'erc1155', 'auction', 'royalt', 'marketplace'],
+    'Yield / Vault': ['vault', 'strategy', 'harvest', 'yield', 'farm', 'reward'],
+    'Governance / DAO': ['governor', 'vote', 'proposal', 'timelock', 'dao'],
+    'Staking': ['stake', 'unstake', 'delegat', 'reward', 'validator'],
+    'Oracle': ['oracle', 'pricefeed', 'chainlink', 'twap'],
+  };
+
+  for (const file of files) {
+    const nameLower = file.relativePath.toLowerCase();
+    for (const [type, keywords] of Object.entries(codeKeywords)) {
+      for (const kw of keywords) {
+        if (nameLower.includes(kw)) {
+          typeSignals[type] = (typeSignals[type] || 0) + 1;
+        }
+      }
+    }
+  }
+
+  const sorted = Object.entries(typeSignals).sort((a, b) => b[1] - a[1]);
+  if (sorted.length > 0 && sorted[0][1] >= 2) {
+    return sorted[0][0];
+  }
+  return null;
+}
+
 function findProjectRoot(startPath: string): string {
   let current = startPath;
   for (let i = 0; i < 5; i++) {
@@ -283,25 +325,35 @@ function extractDescription(readme: string): string {
   return afterTitle.slice(0, 500);
 }
 
-function inferProtocolType(readme: string): string {
+function inferProtocolType(readme: string, contractNames?: string[]): string {
   const lower = readme.toLowerCase();
-  const types: Array<[string, string[]]> = [
-    ['DEX / AMM', ['decentralized exchange', 'dex', 'amm', 'automated market', 'swap', 'liquidity pool']],
-    ['Lending / Borrowing', ['lending', 'borrowing', 'borrow', 'collateral', 'liquidation', 'interest rate']],
-    ['Stablecoin', ['stablecoin', 'stable coin', 'usds', 'usdc peg', 'overcollateralized']],
-    ['NFT / Marketplace', ['nft', 'erc721', 'erc1155', 'marketplace', 'auction', 'royalt']],
-    ['Yield / Vault', ['yield', 'vault', 'strategy', 'farming', 'harvest', 'compound']],
-    ['Governance / DAO', ['governance', 'dao', 'voting', 'proposal', 'timelock']],
-    ['Bridge / Cross-chain', ['bridge', 'cross-chain', 'multichain', 'layer 2', 'l2']],
-    ['Oracle', ['oracle', 'price feed', 'chainlink', 'twap']],
-    ['Staking', ['staking', 'stake', 'unstake', 'delegation', 'validator']],
-    ['RWA / Tokenization', ['rwa', 'real world', 'tokeniz', 'asset-backed']],
+  const types: Array<[string, string[], number]> = [
+    ['DEX / AMM', ['decentralized exchange', 'dex', 'amm', 'automated market', 'swap', 'liquidity pool'], 0],
+    ['Lending / Borrowing', ['lending', 'borrowing', 'borrow', 'collateral', 'liquidation', 'interest rate'], 0],
+    ['Stablecoin', ['stablecoin', 'stable coin', 'usds', 'usdc peg', 'overcollateralized'], 0],
+    ['NFT / Marketplace', ['nft', 'erc721', 'erc1155', 'marketplace', 'auction', 'royalt'], 0],
+    ['Yield / Vault', ['yield', 'vault', 'strategy', 'farming', 'harvest', 'compound'], 0],
+    ['Governance / DAO', ['governance', 'dao', 'voting', 'proposal', 'timelock'], 0],
+    ['Bridge / Cross-chain', ['bridge', 'cross-chain', 'multichain', 'layer 2', 'l2'], 0],
+    ['Oracle', ['oracle', 'price feed', 'chainlink', 'twap'], 0],
+    ['Staking', ['staking', 'stake', 'unstake', 'delegation', 'validator'], 0],
+    ['RWA / Tokenization', ['rwa', 'real world', 'tokeniz', 'asset-backed'], 0],
   ];
 
-  const matched: string[] = [];
+  // Score each type by keyword matches, pick those with count >= 1 (prioritize highest)
+  const scored: Array<{ type: string; count: number }> = [];
   for (const [type, keywords] of types) {
     const count = keywords.filter(k => lower.includes(k)).length;
-    if (count >= 2) matched.push(type);
+    if (count >= 1) scored.push({ type, count });
+  }
+
+  // Sort by match count descending, take top matches
+  scored.sort((a, b) => b.count - a.count);
+  const matched = scored.filter(s => s.count >= 2).map(s => s.type);
+
+  // If no strong matches (2+), take the single best match
+  if (matched.length === 0 && scored.length > 0) {
+    matched.push(scored[0].type);
   }
 
   return matched.join(' + ') || 'DeFi Protocol';

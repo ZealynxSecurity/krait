@@ -79,6 +79,30 @@ export interface VulnerabilityPattern {
   confidence: 'high' | 'medium' | 'low';
 }
 
+export interface ArchitectureAnalysis {
+  protocolSummary: string;
+  fundFlows: FundFlow[];
+  invariants: string[];
+  trustAssumptions: string[];
+  contractRoles: ContractRole[];
+  criticalPaths: string[];
+}
+
+export interface FundFlow {
+  name: string;
+  contracts: string[];
+  description: string;
+  riskNotes: string;
+}
+
+export interface ContractRole {
+  name: string;
+  file: string;
+  role: string;
+  riskLevel: 'high' | 'medium' | 'low';
+  keyFunctions: string[];
+}
+
 export interface KraitConfig {
   apiKey: string;
   model: string;
@@ -90,6 +114,8 @@ export interface KraitConfig {
   outputFormat: 'json' | 'markdown' | 'both';
   verbose: boolean;
   quick: boolean;
+  noCache: boolean;
+  dryRun: boolean;
   soloditApiKey?: string;
 }
 
@@ -140,4 +166,6 @@ export const DEFAULT_CONFIG: Omit<KraitConfig, 'apiKey'> = {
   outputFormat: 'both',
   verbose: false,
   quick: false,
+  noCache: false,
+  dryRun: false,
 };
