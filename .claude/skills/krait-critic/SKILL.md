@@ -20,12 +20,14 @@ The goal is **zero false positives** on H/M findings. A false positive wastes th
 
 ## Core Rule
 
-**GUILTY UNTIL PROVEN INNOCENT does NOT apply here. INNOCENT UNTIL PROVEN GUILTY.**
+**INNOCENT UNTIL PROVEN GUILTY. The burden of proof is on the FINDING, not on the code.**
 
 For each candidate, you must:
-1. Attempt to DISPROVE it through code trace or PoC
+1. Attempt to DISPROVE it through code trace
 2. Only if disproof FAILS does the finding stand
-3. If you cannot conclusively prove it's real, DOWNGRADE or DISCARD
+3. If you cannot write a concrete exploit trace with actual values, the finding is KILLED
+4. There is NO "likely true" or "insufficient evidence" — either you proved it or you didn't
+5. **When in doubt, KILL it.** A missed real bug is unfortunate. A false positive destroys credibility.
 
 ## Verification Methods
 
