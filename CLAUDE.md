@@ -8,6 +8,18 @@ Krait is an AI-first multi-domain security auditor built by Zealynx Security. It
 
 Carlos Vendrell Felici (@TheBlockChainer / @Bloqarl), founder of Zealynx Security.
 
+## Two Modes of Operation
+
+### 1. Claude Code Skills (Zero Cost)
+Run `/krait` inside Claude Code on any project. Uses your Claude subscription — no API costs.
+- `/krait` — Full 4-phase audit (recon → detect → state analysis → verify → report)
+- `/krait-quick` — Fast mode (skips state analysis)
+- `/krait-recon`, `/krait-detect`, `/krait-state`, `/krait-critic`, `/krait-report` — Individual phases
+
+### 2. CLI Tool (API-Powered)
+Run `npx krait audit <path>` for automated batch processing. Uses Anthropic API — costs money per run.
+See "Build Instructions" below for CLI development phases.
+
 ## Build Instructions
 
 This project is being built from scratch. Follow the phases below **in order**. Complete each phase fully before moving to the next. Do not skip steps. Do not over-engineer — keep it lean and working.

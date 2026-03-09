@@ -143,6 +143,7 @@ Check these patterns from real exploits (only check those relevant to the code):
 - **Guard consistency**: Group by shared state writes. Missing guards on any?
 - **Inverse operation parity**: deposit↔withdraw, mint↔burn — symmetric?
 - **Value flow conservation**: value in == value out? Can value be created/destroyed?
+- **Look for what's NOT there**: For each state-changing function, ask: "What SHOULD this function also do that it doesn't?" Compare against sibling functions. If `deposit()` updates rewardDebt but `transferShares()` doesn't, that's a finding.
 
 ### E. Record Candidates
 
@@ -282,6 +283,16 @@ For each candidate, assign:
 - **DOWNGRADE**: Real but wrong severity. Specify correct severity.
 - **FALSE POSITIVE**: Disproven. State which FP pattern (#1-10) and why.
 - **INSUFFICIENT EVIDENCE**: Can't prove or disprove. Exclude from report.
+
+### Post-Verification Code Check (MANDATORY)
+
+For every TRUE POSITIVE and LIKELY TRUE finding, do this final check:
+1. Re-read the exact file and lines cited in the finding
+2. Verify the quoted code snippet matches the actual file content character-by-character
+3. Verify line numbers are accurate (not off by even 1 line)
+4. If ANY mismatch → fix the finding or reclassify as FALSE POSITIVE
+
+This step catches hallucinated line numbers and stale code references.
 
 Save to `.audit/findings/critic-verdicts.md`.
 
