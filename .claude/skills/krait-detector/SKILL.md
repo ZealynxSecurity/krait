@@ -186,7 +186,62 @@ For each file, check these 40 heuristic triggers from real exploits. If the code
 - PR-02: Price/rate as integer → Rounding direction safe? One-sided manipulation?
 - PR-03: Dual conversion (assets↔shares) → Round OPPOSITE directions? mint(1 wei) paying 0?
 
-### Step 5: Cross-Function Analysis
+### Step 5: Targeted Analysis Modules (MANDATORY)
+
+These modules address specific bug classes consistently missed by general interrogation. Apply each one.
+
+#### Module A: Untrusted Recipient Analysis
+For every ETH/token transfer to an address that is NOT msg.sender or a known trusted protocol address:
+1. Can the recipient reenter during the transfer callback? Map reachable functions and stale state.
+2. Can the recipient revert and permanently DOS the function?
+3. Is the same external source queried twice in one function? Can the value change between queries?
+4. If a fee is added to a cost variable, does the corresponding transfer ALWAYS execute? Or is it conditional (e.g., `if recipient != address(0)`) while the cost is unconditional?
+
+#### Module B: Type Cast Safety
+Check EVERY explicit downcast: `uint128(x)`, `uint96(x)`, `int128(x)`, etc. Solidity 0.8+ does NOT revert on explicit type casts — they silently truncate. For each:
+- What is the maximum possible value of the source?
+- Can it exceed the target type's max? (uint128.max ≈ 3.4e38, uint96.max ≈ 7.9e28)
+- What breaks on truncation? (corrupted reserves, wrong prices, broken invariants)
+
+#### Module C: Transfer Order / Implicit Flash Loans
+For functions involving both incoming and outgoing transfers:
+1. Are assets transferred OUT before payment comes IN?
+2. During the callback window, can the recipient use the asset (as collateral, for voting, etc.)?
+3. Compare cost of this implicit flash loan vs explicit flashLoan() fee. If cheaper → bypass.
+
+#### Module D: Fee Consistency Cross-Check
+List ALL fee-charging functions. For each, compare:
+- Fee calculation basis (gross amount? net? feeAmount?)
+- Fee destinations (factory? pool? burned?)
+- Decimal scaling method
+- Zero-fee edge case handling (transfer of 0 attempted?)
+Flag ANY inconsistency between functions.
+
+#### Module E: EIP/Standard Compliance
+For every implemented standard: compare actual implementation against spec. Check:
+- ERC-3156: Fee from receiver, not msg.sender. Callback return value checked.
+- ERC-721: tokenURI checks token exists. safeTransferFrom triggers onReceived.
+- ERC-2981: Royalties actually paid at correct amounts.
+- ERC-4626: Conversion rounding directions correct.
+
+#### Module F: Token Compatibility
+- setApprovalForAll: Some tokens revert if already set to same value. Check loops.
+- 0-value transfers: Check if fee/amount can be 0, and a transfer still happens.
+- Tokens with < 4/6 decimals: Check all `decimals() - N` calculations for underflow.
+
+#### Module G: Factory/Deployment Patterns
+- CREATE2 with user-controlled salt: frontrun deployment? pre-deployment deposits?
+- Gap between deploy and initialize: can someone else initialize?
+
+#### Module H: Ownership/Permission Persistence
+- After ownership transfer, do approvals from old owner persist?
+- Can old owner still execute pending/queued operations?
+
+#### Module I: Weight/Proportionality
+- When operations involve multiple weighted items: are fees/royalties per-item by weight, or averaged?
+- If averaged: high-value items subsidize low-value → underpayment to fee recipients.
+
+### Step 5b: Cross-Function Analysis
 
 After individual function interrogation:
 
@@ -194,6 +249,7 @@ After individual function interrogation:
 2. **Inverse Operation Parity**: Compare deposit↔withdraw, mint↔burn, stake↔unstake. Verify they're symmetric. If deposit validates X, withdraw must validate the inverse.
 3. **State Transition Integrity**: Can states be skipped, triggered out-of-order, or triggered by wrong actors?
 4. **Value Flow Conservation**: Does value in == value out? Can value be created or destroyed unexpectedly?
+5. **Look for what's NOT there**: For each state-changing function, ask: "What SHOULD this function also do that it doesn't?"
 
 ### Step 6: Record Candidates
 

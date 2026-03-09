@@ -157,6 +157,8 @@ The finding claims overflow/underflow but:
 
 **Check**: Is the code in an `unchecked` block? If not, overflow reverts.
 
+**IMPORTANT EXCEPTION**: Explicit type casts like `uint128(someUint256)` do NOT revert in Solidity 0.8+. They silently truncate. Do NOT dismiss type-cast overflow findings with this FP pattern. These are real bugs that corrupt state silently.
+
 ### FP-8: Read-Only / View Function Confusion
 The finding claims state manipulation via a view function:
 - View functions cannot modify state

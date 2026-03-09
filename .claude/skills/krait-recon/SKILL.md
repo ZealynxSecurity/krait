@@ -75,6 +75,26 @@ Map which contracts inherit from which, and what they import. Flag:
 - Multiple inheritance (diamond problem potential)
 - Custom implementations of standard interfaces (ERC20, ERC721, ERC4626)
 
+### Step 3b: Fee Path Mapping
+
+List EVERY function that charges a fee. For each:
+- What type of fee? (protocol fee, user fee, royalty, flash fee, change fee)
+- How is it calculated? (basis points on gross? on net? flat amount? scaled by decimals?)
+- Where is it sent? (factory, pool, recipient, burned)
+- What happens when fee is 0?
+
+This map is critical for cross-checking fee consistency in the Detection phase.
+
+### Step 3c: Untrusted Recipient Map
+
+List every ETH/token transfer where the recipient is NOT msg.sender and NOT a hardcoded protocol address:
+- Royalty recipients (from ERC-2981 registry)
+- Callback receivers (onFlashLoan, onERC721Received)
+- Fee recipients from external registries
+- Oracle/external data sources
+
+These are reentrancy and DOS surfaces.
+
 ### Step 4: Attacker Mindset Recon
 
 Answer these four questions:
