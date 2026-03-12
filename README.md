@@ -53,6 +53,13 @@ After each blind test: score → root-cause every miss → update methodology �
 | **State Analysis** | Coupled state pairs, mutation matrix — catches sync bugs scanning misses |
 | **Verification** | Kill gates + concrete exploit trace required for every H/M |
 
+### Dual-Engine Architecture
+
+Two complementary engines sharing the same knowledge base:
+
+- **CLI Agent** (this repo): 4-phase adversarial pipeline for security researchers who want automated vulnerability analysis with concrete exploit traces.
+- **Web Platform** ([krait.zealynx.io](https://krait.zealynx.io)): Protocol-specific security assessment — 39 DeFi verticals, 845+ checks, smart filtering, auto-generated architectural observations, branded exportable reports.
+
 ---
 
 ## Real Bugs Found (Blind)
@@ -89,16 +96,6 @@ cd krait && npm install && npm run build
 export ANTHROPIC_API_KEY=your-key-here
 npx krait audit /path/to/project
 ```
-
----
-
-## Dual-Engine Architecture
-
-Krait operates as two complementary engines sharing the same knowledge base:
-
-**Engine 1 — CLI Agent** (this repo): 4-phase adversarial pipeline for security researchers who want automated vulnerability analysis with concrete exploit traces.
-
-**Engine 2 — Web Platform** ([krait.zealynx.io](https://krait.zealynx.io)): Protocol-specific security assessment — 39 DeFi verticals, 845+ checks, smart filtering, auto-generated architectural observations, branded exportable reports.
 
 ---
 
