@@ -2,9 +2,97 @@
 
 **Silent. Precise. Lethal.** Named after one of the deadliest snakes.
 
-Krait is an AI-powered security auditor built by [Zealynx Security](https://zealynx.com). It uses Claude as the core analysis engine with structured vulnerability knowledge as context — not regex-based detection. Krait runs a rigorous 4-phase audit pipeline and has been benchmarked against **40 real Code4rena contests** with tracked precision and recall.
+Krait is an AI-powered smart contract security auditor built by [Zealynx Security](https://zealynx.com). It uses Claude as the core analysis engine with structured vulnerability knowledge — not regex-based detection.
 
-> Built entirely with Claude Code. Every line of methodology, every detection heuristic, every kill gate — developed and refined through iterative shadow auditing against real contest results.
+> Built entirely with Claude Code. Every methodology iteration, every detection heuristic, every kill gate — developed and refined through iterative blind testing against real audit contest results.
+
+---
+
+## What Makes Krait Different
+
+Most AI audit tools — including every Claude Code skill we've seen — follow the same pattern: **scan code → report findings**. One pass, no verification, no benchmarks. Krait does four things nobody else does:
+
+### 1. Benchmarked Against Real Contests (40 and counting)
+
+Every other AI audit tool says "we find bugs." None publish precision and recall numbers against real audit contests. Krait has been **blind-tested against 40 Code4rena contests** with every result tracked:
+
+```
+v6.4 (latest):  90% precision  ·  0.2 FPs/contest  ·  4 of 5 contests at 100% precision
+```
+
+| Version | Contests | Avg Precision | FPs/Contest | Key Change |
+|---------|----------|---------------|-------------|------------|
+| v1 | 1-3 | 12% | 1.3 | Baseline |
+| v2 | 5-10 | 66% | 2.3 | Structured phases |
+| v3 | 11-20 | 34% | 3.3 | Multi-pass (precision regressed) |
+| v4 | 21-30 | 37% | 4.2 | Heuristics (FPs still rising) |
+| v5 | 31-35 | 70% | 0.6 | **Kill gates (FP breakthrough)** |
+| **v6.4** | **36-40** | **90%** | **0.2** | **Primers + architecture cleanup** |
+
+Every number is verifiable — the [shadow-audits/](shadow-audits/) directory has the full registry and scoring for all 40 contests.
+
+### 2. Dedicated Verification Phase (Kill Gates)
+
+Other tools generate findings and dump them. Krait has a **dedicated adversarial critic phase** that tries to disprove every finding before it reaches you. Eight automatic kill gates eliminate 95%+ of false positives:
+
+| Gate | Kills | Example |
+|------|-------|---------|
+| A: Generic Best Practice | "Use SafeERC20", "add events" | 0 TPs ever across 40 contests |
+| B: Theoretical | Exotic token behavior not in protocol | 0 TPs ever |
+| C: Intentional Design | Matches docs/reference implementation | 0 TPs ever |
+| D: Speculative | Can't name WHO steals WHAT for HOW MUCH | 0 TPs ever |
+| E: Admin Trust | Requires trusted admin to be malicious | 0 TPs ever |
+| F: Dust | Impact < $100 | 0 TPs ever |
+| G: Out of Context | Tokens/chains not used by protocol | 0 TPs ever |
+| H: Known Issue | Already in README known issues | 0 TPs ever |
+
+These gates have **never killed a true positive** across 40 contests. They only kill noise.
+
+### 3. Self-Improving Through Shadow Audits
+
+Krait doesn't just audit — it **learns from every miss**. After each blind test:
+
+```
+Blind audit → Score against official findings → Root-cause every miss
+→ Add new heuristic/module/primer to methodology → Re-test
+```
+
+This loop has produced 50+ detection heuristics, 30 analysis modules, and 7 protocol-specific primers — all derived from analyzing **real missed findings**, not theoretical checklists. The methodology evolves with every contest.
+
+### 4. Four-Phase Pipeline (Not Just "Scan and Report")
+
+| Phase | Purpose | What Others Do |
+|-------|---------|---------------|
+| **Recon** | Architecture map, risk scoring, file triage | Skip or minimal |
+| **Detection** | Three-pass analysis with 4 parallel lenses | Single scan pass |
+| **State Analysis** | Coupled state pairs, mutation matrix | Nobody does this |
+| **Verification** | Kill gates + exploit trace requirement | No verification |
+
+The state analysis phase catches bugs that require understanding how two pieces of state must stay in sync — a category that pure scanning misses entirely.
+
+---
+
+## Benchmarks at a Glance
+
+### Latest: v6.4 (Contests 36-40)
+
+| Contest | Type | Official H+M | TPs | FPs | Precision |
+|---------|------|-------------|-----|-----|-----------|
+| LoopFi | Lending/Looping | 45 | 2 | 0 | **100%** |
+| DittoETH | Stablecoin/OrderBook | 16 | 1 | 1 | 50% |
+| Phi | Social/NFT | 15 | 1 | 0 | **100%** |
+| Vultisig | ILO/Token | 6 | 2 | 0 | **100%** |
+| Predy | DeFi Derivatives | 12 | 1 | 0 | **100%** |
+
+### Real Bugs Found in Blind Audits
+
+- **AuraVault claim double-spend** (LoopFi) — reward calculation doesn't deduct fees, draining vault
+- **UniV3 fee drain via shared position** (Vultisig) — first claimer steals all investors' fees
+- **ILO launch DoS** (Vultisig) — attacker blocks all token launches by manipulating slot0 price
+- **Public internal functions → permanent fund lock** (Phi) — anyone can corrupt state, locking ETH forever
+- **Both HIGHs found** (Munchables) — lockOnBehalf griefing + early unlock, 100% precision
+- **Assembly encoding bug** (DittoETH) — `add` vs `and` in inline assembly corrupts redemption data
+- **ERC4626 first depositor inflation** (Basin), **Reentrancy in rental system** (reNFT), **EIP-712 typehash mismatch** (reNFT), **Oracle precision loss** (Dopex), **TVL calculation error** (Renzo)
 
 ---
 
