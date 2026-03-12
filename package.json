@@ -23,8 +23,7 @@
     "claude"
   ],
   "author": "Zealynx Security",
-  "license": "UNLICENSED",
-  "private": true,
+  "license": "MIT",
   "dependencies": {
     "chalk": "^5.4.1",
     "commander": "^13.1.0",

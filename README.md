@@ -498,7 +498,7 @@ Founder, [Zealynx Security](https://zealynx.com)
 
 ## License
 
-Proprietary. See [LICENSE](LICENSE) for details.
+[MIT](LICENSE) © [Zealynx Security](https://zealynx.com)
 
 ---
 
