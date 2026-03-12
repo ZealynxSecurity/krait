@@ -10,7 +10,7 @@ Krait is an AI-powered smart contract security auditor built by [Zealynx Securit
 
 ## What Makes Krait Different
 
-Most AI audit tools — including every Claude Code skill we've seen — follow the same pattern: **scan code → report findings**. One pass, no verification, no benchmarks. Krait does four things nobody else does:
+Most AI audit tools — including every Claude Code skill we've seen — follow the same pattern: **scan code → report findings**. One pass, no verification, no benchmarks. Krait does five things nobody else does:
 
 ### 1. Benchmarked Against Real Contests (40 and counting)
 
@@ -69,6 +69,15 @@ This loop has produced 50+ detection heuristics, 30 analysis modules, and 7 prot
 | **Verification** | Kill gates + exploit trace requirement | No verification |
 
 The state analysis phase catches bugs that require understanding how two pieces of state must stay in sync — a category that pure scanning misses entirely.
+
+### 5. Dual-Engine Architecture (CLI + Web Platform)
+
+Every other AI audit tool is a single-mode scanner. Krait operates as **two complementary engines** sharing the same knowledge base:
+
+- **Engine 1 — CLI Agent** (this repo): 4-phase adversarial pipeline that runs directly on codebases. For security researchers and audit teams who want deep, automated vulnerability analysis with concrete exploit traces.
+- **Engine 2 — Web Assessment Platform** ([krait.zealynx.io](https://krait.zealynx.io)): Protocol-specific security assessment for teams who want structured guidance before or alongside an AI/human audit. 39 DeFi verticals, 845+ security checks, smart filtering by project config, auto-generated architectural observations, and branded exportable reports.
+
+Both engines draw from the same vulnerability patterns, protocol primers, and Solodit references. CLI scan results can feed into the web platform for a combined security score.
 
 ---
 
@@ -534,31 +543,6 @@ npx krait patterns
 
 ---
 
-## Dual-Engine Architecture
-
-Krait operates as two complementary systems sharing the same knowledge base:
-
-### Engine 1: CLI Agent (this repo)
-
-The AI auditor — 4-phase adversarial pipeline that runs directly on codebases. Designed for security researchers and audit teams who want deep, automated vulnerability analysis with concrete exploit traces.
-
-### Engine 2: Web Assessment Platform ([krait.zealynx.io](https://krait.zealynx.io))
-
-Protocol-specific security assessment for teams who want structured guidance before or alongside an AI/human audit.
-
-- **39 DeFi verticals** — DEX/AMM, lending, staking, bridges, vaults, stablecoins, perpetuals, and 32 more
-- **845+ security checks** backed by real Solodit audit references
-- **Smart filtering** — checks adapt based on project config (oracle type, admin model, flash loans, etc.)
-- **Auto-generated insights** — Architectural Security Observations + Security Strengths sections, same format as professional Zealynx audit reports
-- **Branded exportable reports** — Markdown + interactive web view with score ring, risk breakdown, evidence appendix
-- Auth via Supabase (email + GitHub OAuth)
-
-Both engines draw from the same vulnerability patterns, protocol primers, and Solodit references. CLI scan results can be uploaded to the web platform for a combined security score.
-
-**Status:** Live at [krait.zealynx.io](https://krait.zealynx.io). Assessment flow functional, AI scan integration in progress.
-
----
-
 ## Project Status
 
 | Component | Status |
@@ -607,8 +591,8 @@ Both engines draw from the same vulnerability patterns, protocol primers, and So
 
 ## Author
 
-**Carlos Vendrell Felici** ([@TheBlockChainer](https://x.com/TheBlockChainer) / [@Bloqarl](https://github.com/Bloqarl))
-Founder, [Zealynx Security](https://zealynx.io)
+**Carlos Vendrell Felici** — Founder, [Zealynx Security](https://zealynx.io)
+[Twitter/X](https://x.com/TheBlockChainer) · [GitHub](https://github.com/vendrell46)
 
 ---
 
