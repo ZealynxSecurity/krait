@@ -2,7 +2,7 @@
 
 **Silent. Precise. Lethal.** Named after one of the deadliest snakes.
 
-Krait is an AI-powered smart contract security auditor built by [Zealynx Security](https://zealynx.com). It uses Claude as the core analysis engine with structured vulnerability knowledge — not regex-based detection.
+Krait is an AI-powered smart contract security auditor built by [Zealynx Security](https://zealynx.io). It uses Claude as the core analysis engine with structured vulnerability knowledge — not regex-based detection.
 
 > Built entirely with Claude Code. Every methodology iteration, every detection heuristic, every kill gate — developed and refined through iterative blind testing against real audit contest results.
 
@@ -580,13 +580,13 @@ npx krait patterns
 ## Author
 
 **Carlos Vendrell Felici** ([@TheBlockChainer](https://x.com/TheBlockChainer) / [@Bloqarl](https://github.com/Bloqarl))
-Founder, [Zealynx Security](https://zealynx.com)
+Founder, [Zealynx Security](https://zealynx.io)
 
 ---
 
 ## License
 
-[MIT](LICENSE) © [Zealynx Security](https://zealynx.com)
+[MIT](LICENSE) © [Zealynx Security](https://zealynx.io)
 
 ---
 
