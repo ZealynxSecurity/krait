@@ -92,20 +92,36 @@ Two complementary engines sharing the same knowledge base:
 
 ---
 
-## Quick Start
+## Installation
 
 ### Claude Code Skills (Recommended — Zero Cost)
 
+Clone and copy the skills into your global Claude Code directory:
+
 ```bash
 git clone https://github.com/ZealynxSecurity/krait.git
-# Open Claude Code in your target project, then:
+cp -r krait/.claude/skills/* ~/.claude/skills/
+cp -r krait/.claude/commands/* ~/.claude/commands/
+```
+
+Then open Claude Code in any Solidity project and run:
+
+```
 /krait                  # Full 4-phase audit
 /krait-quick            # Fast mode (skips state analysis)
 ```
 
 Individual phases: `/krait-recon` · `/krait-detect` · `/krait-state` · `/krait-critic` · `/krait-report`
 
-The skills in `.claude/skills/` are loaded automatically by Claude Code.
+To update to the latest methodology:
+
+```bash
+cd krait && git pull
+cp -r .claude/skills/* ~/.claude/skills/
+cp -r .claude/commands/* ~/.claude/commands/
+```
+
+> Works with Claude Code CLI, VS Code Claude extension, and Cursor.
 
 ### CLI (API-Powered)
 
