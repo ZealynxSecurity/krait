@@ -10,3 +10,4 @@ krait-report-*
 .krait-cache/
 .claude/projects/
 *.jsonl
+CLAUDE.md
