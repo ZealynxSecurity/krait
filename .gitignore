@@ -8,3 +8,5 @@ test-repos/
 shadow-results/
 krait-report-*
 .krait-cache/
+.claude/projects/
+*.jsonl

@@ -1,0 +1,756 @@
+# Shadow Audit Contest Registry
+# Each contest is a blind benchmark target for Krait's self-improvement loop
+# Order: start with smaller/simpler codebases, progressively increase complexity
+
+contests:
+  - id: basin
+    name: "Basin"
+    contest: "2023-07-basin"
+    repo: "https://github.com/code-423n4/2023-07-basin"
+    findings_repo: "code-423n4/2023-07-basin-findings"
+    type: "AMM + Oracle"
+    estimated_loc: 1200
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 1
+      high_found: 1
+      medium_total: 12
+      medium_found: 0
+      precision: 16.7
+      recall: 7.7
+      f1: 0.105
+      lessons_generated: 12
+
+  - id: wildcat
+    name: "Wildcat V2"
+    contest: "2024-08-wildcat"
+    repo: "https://github.com/code-423n4/2024-08-wildcat"
+    findings_repo: "code-423n4/2024-08-wildcat-findings"
+    type: "Fixed-Rate Private Credit + Hooks"
+    estimated_loc: 5000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 1
+      high_found: 0
+      medium_total: 8
+      medium_found: 0
+      partial: 1
+      precision: 11.1
+      recall: 5.6
+      f1: 0.074
+      lessons_generated: 8
+      fp_count: 4
+
+  - id: amphora
+    name: "Amphora"
+    contest: "2023-07-amphora"
+    repo: "https://github.com/code-423n4/2023-07-amphora"
+    findings_repo: "code-423n4/2023-07-amphora-findings"
+    type: "Lending/Borrowing + Stablecoin"
+    estimated_loc: 2400
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 3
+      high_found: 0
+      medium_total: 3
+      medium_found: 0
+      partial: 1
+      precision: 8.3
+      recall: 4.2
+      f1: 0.056
+      lessons_generated: 5
+      fp_count: 0
+
+  - id: tangible-caviar
+    name: "Tangible Caviar"
+    contest: "2023-08-tangible"
+    repo: "https://github.com/code-423n4/2023-08-tangible"
+    findings_repo: "code-423n4/2023-08-tangible-findings"
+    type: "ve(3,3) Liquid Wrapper"
+    estimated_loc: 1500
+    status: unscorable
+    date: "2026-03-09"
+    notes: "Findings repo not publicly available. Found 2H+1M with high confidence. Partial validation from audit page keywords."
+
+  - id: venus-prime
+    name: "Venus Prime"
+    contest: "2023-09-venus"
+    repo: "https://github.com/code-423n4/2023-09-venus"
+    findings_repo: "code-423n4/2023-09-venus-findings"
+    type: "Soulbound Incentive Token"
+    estimated_loc: 1500
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 3
+      high_found: 0
+      medium_total: 2
+      medium_found: 1
+      precision: 100.0
+      recall: 20.0
+      f1: 0.333
+      fp_count: 0
+      lessons_generated: 0
+      notes: "First audit with 100% precision. Found M-02 (updateScores DoS) exactly. Missed 3H and 1M."
+
+  - id: nextgen
+    name: "NextGen"
+    contest: "2023-10-nextgen"
+    repo: "https://github.com/code-423n4/2023-10-nextgen"
+    findings_repo: "code-423n4/2023-10-nextgen-findings"
+    type: "NFT Generative Art"
+    estimated_loc: 2000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 4
+      high_found: 3
+      medium_total: 10
+      medium_found: 2
+      precision: 81.8
+      recall: 32.1
+      f1: 0.46
+      fp_count: 1
+      notes: "Best recall yet. Caught 3/4 HIGHs. FP was allowlist/public double mint cap."
+
+  - id: kelp
+    name: "Kelp DAO"
+    contest: "2023-11-kelp"
+    repo: "https://github.com/code-423n4/2023-11-kelp"
+    findings_repo: "code-423n4/2023-11-kelp-findings"
+    type: "Liquid Restaking"
+    estimated_loc: 1000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 3
+      high_found: 1
+      medium_total: 2
+      medium_found: 1
+      precision: 55.6
+      recall: 50.0
+      f1: 0.53
+      fp_count: 2
+      notes: "Best F1 (0.53). 2 FPs were admin-gated revert conditions. Missed rsETH minting math bug."
+
+  - id: revolution
+    name: "Revolution"
+    contest: "2023-12-revolutionprotocol"
+    repo: "https://github.com/code-423n4/2023-12-revolutionprotocol"
+    findings_repo: "code-423n4/2023-12-revolutionprotocol-findings"
+    type: "Auction + Governance"
+    estimated_loc: 2500
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 4
+      high_found: 0
+      medium_total: 14
+      medium_found: 5
+      precision: 69.2
+      recall: 25.0
+      f1: 0.37
+      fp_count: 2
+      notes: "Missed all 4 HIGHs. Caught 5 mediums. Missed JSON injection, delegation griefing, ETH distribution."
+
+  - id: decent
+    name: "Decent"
+    contest: "2024-01-decent"
+    repo: "https://github.com/code-423n4/2024-01-decent"
+    findings_repo: "code-423n4/2024-01-decent-findings"
+    type: "Cross-chain Swaps"
+    estimated_loc: 1500
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 4
+      high_found: 0
+      medium_total: 5
+      medium_found: 3
+      precision: 45.5
+      recall: 27.8
+      f1: 0.35
+      fp_count: 3
+      notes: "3 FPs — SafeERC20 generic, signature replay, wrong variable. Missed all cross-chain specific HIGHs."
+
+  - id: ai-arena
+    name: "AI Arena"
+    contest: "2024-02-ai-arena"
+    repo: "https://github.com/code-423n4/2024-02-ai-arena"
+    findings_repo: "code-423n4/2024-02-ai-arena-findings"
+    type: "Gaming + NFT"
+    estimated_loc: 2000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 8
+      high_found: 4
+      medium_total: 9
+      medium_found: 0
+      precision: 45.0
+      recall: 26.5
+      f1: 0.33
+      fp_count: 5.5
+      notes: "Worst FP rate (5.5). Zero-FP discipline broke down on larger codebase. Missed all mediums."
+
+  - id: revert-lend
+    name: "Revert Lend"
+    contest: "2024-03-revert-lend"
+    repo: "https://github.com/code-423n4/2024-03-revert-lend"
+    findings_repo: "code-423n4/2024-03-revert-lend-findings"
+    type: "Lending on Uniswap V3 LP"
+    estimated_loc: 3000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 6
+      medium_total: 27
+      precision: 33.3
+      recall: 6.1
+      f1: 10.3
+      fp_count: 4
+
+  - id: curves
+    name: "Curves"
+    contest: "2024-01-curves"
+    repo: "https://github.com/code-423n4/2024-01-curves"
+    findings_repo: "code-423n4/2024-01-curves-findings"
+    type: "Social Token Bonding Curves"
+    estimated_loc: 1500
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 5
+      medium_total: 10
+      precision: 73.3
+      recall: 36.7
+      f1: 48.9
+      fp_count: 2
+
+  - id: dyad
+    name: "DYAD"
+    contest: "2024-04-dyad"
+    repo: "https://github.com/code-423n4/2024-04-dyad"
+    findings_repo: "code-423n4/2024-04-dyad-findings"
+    type: "Stablecoin + Endogenous Collateral"
+    estimated_loc: 1500
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 10
+      medium_total: 9
+      precision: 55.6
+      recall: 13.2
+      f1: 21.3
+      fp_count: 2
+
+  - id: ethena
+    name: "Ethena"
+    contest: "2023-10-ethena"
+    repo: "https://github.com/code-423n4/2023-10-ethena"
+    findings_repo: "code-423n4/2023-10-ethena-findings"
+    type: "Stablecoin + Staking"
+    estimated_loc: 1000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 0
+      medium_total: 4
+      precision: 33.3
+      recall: 12.5
+      f1: 18.2
+      fp_count: 1
+
+  - id: credit-guild
+    name: "Ethereum Credit Guild"
+    contest: "2023-12-ethereumcreditguild"
+    repo: "https://github.com/code-423n4/2023-12-ethereumcreditguild"
+    findings_repo: "code-423n4/2023-12-ethereumcreditguild-findings"
+    type: "Credit + Governance"
+    estimated_loc: 5000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 4
+      medium_total: 25
+      precision: 40.0
+      recall: 6.9
+      f1: 11.8
+      fp_count: 3
+
+  - id: ondo
+    name: "Ondo"
+    contest: "2023-09-ondo"
+    repo: "https://github.com/code-423n4/2023-09-ondo"
+    findings_repo: "code-423n4/2023-09-ondo-findings"
+    type: "RWA Bridge + Stablecoin"
+    estimated_loc: 2000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 0
+      medium_total: 4
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      fp_count: 7
+      notes: "Worst contest. 100% FP rate. All findings were event/admin/dust issues."
+
+  - id: salty
+    name: "Salty"
+    contest: "2024-01-salty"
+    repo: "https://github.com/code-423n4/2024-01-salty"
+    findings_repo: "code-423n4/2024-01-salty-findings"
+    type: "DEX + Stablecoin + Governance"
+    estimated_loc: 6000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 6
+      medium_total: 33
+      precision: 85.7
+      recall: 15.4
+      f1: 26.1
+      fp_count: 1
+      notes: "Best v3 precision. 6/8 H+M findings matched real issues."
+
+  - id: shell
+    name: "Shell Protocol"
+    contest: "2023-11-shellprotocol"
+    repo: "https://github.com/code-423n4/2023-11-shellprotocol"
+    findings_repo: "code-423n4/2023-11-shellprotocol-findings"
+    type: "Ocean + AMM + Adapters"
+    estimated_loc: 2500
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 4
+      medium_total: 4
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      fp_count: 2
+      notes: "Complete miss. All findings were DeFi integration-specific (Curve adapters)."
+
+  - id: party
+    name: "Party Protocol"
+    contest: "2023-10-party"
+    repo: "https://github.com/code-423n4/2023-10-party"
+    findings_repo: "code-423n4/2023-10-party-findings"
+    type: "Group Governance + NFT"
+    estimated_loc: 4000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 2
+      medium_total: 7
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      fp_count: 6
+      notes: "Complete miss. All findings were governance-specific."
+
+  - id: spectra
+    name: "Spectra"
+    contest: "2024-02-spectra"
+    repo: "https://github.com/code-423n4/2024-02-spectra"
+    findings_repo: "code-423n4/2024-02-spectra-findings"
+    type: "Yield Tokenization"
+    estimated_loc: 3000
+    status: completed
+    date: "2026-03-09"
+    results:
+      high_total: 0
+      medium_total: 2
+      precision: 16.7
+      recall: 50.0
+      f1: 25.0
+      fp_count: 5
+      notes: "Only 2 official findings. Partial matches on ERC-5095 and flash loan."
+
+  - id: dopex
+    name: "Dopex"
+    contest: "2023-08-dopex"
+    repo: "https://github.com/code-423n4/2023-08-dopex"
+    findings_repo: "code-423n4/2023-08-dopex-findings"
+    type: "Options/DeFi Derivatives"
+    estimated_loc: 3000
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 9
+      medium_total: 17
+      precision: 36.8
+      recall: 13.5
+      f1: 19.7
+      fp_count: 6
+      notes: "Found 3.5 TPs. Caught oracle precision, LP share manipulation, settle donation."
+
+  - id: centrifuge
+    name: "Centrifuge"
+    contest: "2023-09-centrifuge"
+    repo: "https://github.com/code-423n4/2023-09-centrifuge"
+    findings_repo: "code-423n4/2023-09-centrifuge-findings"
+    type: "RWA/Lending"
+    estimated_loc: 2500
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 0
+      medium_total: 8
+      precision: 45.5
+      recall: 31.3
+      f1: 37.0
+      fp_count: 3
+      notes: "Best v4 recall. Found ERC1404 restriction gap, deposit DoS, rounding direction."
+
+  - id: badger
+    name: "Badger eBTC"
+    contest: "2023-10-badger"
+    repo: "https://github.com/code-423n4/2023-10-badger"
+    findings_repo: "code-423n4/2023-10-badger-findings"
+    type: "CDP/Lending"
+    estimated_loc: 5000
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 1
+      medium_total: 6
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      fp_count: 5
+      notes: "Complete miss. Liquity-fork with complex multi-contract interactions."
+
+  - id: panoptic
+    name: "Panoptic"
+    contest: "2023-11-panoptic"
+    repo: "https://github.com/code-423n4/2023-11-panoptic"
+    findings_repo: "code-423n4/2023-11-panoptic-findings"
+    type: "Options/UniV3"
+    estimated_loc: 2000
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 2
+      medium_total: 5
+      precision: 33.3
+      recall: 14.3
+      f1: 20.8
+      fp_count: 1
+      notes: "Partial matches on both HIGHs (reentrancy, transfer state). Only 1 FP."
+
+  - id: autonolas
+    name: "Autonolas"
+    contest: "2023-12-autonolas"
+    repo: "https://github.com/code-423n4/2023-12-autonolas"
+    findings_repo: "code-423n4/2023-12-autonolas-findings"
+    type: "Agent/Governance"
+    estimated_loc: 4000
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 5
+      medium_total: 6
+      precision: 7.7
+      recall: 4.5
+      f1: 5.8
+      fp_count: 6
+      notes: "Most HIGHs were Solana lockbox (out of Solidity scope). 6 FPs."
+
+  - id: renft
+    name: "reNFT"
+    contest: "2024-01-renft"
+    repo: "https://github.com/code-423n4/2024-01-renft"
+    findings_repo: "code-423n4/2024-01-renft-findings"
+    type: "NFT Rental"
+    estimated_loc: 2000
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 7
+      medium_total: 16
+      precision: 87.5
+      recall: 15.2
+      f1: 25.9
+      fp_count: 0.5
+      notes: "Best v4 precision. 0 clear FPs. Found disableModule offset, reentrancy, EIP-712."
+
+  - id: renzo
+    name: "Renzo"
+    contest: "2024-04-renzo"
+    repo: "https://github.com/code-423n4/2024-04-renzo"
+    findings_repo: "code-423n4/2024-04-renzo-findings"
+    type: "LRT/Restaking"
+    estimated_loc: 3000
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 8
+      medium_total: 14
+      precision: 62.5
+      recall: 22.7
+      f1: 33.3
+      fp_count: 3
+      notes: "Best v4 F1. 5 exact TPs including nonReentrant receive, TVL calculation, stale oracle."
+
+  - id: olas
+    name: "Olas"
+    contest: "2024-05-olas"
+    repo: "https://github.com/code-423n4/2024-05-olas"
+    findings_repo: "code-423n4/2024-05-olas-findings"
+    type: "Agent/Staking"
+    estimated_loc: 3000
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 2
+      medium_total: 20
+      precision: 30.0
+      recall: 6.8
+      f1: 11.1
+      fp_count: 3
+      notes: "Large cross-chain scope. Most mediums are bridge-specific edge cases."
+
+  - id: size
+    name: "Size"
+    contest: "2024-06-size"
+    repo: "https://github.com/code-423n4/2024-06-size"
+    findings_repo: "code-423n4/2024-06-size-findings"
+    type: "Lending/Credit"
+    estimated_loc: 3000
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 4
+      medium_total: 13
+      precision: 28.6
+      recall: 11.8
+      f1: 17.0
+      fp_count: 5
+      notes: "Below average. 5 FPs on credit-specific logic."
+
+  - id: traitforge
+    name: "TraitForge"
+    contest: "2024-07-traitforge"
+    repo: "https://github.com/code-423n4/2024-07-traitforge"
+    findings_repo: "code-423n4/2024-07-traitforge-findings"
+    type: "NFT/GameFi"
+    estimated_loc: 1500
+    status: completed
+    date: "2026-03-10"
+    results:
+      high_total: 6
+      medium_total: 19
+      precision: 35.7
+      recall: 20.0
+      f1: 25.6
+      fp_count: 9
+      notes: "5 TPs but 9 FPs. Caught nuke factor, forge limits, generation bugs. Missed golden god logic."
+
+  # ─── v5 Methodology (Kill Gate System) ───
+
+  - id: verwa
+    name: "verwa"
+    contest: "2023-08-verwa"
+    repo: "https://github.com/code-423n4/2023-08-verwa"
+    findings_repo: "code-423n4/2023-08-verwa-findings"
+    type: "Voting Escrow/Gauge"
+    estimated_loc: 800
+    status: completed
+    date: "2026-03-10"
+    methodology: v5
+    results:
+      high_total: 8
+      medium_total: 3
+      precision: 50.0
+      recall: 9.1
+      f1: 15.4
+      fp_count: 1
+      notes: "Found gauge removal power lock (H-62 exact match). 1 FP (division-by-zero DoS, QA-level)."
+
+  - id: munchables
+    name: "Munchables"
+    contest: "2024-05-munchables"
+    repo: "https://github.com/code-423n4/2024-05-munchables"
+    findings_repo: "code-423n4/2024-05-munchables-findings"
+    type: "GameFi/Points"
+    estimated_loc: 500
+    status: completed
+    date: "2026-03-10"
+    methodology: v5
+    results:
+      high_total: 2
+      medium_total: 4
+      precision: 100.0
+      recall: 33.3
+      f1: 50.0
+      fp_count: 0
+      notes: "PERFECT PRECISION. Both HIGHs found (lockOnBehalf griefing + early unlock). 0 FPs."
+
+  - id: abracadabra
+    name: "Abracadabra MIMSwap"
+    contest: "2024-03-abracadabra-money"
+    repo: "https://github.com/code-423n4/2024-03-abracadabra-money"
+    findings_repo: "code-423n4/2024-03-abracadabra-money-findings"
+    type: "DEX/AMM"
+    estimated_loc: 2300
+    status: completed
+    date: "2026-03-10"
+    methodology: v5
+    results:
+      high_total: 4
+      medium_total: 16
+      precision: 100.0
+      recall: 5.0
+      f1: 9.5
+      fp_count: 0
+      notes: "PERFECT PRECISION. Found missing return in oracle aggregator (M-146). 0 FPs on large codebase."
+
+  - id: stader
+    name: "Stader"
+    contest: "2023-06-stader"
+    repo: "https://github.com/code-423n4/2023-06-stader"
+    findings_repo: "code-423n4/2023-06-stader-findings"
+    type: "ETH Liquid Staking"
+    estimated_loc: 4300
+    status: completed
+    date: "2026-03-10"
+    methodology: v5
+    results:
+      high_total: 1
+      medium_total: 14
+      precision: 0.0
+      recall: 0.0
+      f1: 0.0
+      fp_count: 2
+      notes: "Both findings were real bugs but listed as known issues in README. Needs Gate H (known issues filter)."
+
+  - id: brahma
+    name: "Brahma"
+    contest: "2023-10-brahma"
+    repo: "https://github.com/code-423n4/2023-10-brahma"
+    findings_repo: "code-423n4/2023-10-brahma-findings"
+    type: "Smart Account Governance"
+    estimated_loc: 850
+    status: completed
+    date: "2026-03-10"
+    methodology: v5
+    results:
+      high_total: 0
+      medium_total: 4
+      precision: null
+      recall: 0.0
+      f1: 0.0
+      fp_count: 0
+      notes: "Clean sheet — 0 findings, 0 FPs. Official findings were Safe version compatibility issues."
+
+  # ─── v6.4 Methodology (Sprint 3+4: Primers + Architecture Cleanup) ───
+
+  - id: loopfi
+    name: "LoopFi"
+    contest: "2024-07-loopfi"
+    repo: "https://github.com/code-423n4/2024-07-loopfi"
+    findings_repo: "code-423n4/2024-07-loopfi-findings"
+    type: "Lending/Looping (Gearbox V3 fork)"
+    estimated_loc: 10383
+    status: completed
+    date: "2026-03-12"
+    methodology: v6.4
+    results:
+      high_total: 15
+      medium_total: 30
+      high_found: 1
+      medium_found: 1
+      precision: 100.0
+      recall: 4.4
+      f1: 8.4
+      fp_count: 0
+      notes: "Found AuraVault claim fee bug (H-401 exact) + pause bypass (M-204 exact). 0 FPs."
+
+  - id: dittoeth
+    name: "DittoETH"
+    contest: "2024-03-dittoeth"
+    repo: "https://github.com/code-423n4/2024-03-dittoeth"
+    findings_repo: "code-423n4/2024-03-dittoeth-findings"
+    type: "Stablecoin/Order Book"
+    estimated_loc: 16215
+    status: completed
+    date: "2026-03-12"
+    methodology: v6.4
+    results:
+      high_total: 7
+      medium_total: 9
+      high_found: 0
+      medium_found: 1
+      precision: 50.0
+      recall: 6.3
+      f1: 11.2
+      fp_count: 1
+      notes: "Found LibBytes assembly bug (M-221 exact, rated Low). 1 FP (claimRemainingCollateral &&/||)."
+
+  - id: phi
+    name: "Phi"
+    contest: "2024-08-phi"
+    repo: "https://github.com/code-423n4/2024-08-phi"
+    findings_repo: "code-423n4/2024-08-phi-findings"
+    type: "Social/NFT/Bonding Curves"
+    estimated_loc: 3964
+    status: completed
+    date: "2026-03-12"
+    methodology: v6.4
+    results:
+      high_total: 7
+      medium_total: 8
+      high_found: 1
+      medium_found: 0
+      precision: 100.0
+      recall: 6.7
+      f1: 12.6
+      fp_count: 0
+      notes: "Found exposed public internal functions (H-51 exact). 0 FPs."
+
+  - id: vultisig
+    name: "Vultisig"
+    contest: "2024-06-vultisig"
+    repo: "https://github.com/code-423n4/2024-06-vultisig"
+    findings_repo: "code-423n4/2024-06-vultisig-findings"
+    type: "ILO + Token Whitelist"
+    estimated_loc: 2705
+    status: completed
+    date: "2026-03-12"
+    methodology: v6.4
+    results:
+      high_total: 3
+      medium_total: 3
+      high_found: 2
+      medium_found: 0
+      precision: 100.0
+      recall: 33.3
+      f1: 50.0
+      fp_count: 0
+      notes: "Found fee drain (H-43 exact) + launch DoS (H-41 exact, rated M). 0 FPs. Best v6.4 F1."
+
+  - id: predy
+    name: "Predy"
+    contest: "2024-05-predy"
+    repo: "https://github.com/code-423n4/2024-05-predy"
+    findings_repo: "code-423n4/2024-05-predy-findings"
+    type: "DeFi Derivatives/UniV3"
+    estimated_loc: 7631
+    status: completed
+    date: "2026-03-12"
+    methodology: v6.4
+    results:
+      high_total: 4
+      medium_total: 8
+      high_found: 0
+      medium_found: 1
+      precision: 100.0
+      recall: 8.3
+      f1: 15.3
+      fp_count: 0
+      notes: "Found Chainlink staleness (M-69 exact). 0 FPs."

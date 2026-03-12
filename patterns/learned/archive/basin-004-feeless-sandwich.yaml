@@ -1,0 +1,34 @@
+id: LEARNED-004
+source_contest: basin-2023-07
+official_finding: M-04
+category: economic-attack
+severity: medium
+title: "Fee-less protocol enables zero-cost sandwich/DoS attacks"
+
+detection_signal: |
+  Any AMM/DEX/lending protocol where swap or trade operations charge NO protocol fee.
+  Without fees, the cost of sandwich attacking is only gas, making any-size sandwich
+  profitable on transactions above a small threshold.
+
+code_pattern: |
+  // Well.sol — swap calculates amountOut purely from reserve math, no fee deduction
+  function _swapFrom(...) internal returns (uint256 amountOut) {
+      reserves[i] += amountIn;
+      reserves[j] = _calcReserve(wellFunction(), reserves, j, totalSupply());
+      amountOut = reserveJBefore - reserves[j];  // NO FEE SUBTRACTED
+      // Compare Uniswap V2: amountOut = amountIn * 997 / 1000 (0.3% fee)
+  }
+
+check: |
+  1. Search for fee/protocol_fee/swap_fee in the codebase. If none exists:
+  2. Calculate sandwich profitability: front-run a swap by moving price,
+     let victim swap at worse price, back-run to restore.
+     With 0% fee, profit = victim's slippage minus 2x gas cost.
+  3. Check if there's any cost to the attacker beyond gas (e.g., time-weighted penalties, caps)
+  4. If no fee AND no other deterrent → MEDIum: sandwich DoS is economically rational
+  5. Also check: can an attacker grief by sandwiching every transaction to cause max slippage reverts?
+
+why_missed: |
+  Analyzed the swap logic for correctness but never asked "what's the cost of manipulation?"
+  The code is correct — it does what it's designed to do. The vulnerability is in the DESIGN,
+  not the implementation. Lesson: always ask "what does an adversary do for free?"

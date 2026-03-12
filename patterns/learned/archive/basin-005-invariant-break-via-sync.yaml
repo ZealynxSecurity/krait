@@ -1,0 +1,37 @@
+id: LEARNED-005
+source_contest: basin-2023-07
+official_finding: M-05
+category: state-desync
+severity: medium
+title: "sync() can break AMM invariant by updating reserves without updating LP supply"
+
+detection_signal: |
+  Any function that updates stored reserves to match actual balances (sync/skim pattern)
+  WITHOUT minting or burning LP tokens. This breaks the invariant:
+  f(reserves) = totalSupply, because reserves change but totalSupply doesn't.
+
+code_pattern: |
+  function sync() external nonReentrant {
+      IERC20[] memory _tokens = tokens();
+      uint256[] memory reserves = new uint256[](_tokens.length);
+      for (uint256 i; i < _tokens.length; ++i) {
+          reserves[i] = _tokens[i].balanceOf(address(this)); // new reserves from balances
+      }
+      _setReserves(_tokens, reserves);  // update reserves
+      // BUG: no _mint() or _burn() to match new reserves to LP supply
+      // After: f(new_reserves) != totalSupply()
+  }
+
+check: |
+  1. Find every function that calls _setReserves (or equivalent reserve update)
+  2. For each: does it also mint/burn LP tokens to maintain the invariant?
+  3. sync() pattern: if reserves can increase via direct transfer + sync,
+     then calcReserve() returns wrong values because lpTokenSupply is stale
+  4. Trace: donate tokens → sync() → now reserves are higher but LP supply unchanged
+     → next removeLiquidityOneToken uses calcReserve with stale supply → user gets more tokens
+  5. The fix: sync() should either mint LP tokens for the excess or not exist
+
+why_missed: |
+  Identified sync() doesn't update pumps (oracle issue) but missed the deeper problem:
+  sync() breaks the LP invariant itself. Framed it as oracle manipulation instead of
+  invariant violation. Lesson: for every reserve update, check BOTH the oracle AND the invariant.

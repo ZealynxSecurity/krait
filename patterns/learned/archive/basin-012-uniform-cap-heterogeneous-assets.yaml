@@ -1,0 +1,41 @@
+id: LEARNED-012
+source_contest: basin-2023-07
+official_finding: M-12
+category: oracle-design
+severity: medium
+title: "Single hardcoded cap for multiple tokens causes stale oracles for some assets"
+
+detection_signal: |
+  An oracle or rate-limiting mechanism that applies the same max change cap
+  to all tokens, regardless of their volatility profile. Stablecoins need
+  tight caps; volatile assets need loose caps. One cap can't serve both.
+
+code_pattern: |
+  // MultiFlowPump — same LOG_MAX_INCREASE and LOG_MAX_DECREASE for all tokens
+  constructor(bytes16 _maxPercentIncrease, bytes16 _maxPercentDecrease, ...) {
+      LOG_MAX_INCREASE = ABDKMathQuad.ONE.add(_maxPercentIncrease).log_2();
+      LOG_MAX_DECREASE = ABDKMathQuad.ONE.sub(_maxPercentDecrease).log_2();
+  }
+  // Applied uniformly to ALL reserves:
+  for (uint256 i; i < numberOfReserves; ++i) {
+      pumpState.lastReserves[i] = _capReserve(
+          pumpState.lastReserves[i], reserves[i].fromUIntToLog2(), blocksPassed
+      );  // same cap for token 0 (maybe WETH) and token 1 (maybe a stablecoin)
+  }
+
+check: |
+  1. Find rate-limiting or cap mechanisms in oracles/pumps
+  2. Is the cap per-token or global?
+  3. If global: consider a pool with WETH + USDC
+     - WETH might move 10% in a day (normal)
+     - USDC should never move more than 0.5%
+     - If cap = 10%: USDC oracle allows 10% swing (too loose, manipulation possible)
+     - If cap = 0.5%: WETH oracle is always capped (too tight, always stale)
+  4. Can the cap be set per-token? If not → design flaw
+  5. Impact: either stale oracle data OR insufficient manipulation protection
+
+why_missed: |
+  Analyzed the _capReserve logic for correctness and verified the math was right.
+  Never asked "is the same cap appropriate for different tokens?"
+  Lesson: for any uniform parameter applied to heterogeneous assets, ask
+  "does this work for the most volatile AND the most stable asset in the pool?"

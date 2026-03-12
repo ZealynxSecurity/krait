@@ -1,0 +1,43 @@
+id: LEARNED-025
+name: Reorg Attack on CREATE-deployed Contracts
+source: amphora-shadow-audit
+contest: 2023-07-amphora
+official_finding: M-233
+severity: Medium
+category: deployment-security
+
+detection_signal: |
+  Factory contract deploys child contracts using CREATE (new Contract(...))
+  where the address depends on deployer nonce. During a chain reorg, an attacker
+  can front-run the deployment, getting a different contract at the expected address.
+
+code_pattern: |
+  // VULNERABLE: uses CREATE (nonce-dependent)
+  function deployVault(uint96 id, address minter) returns (address) {
+    return address(new Vault(id, minter, address(this)));
+    // Address = keccak256(deployer, nonce) — reorg changes nonce ordering
+  }
+
+  // SAFER: uses CREATE2 (salt-dependent)
+  function deployVault(uint96 id, address minter) returns (address) {
+    bytes32 salt = keccak256(abi.encodePacked(id, minter));
+    return address(new Vault{salt: salt}(id, minter, address(this)));
+    // Address = keccak256(0xff, deployer, salt, initCodeHash) — deterministic
+  }
+
+check: |
+  For factory contracts that deploy user-specific contracts:
+  1. Does it use CREATE (new X()) or CREATE2 (new X{salt: s}())?
+  2. If CREATE: is there a reorg risk? (especially on L2s, Polygon, etc.)
+  3. If users deposit into the deployed contract in the same/next block: reorg attack possible
+  4. Check: does the user verify the deployed address matches expectations?
+
+why_missed: |
+  Krait never read VaultDeployer.sol during the audit. The file was in scope but
+  was likely deprioritized as a "simple factory." Deployment contracts need audit
+  attention for CREATE vs CREATE2 and initialization safety.
+
+false_positive_notes: |
+  - Lower risk on Ethereum mainnet (reorgs are rare and shallow)
+  - Higher risk on L2s, Polygon, and alt-L1s (deeper reorgs)
+  - Not an issue if deployment and deposit are in separate transactions with verification

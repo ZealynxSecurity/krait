@@ -1,0 +1,33 @@
+id: LEARNED-001
+source_contest: basin-2023-07
+official_finding: M-01
+category: assembly-verification
+severity: medium
+title: "Off-by-one in assembly bounds check allows out-of-bounds memory read"
+
+detection_signal: |
+  Any function that reads from a dynamic-length bytes/array using assembly
+  and has a bounds check using `>` instead of `>=`. The boundary condition
+  allows reading exactly one slot past the end of the data.
+
+code_pattern: |
+  function getBytes32FromBytes(bytes memory data, uint256 i) internal pure returns (bytes32 _bytes) {
+      uint256 index = i * 32;
+      if (index > data.length) {   // BUG: should be >=
+          _bytes = ZERO_BYTES;     // because mload at index == data.length reads past end
+      } else {
+          assembly { _bytes := mload(add(add(data, index), 32)) }
+      }
+  }
+
+check: |
+  For every assembly function that reads from bytes/arrays:
+  1. Find the bounds check. Is it `>` or `>=`?
+  2. Compute the boundary: if index == data.length, does mload read past the allocation?
+  3. Test with concrete values: data.length=32, i=1 → index=32 → 32 > 32 is false → reads at offset 64 → past end
+  4. The fix: change `>` to `>=` or adjust the offset calculation
+
+why_missed: |
+  Read LibBytes.sol but focused on the packing/unpacking logic in storeUint128/readUint128.
+  Did not trace getBytes32FromBytes with concrete boundary values.
+  Lesson: every assembly bounds check needs a boundary-value test.

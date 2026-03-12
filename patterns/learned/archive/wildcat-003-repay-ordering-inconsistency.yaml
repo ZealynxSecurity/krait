@@ -1,0 +1,50 @@
+id: LEARNED-015
+source_contest: wildcat-2024-08
+official_finding: "M-03 (#62)"
+category: state-desync
+severity: medium
+title: "Inconsistent transfer-vs-state-update ordering causes fee discrepancy"
+
+detection_signal: |
+  Multiple functions that modify the same state (balance + interest accrual) but
+  in different order. Specifically: any function that transfers tokens BEFORE calling
+  the state update function, vs sister functions that update state BEFORE transferring.
+  The ordering matters because state update accrues interest up to block.timestamp —
+  if funds are transferred first, accrued interest doesn't account for the added funds.
+
+code_pattern: |
+  // repay() — transfers BEFORE state update
+  function repay(uint256 amount) external {
+      asset.safeTransferFrom(msg.sender, address(this), amount);  // funds arrive first
+      MarketState memory state = _getUpdatedState();               // accrues interest AFTER transfer
+      // BUG: interest was accrued as if funds weren't there yet
+      // Borrower pays fees on a time period where funds were actually already in the contract
+  }
+
+  // deposit() — updates state BEFORE transfer (correct ordering)
+  function deposit(uint256 amount) external {
+      MarketState memory state = _getUpdatedState();               // accrues interest first
+      asset.safeTransferFrom(msg.sender, address(this), amount);  // then transfers
+  }
+
+  // closeMarket() — also updates state first (correct ordering)
+  function closeMarket() external {
+      MarketState memory state = _getUpdatedState();
+      // ... then handles transfers
+  }
+
+check: |
+  1. Identify all functions that both transfer tokens and call a state-update function
+  2. For each function, note the ordering: transfer-first or state-update-first
+  3. Compare ordering across all such functions — any inconsistency is a red flag
+  4. For transfer-first functions, analyze: does the state update use balance or timestamp?
+  5. Compute concrete impact: if repay() transfers 1000 tokens then accrues interest,
+     how much extra interest is charged vs the correct ordering?
+  6. Verify: the fix is to call _getUpdatedState() before safeTransferFrom in all cases
+
+why_missed: |
+  Noted the transfer-before-state pattern in repay() but rationalized it as
+  "reverts if market is closed anyway" instead of analyzing the fee timing
+  implication. Didn't compare the ordering across ALL repay-like functions to
+  spot the inconsistency. Lesson: when multiple functions touch the same state,
+  always compare their ordering — inconsistency is itself a bug signal.

@@ -1,0 +1,51 @@
+id: LEARNED-017
+source_contest: wildcat-2024-08
+official_finding: "M-01 (#121)"
+category: economic-attack
+severity: medium
+title: "Withdrawal batch rate averaging creates perverse incentive to delay withdrawal on market close"
+
+detection_signal: |
+  Batch-based withdrawal systems where (1) new entries join an existing batch that
+  has a different historical average rate, and (2) the batch payout divides total
+  payment proportionally by scaledAmount. When a market closes with an outstanding
+  batch, new withdrawal requests join the old batch. The old batch has a lower
+  average rate than the current rate. Users who withdraw immediately get the old
+  lower rate. Users who wait until expiry get the full current rate. This
+  incentivizes NOT withdrawing after close, creating a perverse incentive.
+
+code_pattern: |
+  // When market closes, outstanding withdrawal batch still accepts new requests
+  function closeMarket() external {
+      // If there's a pending withdrawal batch, its expiry stays the same
+      // New withdrawal requests join this existing batch
+  }
+
+  function queueWithdrawal(uint256 amount) external {
+      WithdrawalBatch storage batch = _withdrawalData.batches[expiry];
+      // User's scaledAmount is added to the batch
+      // Batch has a normalizedAmountPaid that reflects the AVERAGE rate across all entries
+      // Old entries were added at a lower rate → average is below current rate
+      // New user joining gets the averaged rate, NOT the current rate
+      batch.scaledTotalAmount += scaledAmount;
+      // User who waits until expiry and withdraws fresh gets current (higher) rate
+      // User who joins the existing batch accepts diluted rate
+      // Rational users delay withdrawal → defeats the purpose of the batch
+  }
+
+check: |
+  1. Identify any batch-based withdrawal system where multiple users share a single batch
+  2. Check whether new requests can join an already-existing batch from a prior period
+  3. Determine how the payout rate is calculated: is it averaged across all entries or per-entry?
+  4. If averaged: compare the rate a user gets by joining the existing batch NOW vs waiting and withdrawing later
+  5. If waiting yields a higher rate, there is a perverse incentive to delay
+  6. Model the scenario: market closes, batch exists with old lower rate, new user joins vs waits
+  7. Ask: "Would a rational user prefer to withdraw now or later? Does that create systemic risk?"
+
+why_missed: |
+  Analyzed withdrawal batches mechanically, looking for arithmetic bugs and rounding
+  errors, but did not model the economic incentives for users. Did not ask the key
+  question: "would a rational user prefer to withdraw now or later? And does that
+  create problems?" Lesson: for any shared-rate batch system, always compare the
+  rate a user gets by joining immediately vs the rate they get by waiting. If
+  waiting is strictly better, the mechanism is broken.

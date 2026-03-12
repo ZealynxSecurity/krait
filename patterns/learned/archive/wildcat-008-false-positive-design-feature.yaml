@@ -1,0 +1,48 @@
+id: LEARNED-020
+source_contest: wildcat-2024-08
+official_finding: "N/A (FP lessons)"
+category: logic-error
+severity: medium
+title: "FP Lesson: Distinguishing design features from bugs in access control"
+
+detection_signal: |
+  When analyzing access control patterns, verify whether "permanent access after
+  initial validation" is an intentional safety feature (prevents fund lockout)
+  before reporting it as a bypass vulnerability. Read protocol documentation and
+  look for comments explaining the design choice. In lending/credit protocols,
+  always-open withdrawal paths are features, not bugs.
+
+code_pattern: |
+  // Wildcat V2: isKnownLenderOnMarket is INTENTIONALLY permanent
+  // It prevents lenders from losing withdrawal access after credential expiry
+  // This is a safety feature, not a bug
+  isKnownLenderOnMarket[lender][market] = true; // Set once, never cleared — by design
+
+  function onQueueWithdrawal(address lender, uint32, uint256, bytes calldata hooksData) external {
+      // If lender is already known, skip credential validation
+      if (isKnownLenderOnMarket[lender][msg.sender]) {
+          return; // This is NOT a bypass — it's the core safety guarantee
+      }
+      // Only new/unknown lenders need credential validation
+      _tryValidateAccess(lender, hooksData);
+  }
+
+check: |
+  Before reporting "permanent state that bypasses checks" as a vulnerability:
+  1. Check if the permanent state is a SAFETY feature (prevents fund lockout)
+  2. Read comments and documentation for the design rationale
+  3. Ask: "If this were removed, would users lose access to their funds?"
+  4. If yes, it is a design feature, not a bug
+  5. Consider the protocol's core promise: lending protocols MUST let lenders exit
+  6. Check if the "bypass" only applies to withdrawal (safety-critical) vs deposit (not safety-critical)
+  7. If permanent access is limited to fund-recovery operations, it is almost certainly intentional
+
+why_missed: |
+  Reported isKnownLenderOnMarket as H-01 without considering that permanent
+  withdrawal access is a SAFETY feature for a lending protocol. Lenders must
+  always be able to exit. The "bypass" is the entire point. In lending/credit
+  protocols, always-open withdrawal paths are features, not bugs. Validate your
+  assumption against the protocol's core promise to users before flagging
+  permanent access as a vulnerability. Lesson: ask "what happens to user funds
+  if this check were enforced?" — if the answer is "they get locked out," then
+  the lack of enforcement is the correct design.

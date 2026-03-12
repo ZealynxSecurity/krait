@@ -1,0 +1,37 @@
+id: LEARNED-006
+source_contest: basin-2023-07
+official_finding: M-06
+category: precision-loss
+severity: medium
+title: "sqrt-based LP calculation has larger precision errors than division-based"
+
+detection_signal: |
+  Any LP token calculation that uses sqrt (or nth root) where the input
+  is a product of reserves with very different magnitudes. The precision
+  error of sqrt grows with the ratio between reserves, unlike simple
+  division which has constant 1-wei error.
+
+code_pattern: |
+  // ConstantProduct2.calcLpTokenSupply
+  function calcLpTokenSupply(uint256[] calldata reserves, bytes calldata)
+      external pure returns (uint256 lpTokenSupply) {
+      lpTokenSupply = (reserves[0] * reserves[1] * EXP_PRECISION).sqrt();
+      // When reserves[0] >> reserves[1], sqrt precision error is amplified
+      // Example: reserves = [1e24, 1] → product = 1e36 → sqrt = 1e18
+      //          reserves = [1e24 + 1e4, 1] → product = 1e36 + 1e16 → sqrt = 1e18 (SAME!)
+      // 1e4 tokens added but 0 LP minted due to sqrt precision loss
+  }
+
+check: |
+  1. Find LP supply calculations that use sqrt or nthRoot
+  2. Test with extreme reserve ratios: [1e24, 1], [1e24 + X, 1] for increasing X
+  3. Find the smallest X where sqrt(product + delta) > sqrt(product) — this is the precision threshold
+  4. If an attacker can deposit X tokens and get 0 LP → the excess tokens are stuck
+  5. Over many such deposits, the pool accumulates "phantom tokens" not backed by LP
+  6. Check: does addLiquidity allow imbalanced deposits? If yes, precision loss = exploitable
+
+why_missed: |
+  Found precision issues in the generic ConstantProduct (integer division before exponentiation)
+  but missed the sqrt precision issue in ConstantProduct2 (the one actually deployed).
+  Analyzed the less-used contract more deeply. Lesson: prioritize the DEFAULT/deployed
+  implementation, not just alternative implementations.

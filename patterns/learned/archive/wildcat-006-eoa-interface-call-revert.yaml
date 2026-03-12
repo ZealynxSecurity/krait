@@ -1,0 +1,48 @@
+id: LEARNED-018
+source_contest: wildcat-2024-08
+official_finding: "M-07 (#49)"
+category: input-validation
+severity: medium
+title: "Interface call to potential EOA address reverts instead of returning default"
+
+detection_signal: |
+  Any function that calls an interface method on a user-provided or configurable
+  address without first checking if the address has code. Especially dangerous
+  when documentation or usage patterns indicate the address can be an EOA (externally
+  owned account). In the EVM, calling a function on an address with no code reverts.
+  Look for external calls to addresses that might not be contracts, particularly in
+  registration or configuration functions.
+
+code_pattern: |
+  function addRoleProvider(address providerAddress, uint32 timeToLive) external {
+      // Calls isPullProvider() on the address — reverts if providerAddress is an EOA
+      // because there's no code at the address to execute
+      bool isPullProvider = IRoleProvider(providerAddress).isPullProvider();
+
+      // Documentation says providers can be EOAs
+      // Constructor auto-registers the deployer (an EOA) as a provider
+      // But addRoleProvider doesn't handle the EOA case
+      // If deployer tries to add an EOA provider via this function → revert
+
+      RoleProvider memory provider = RoleProvider({
+          providerAddress: providerAddress,
+          timeToLive: timeToLive,
+          pullProviderIndex: isPullProvider ? _pullProviders.length : type(uint24).max
+      });
+  }
+
+check: |
+  1. Find all external calls that use an interface on a user-provided or configurable address
+  2. Check if the address could ever be an EOA (read docs, check constructor, check usage patterns)
+  3. Verify whether there's an extcodesize/code.length check before the call
+  4. If no code check exists and EOA is a valid input, the call will revert unexpectedly
+  5. Compare with similar functions in the same contract — does the constructor handle this case differently?
+  6. Check if try/catch or low-level call is used to handle the no-code case gracefully
+
+why_missed: |
+  Read the addRoleProvider function and focused on the role management logic — who
+  can add providers, what permissions they get, how timeToLive works. Did not think
+  about what happens at the EVM level when you call a function on an address with no
+  code. Did not consider the practical deployment scenario where providers might be
+  EOAs, even though the documentation explicitly mentions this. Lesson: for every
+  external call on a user-provided address, ask "what if this address has no code?"

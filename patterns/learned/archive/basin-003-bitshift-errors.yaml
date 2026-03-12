@@ -1,0 +1,36 @@
+id: LEARNED-003
+source_contest: basin-2023-07
+official_finding: M-03
+category: assembly-verification
+severity: medium
+title: "Bit-shifting errors in packed storage corrupt adjacent values"
+
+detection_signal: |
+  When packing multiple values into a single storage slot using shl/shr,
+  the shift amounts must exactly match the field widths. If a library uses
+  `shr(128, shl(128, x))` to extract the lower 128 bits, verify this is
+  consistent with how the value was stored.
+
+code_pattern: |
+  // LibBytes16 — storing odd number of bytes16 values
+  // Compare with LibBytes.storeUint128 which does it correctly:
+  //   add(value, shl(128, shr(128, sload(...)))) — preserves UPPER 128 bits
+  // LibBytes16 does:
+  //   add(value, shr(128, shl(128, sload(...)))) — preserves LOWER 128 bits (WRONG!)
+  // This reads the wrong half of the existing slot when preserving the other entry
+
+check: |
+  For every packed storage operation:
+  1. Draw the slot layout: which bits belong to which value
+  2. When storing a new value in one half, verify the OTHER half is preserved correctly
+  3. shl(128, shr(128, x)) = clear upper 128, keep lower 128
+     shr(128, shl(128, x)) = clear lower 128, keep upper 128 — OPPOSITE meaning!
+  4. If the library stores value A in upper and B in lower:
+     - Updating A must preserve B: use shr(128, shl(128, sload(...)))
+     - Updating B must preserve A: use shl(128, shr(128, sload(...)))
+  5. Compare with a known-correct reference (e.g., LibBytes.storeUint128)
+
+why_missed: |
+  Read LibBytes16 but did not compare its bit-shifting pattern against LibBytes.
+  The two libraries pack values similarly but LibBytes16 swaps the preserve/clear operations.
+  Lesson: when multiple libraries do similar packing, diff their approaches to find inconsistencies.

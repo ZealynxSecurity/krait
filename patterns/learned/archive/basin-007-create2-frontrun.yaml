@@ -1,0 +1,40 @@
+id: LEARNED-007
+source_contest: basin-2023-07
+official_finding: M-07
+category: deployment-security
+severity: medium
+title: "CREATE2 with user-supplied salt enables deployment frontrunning"
+
+detection_signal: |
+  Any factory contract that uses CREATE2 (cloneDeterministic) with a salt
+  parameter provided by the caller. An attacker can observe the pending
+  transaction and frontrun with the same salt to deploy at the predicted address.
+
+code_pattern: |
+  function boreWell(
+      address implementation,
+      bytes calldata immutableData,
+      bytes calldata initFunctionCall,
+      bytes32 salt                          // user-supplied salt
+  ) external returns (address well) {
+      if (salt != bytes32(0)) {
+          well = implementation.cloneDeterministic(immutableData, salt); // deterministic address
+      }
+      // Attacker sees this in mempool, frontruns with same salt
+      // Victim's tx reverts (address already occupied)
+      // Attacker controls the Well at the predicted address
+  }
+
+check: |
+  1. Find all CREATE2 / cloneDeterministic calls in factory contracts
+  2. Is the salt user-supplied or derived from msg.sender?
+  3. If user-supplied: attacker can frontrun with same salt → DoS or address theft
+  4. If derived from msg.sender: safer but check if msg.sender is predictable
+  5. Check: does the init function have access control? Can the frontrunner
+     initialize with malicious parameters?
+  6. Fix: include msg.sender in the salt: salt = keccak256(abi.encode(msg.sender, userSalt))
+
+why_missed: |
+  Read Aquifer.sol and understood the clone pattern but never asked "can someone
+  frontrun the deployment?" Focused on post-deployment behavior, not deployment-time attacks.
+  Lesson: for every factory, ask "what happens if someone frontruns the create?"

@@ -1,0 +1,36 @@
+id: LEARNED-002
+source_contest: basin-2023-07
+official_finding: M-02
+category: assembly-verification
+severity: medium
+title: "Slot arithmetic confusion in packed storage libraries corrupts oracle values"
+
+detection_signal: |
+  Storage libraries that pack multiple values into slots using assembly,
+  where the slot offset calculation in the STORE function differs from
+  the READ function, or where `add(slot, X)` uses X in bytes vs words
+  inconsistently.
+
+code_pattern: |
+  // LibLastReserveBytes — storing odd number of reserves
+  // BUG: sload uses `add(slot, maxI)` but should use `add(slot, mul(maxI, 32))`
+  assembly {
+      sstore(
+          add(slot, mul(maxI, 32)),                                           // store target: slot + maxI*32
+          add(mload(...), shl(128, shr(128, sload(add(slot, maxI)))))         // read source: slot + maxI (WRONG!)
+      )                                                                       // should be: sload(add(slot, mul(maxI, 32)))
+  }
+
+check: |
+  For every library that does packed storage with assembly:
+  1. Find ALL sload() and sstore() calls
+  2. Verify the slot argument is computed identically for paired reads/writes
+  3. Check: does the offset use raw value (maxI) or scaled value (maxI * 32)?
+  4. Trace with n=3 (odd): what slot does the store write to? What slot does the sload read from?
+     If they differ → corruption
+  5. Cross-reference: does LibBytes16 use the same offset scheme as LibLastReserveBytes?
+
+why_missed: |
+  Read LibLastReserveBytes.sol but did not compare sload source slot vs sstore target slot
+  in the odd-reserves branch. The bug is subtle: `add(slot, maxI)` vs `add(slot, mul(maxI, 32))`.
+  Lesson: for every sstore, find the corresponding sload and verify the slot addresses match exactly.

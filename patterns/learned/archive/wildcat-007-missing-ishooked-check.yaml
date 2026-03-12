@@ -1,0 +1,51 @@
+id: LEARNED-019
+source_contest: wildcat-2024-08
+official_finding: "M-08 (#11)"
+category: access-control
+severity: medium
+title: "Hook function missing caller validation allows anyone to trigger credential operations"
+
+detection_signal: |
+  A set of hook functions where most check caller authorization (e.g., isHooked,
+  isRegistered, isValidMarket) but one or more skip that check. This is a
+  consistency bug: if N hook functions all verify the caller is authorized and
+  one does not, that one can be called by anyone. Look for patterns where a
+  contract has multiple external functions that share a common authorization
+  requirement, and verify ALL of them enforce it.
+
+code_pattern: |
+  // All other hook functions check isHooked:
+  function onDeposit(address lender, uint256 amount, bytes calldata hooksData) external {
+      if (!_isHooked[msg.sender]) revert NotHookedMarket();
+      // ... process deposit hook
+  }
+
+  function onTransfer(address from, address to, uint256 amount, bytes calldata hooksData) external {
+      if (!_isHooked[msg.sender]) revert NotHookedMarket();
+      // ... process transfer hook
+  }
+
+  // BUG: onQueueWithdrawal is missing the isHooked check
+  function onQueueWithdrawal(address lender, uint32 expiry, uint256 amount, bytes calldata hooksData) external {
+      // No isHooked check! Anyone can call this with arbitrary lender/hooksData
+      // This triggers credential validation calls to registered providers
+      // Can abuse short-lived credentials or DoS providers with excessive calls
+      _tryValidateAccess(lender, hooksData);
+  }
+
+check: |
+  1. Identify all hook/callback functions in a contract (onDeposit, onTransfer, onQueueWithdrawal, etc.)
+  2. For each, check whether it validates the caller (msg.sender) against an authorization mapping
+  3. Compare the authorization pattern across ALL hook functions — are they consistent?
+  4. If one function is missing the check that all others have, flag it
+  5. Determine the impact: what can an unauthorized caller trigger by calling the unprotected function?
+  6. Check if the unprotected function calls external contracts (providers, oracles) that could be abused
+
+why_missed: |
+  Read onQueueWithdrawal and focused on the known-lender bypass logic, missing the
+  forest for the trees: the function does not even check that the caller is a valid
+  hooked market. Did not systematically compare the authorization checks across all
+  hook functions in the contract. Lesson: when a contract has multiple functions that
+  should share the same authorization pattern, explicitly verify each one. A simple
+  consistency check (does every hook function start with the same guard?) catches this
+  class of bug immediately.

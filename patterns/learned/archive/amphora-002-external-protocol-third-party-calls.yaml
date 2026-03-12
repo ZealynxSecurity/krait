@@ -1,0 +1,46 @@
+id: LEARNED-022
+name: External Protocol Functions Callable by Third Parties
+source: amphora-shadow-audit
+contest: 2023-07-amphora
+official_finding: H-301
+severity: High
+category: external-integration
+
+detection_signal: |
+  Contract calls an external protocol function (e.g., getReward, claim) and
+  assumes only it can trigger that function. But the external protocol allows
+  ANYONE to call it on behalf of any address, enabling front-running attacks.
+
+code_pattern: |
+  // VULNERABLE: assumes earned() reflects pending rewards
+  function claimRewards() external {
+    uint256 reward = rewardsContract.earned(address(this));
+    if (reward != 0) {
+      rewardsContract.getReward(address(this), false);
+      // uses 'reward' amount for further logic (AMPH claiming, CVX calculation)
+      _processReward(reward);
+    }
+  }
+
+  // ATTACK: attacker front-runs by calling:
+  // rewardsContract.getReward(victimVault, false)
+  // Now earned() returns 0, but CRV tokens are in the vault unclaimed
+  // Vault's claimRewards sees 0 earned, skips processing, rewards stuck
+
+check: |
+  For every external protocol integration:
+  1. Check if the external function can be called by ANY address (not just the contract)
+  2. Check if an attacker calling it first would break the contract's assumptions
+  3. Look for patterns where earned()/pending() is read, then claim() is called
+  4. Verify the contract handles the case where rewards arrive unexpectedly
+
+why_missed: |
+  Krait analyzed Vault.claimRewards from the vault owner's perspective only.
+  It never considered that Convex's BaseRewardPool.getReward() is permissionless
+  and callable by anyone on behalf of any address. This is a common DeFi integration
+  assumption that needs explicit checking.
+
+false_positive_notes: |
+  - Not exploitable if: the external function requires msg.sender == the beneficiary
+  - Not exploitable if: the contract handles unexpected token balances gracefully
+  - Some protocols intentionally allow third-party claims (e.g., Aave, Compound)

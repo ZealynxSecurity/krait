@@ -207,13 +207,39 @@ Patterns live in `patterns/` as YAML files following the schema in `patterns/sch
 
 Patterns are NOT used for regex matching. They are formatted and included in the LLM system prompt so Claude knows what vulnerability classes to look for and has real examples to reference.
 
+## Shadow Audit Pipeline & Self-Improvement Loop
+
+### Current Status (5/10 contests completed)
+- **v1 methodology** (contests 1-3): Declining recall (7.7% → 5.6% → 4.2%), broken learning loop
+- **v2 methodology** (contests 4-5): 100% precision, 20% recall, F1=0.333 — 5x recall improvement
+- **Best result**: Venus Prime — 1 exact TP match, 0 FP, first real finding since Basin
+
+### How the Learning Loop Works
+1. Run blind audit on public contest codebase
+2. Fetch official findings → Score precision/recall/F1
+3. Analyze every miss: WHY did we miss it? What heuristic/module/question would catch it?
+4. **Integrate lessons INTO detector skill files** (heuristics, modules, question categories)
+5. Mirror changes between `.claude/skills/krait-detector/SKILL.md` and `.claude/commands/krait.md`
+6. Update `shadow-audits/registry.yaml` and `shadow-audits/progress.md`
+
+**CRITICAL**: Lessons go INTO skill files, NOT into YAML files. The `patterns/learned/` directory is archive-only. The old approach of writing YAML lessons was broken — nothing loaded them.
+
+### Methodology Versions
+- **v1** (Basin → Amphora): 7 question categories, 40 heuristics, 14 modules
+- **v2** (Tangible → Venus): 9 question categories (+External Protocol, +Derived Class), 43+ heuristics (+EXT-01/02/03, +C2-02), 17 modules (+D15/D16/D17), mandatory CEI check
+- **v3** (planned): State variable lifecycle tracing, DoS→Economic exploit escalation, external return value verification, math boundary testing
+
+### Shadow Audit Commands
+- `/krait-shadow` — Full 6-phase pipeline: Setup → Blind Audit → Score → Learn → Verify → Update
+- `/krait-learn` — Post-audit lesson integration: analyze misses → modify skill files
+
 ## Key Principles
 
 1. **AI is the engine, not a supplement.** Claude analyzes code. Patterns provide knowledge context. Regex is dead.
 2. **Every finding must have file:line.** No generic warnings. Actionable or nothing.
-3. **Precision over recall.** Better to miss subtle issues than flood with false positives.
+3. **ZERO false positives is #1 priority.** Better to miss bugs than report fake ones. Concrete exploit trace required for every H/M.
 4. **Multi-domain from day one.** Architecture supports Solidity, Rust, TypeScript, AI — even if only Solidity is implemented first.
-5. **Shadow audits are the training loop.** Regular automated benchmarking against known contests drives improvement.
+5. **Shadow audits are the training loop.** Regular automated benchmarking against known contests drives improvement. Lessons go INTO skill files.
 6. **Keep it lean.** No fake agents, no unnecessary abstractions, no over-engineering.
 
 ## Communication Style

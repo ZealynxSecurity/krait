@@ -1,0 +1,51 @@
+id: LEARNED-014
+source_contest: wildcat-2024-08
+official_finding: "M-02 (#77), M-04 (#60), M-06 (#52)"
+category: logic-error
+severity: medium
+title: "Fixed-term hook overrides parent but doesn't add term-specific enforcement to all actions"
+
+detection_signal: |
+  Any hook/modifier contract that inherits from a base and overrides SOME functions
+  but not others. When a derived contract adds a new invariant (e.g., "no changes
+  before term end"), check that ALL state-changing functions enforce it, not just
+  the obvious ones. Specifically: FixedTermLoanHooks extends AccessControlHooks +
+  MarketConstraintHooks but doesn't apply fixedTermEndTime checks to all relevant
+  entry points.
+
+code_pattern: |
+  // FixedTermLoanHooks inherits from AccessControlHooks but only overrides some hooks
+  contract FixedTermLoanHooks is AccessControlHooks {
+      uint256 public fixedTermEndTime;
+
+      // OVERRIDDEN: correctly checks term end for withdrawals
+      function onQueueWithdrawal(...) external override {
+          // BUG: checks block.timestamp < fixedTermEndTime instead of
+          // checking whether the BATCH EXPIRY is after fixedTermEndTime
+          // This forces lenders to wait extra time beyond the term end
+          if (block.timestamp < fixedTermEndTime) revert();
+      }
+
+      // NOT OVERRIDDEN: borrower can reduce APR during locked term
+      // onSetAnnualInterestAndReserveRatioBips → inherited from parent, no term check
+
+      // NOT OVERRIDDEN: closeMarket doesn't update fixedTermEndTime
+      // Lenders are trapped — market is closed but term hasn't ended
+  }
+
+check: |
+  1. Identify any contract that inherits a base and adds a time-locked invariant
+  2. List ALL state-changing functions in the base contract
+  3. For each function, check: does the derived contract override it with the new constraint?
+  4. Specifically verify:
+     a. Can the borrower change interest rates during the locked term?
+     b. Do withdrawal checks compare against batch expiry or block.timestamp?
+     c. Does closeMarket update or respect the fixedTermEndTime?
+  5. For any unoverridden function, trace whether the base implementation is safe under the new invariant
+
+why_missed: |
+  Treated FixedTermLoanHooks as just another access control variant. Didn't
+  systematically check: "for every function the fixed term should constrain, is
+  the constraint actually applied?" Read the file but didn't audit against the
+  spec. Lesson: when a derived contract introduces a new invariant, enumerate
+  every function in the parent and verify the invariant holds for each one.

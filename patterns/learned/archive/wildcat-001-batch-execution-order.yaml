@@ -1,0 +1,52 @@
+id: LEARNED-013
+source_contest: wildcat-2024-08
+official_finding: "H-01 (#64)"
+category: logic-error
+severity: high
+title: "Withdrawal batch rate disparity when execution happens before all requests are added"
+
+detection_signal: |
+  Any withdrawal batch system where (1) a batch becomes executable while still
+  accepting new entries (e.g., market closure makes batches immediately executable),
+  and (2) per-user payout is calculated as a share of the batch total. If execution
+  can happen before all entries are queued, early executors get a disproportionate
+  share. The invariant "total payouts <= batch.normalizedAmountPaid" breaks when
+  execution precedes finalization.
+
+code_pattern: |
+  // When market is closed, batch expiry is set to current timestamp → immediately executable
+  function closeMarket() external {
+      // ...
+      WithdrawalBatch memory batch = _withdrawalData.batches[expiry];
+      // batch becomes executable NOW, but other lenders haven't queued yet
+  }
+
+  // Lender A executes withdrawal immediately after close
+  // batch.normalizedAmountPaid reflects only current queued amount
+  function executeWithdrawal(address accountAddress, uint32 expiry) external {
+      // accountAvailableAmount = account.scaledAmount * batch.normalizedAmountPaid / batch.scaledTotalAmount
+      // If only partial lenders have queued, normalizedAmountPaid covers them at full rate
+      // When lender B queues later, the same normalizedAmountPaid must cover more users → shortfall
+  }
+
+  // Lender B queues withdrawal AFTER lender A already executed
+  function queueWithdrawal(uint256 amount) external {
+      // Adds to batch.scaledTotalAmount, but batch.normalizedAmountPaid doesn't grow
+      // Last lender gets less than entitled; may not be able to withdraw at all
+  }
+
+check: |
+  1. Identify any batch/queue system where users share a pool of funds
+  2. Check whether the batch can become executable while new entries are still accepted
+  3. Trace what happens when user A executes before user B queues:
+     a. Does normalizedAmountPaid increase when new entries join after execution?
+     b. Is the per-user share recalculated or fixed at execution time?
+  4. Compute concrete scenario: 3 lenders, 1 executes immediately after close, 2 queue later
+  5. Verify invariant: sum of all payouts <= total funds available in the batch
+
+why_missed: |
+  Focused on arithmetic underflow risk in batch processing rather than the economic
+  consequence of execution ordering. Analyzed rounding behavior but not the core
+  invariant: total payouts <= batch.normalizedAmountPaid can break when execution
+  precedes finalization. Lesson: for any shared-pool withdrawal system, always
+  simulate the ordering where some users execute before others have even joined.

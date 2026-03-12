@@ -1,0 +1,46 @@
+id: LEARNED-021
+name: CEI Violation Reentrancy in Token Operations
+source: amphora-shadow-audit
+contest: 2023-07-amphora
+official_finding: H-304
+severity: High
+category: reentrancy
+
+detection_signal: |
+  External call (transfer, safeTransfer, call) happens BEFORE state update
+  (burn, balance decrement, state variable change). Classic Checks-Effects-Interactions
+  violation that enables reentrancy if the transferred token has callbacks.
+
+code_pattern: |
+  // VULNERABLE: transfer before burn
+  function _withdraw(uint256 amount, address target) internal {
+    reserveAmount -= amount;
+    token.transfer(target, amount);  // external call FIRST
+    _burn(msg.sender, amount);       // state update SECOND
+  }
+
+  // FIXED: burn before transfer
+  function _withdraw(uint256 amount, address target) internal {
+    reserveAmount -= amount;
+    _burn(msg.sender, amount);       // state update FIRST
+    token.transfer(target, amount);  // external call SECOND
+  }
+
+check: |
+  For every function that performs external calls AND state updates:
+  1. Map the ORDER of operations
+  2. Verify ALL state changes happen BEFORE external calls
+  3. Check if the transferred token could have callbacks (ERC777, hooks, fallback)
+  4. Note: even standard ERC20 .transfer() can be exploited if sUSD is ever upgraded
+
+why_missed: |
+  Krait identified the unsafe .transfer() pattern (return value issue) but
+  completely missed the CEI ordering. The reentrancy was the HIGH finding,
+  not the return value. When auditing external calls, check ORDERING first,
+  return values second.
+
+false_positive_notes: |
+  - Not a CEI violation if: reentrancy guard (nonReentrant) is present
+  - Not exploitable if: token is known to have no callbacks (pure ERC20)
+  - Not exploitable if: the state is checked via external call (this.balanceOf)
+    which reads the already-updated state

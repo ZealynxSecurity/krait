@@ -1,0 +1,46 @@
+id: LEARNED-023
+name: External Protocol State Changes (Shutdown/Migration/Operator)
+source: amphora-shadow-audit
+contest: 2023-07-amphora
+official_findings: M-414, M-90
+severity: Medium
+category: external-integration
+
+detection_signal: |
+  Contract integrates with external protocol and assumes its state never changes.
+  External protocols can: shut down pools, change operators, pause, migrate.
+  If the integrating contract has no fallback for these scenarios, functionality bricks.
+
+code_pattern: |
+  // VULNERABLE: assumes Convex booster always works
+  function depositAndStake(address token, uint256 amount, uint256 poolId) {
+    IERC20(token).approve(address(booster), amount);
+    booster.deposit(poolId, amount, true);  // reverts if pool is shutdown
+  }
+
+  // VULNERABLE: assumes CVX always mints
+  uint256 cvxReward = _calculateCVXReward(crvReward);
+  // ... later
+  CVX.transfer(msg.sender, cvxReward);  // reverts if CVX wasn't actually minted
+
+  // In CVX contract: if(msg.sender != operator) return; // silent no-op!
+
+check: |
+  For every external protocol integration, ask:
+  1. What happens if the external protocol SHUTS DOWN this specific pool/market?
+  2. What happens if the external protocol CHANGES OPERATORS or MIGRATES?
+  3. What happens if the external protocol's function SILENTLY FAILS (returns without reverting)?
+  4. Does the contract have a recovery mechanism (governance can update, migrate collateral)?
+  5. Are there hardcoded assumptions about external protocol behavior?
+
+why_missed: |
+  Krait focused on the happy-path logic of Convex integration. It never modeled
+  Convex's lifecycle events: pool shutdown (M-90) makes booster.deposit() revert,
+  operator change (M-414) makes CVX.mint() silently return without minting.
+  Both brick core functionality with no recovery path.
+
+false_positive_notes: |
+  - Not an issue if: governance can update/migrate the external dependency
+  - Not an issue if: the contract gracefully handles the failure case
+  - Lower severity if: the scenario is extremely unlikely (protocol has never changed operator)
+  - Consider: is the external protocol upgradeable? If so, ANY assumption can break

@@ -29,16 +29,93 @@ Determine:
 - **Key dependencies**: OpenZeppelin, Chainlink, Uniswap, Aave, Compound, Solmate, etc.
 - **Compiler version** and any pragma constraints
 
-### Step 2: File Inventory
+### Step 2: AST Fact Extraction (Solidity Only)
 
-Scan all source files. For each contract/module:
-- File path, approximate LOC
-- Is it: core logic, library, interface, test, script, mock?
-- Language: Solidity, Rust, Move, TypeScript, etc.
+Before manually reading code for risk scoring, extract compiler-verified structural facts.
 
-**SKIP**: test files, scripts, mocks, interfaces-only files, node_modules, build artifacts, OpenZeppelin/Solmate standard implementations.
+**Run this command:**
+```bash
+bash .claude/skills/krait-recon/ast-extract.sh <project-root> .audit/ast-facts.md
+```
 
-**PRIORITIZE**: Files with custom business logic, state management, external interactions, fund handling.
+This script will:
+1. Check for `forge` availability and attempt compilation with AST output
+2. If compilation succeeds: parse AST JSON via `jq` for verified inheritance trees, function signatures, call graphs, state variables, modifier usage
+3. If compilation fails (missing deps, wrong solc): fall back to regex-based extraction from raw `.sol` files
+4. Save all facts to `.audit/ast-facts.md` with sections: Inheritance Tree, Function Registry, State Variables, Call Graph, Modifier Definitions, Risk Score Inputs
+
+**If extraction succeeds:**
+- Use the "Risk Score Inputs" table for EXACT counts in the RISK_SCORE formula (Step 3)
+- Use the "Call Graph" during Detection Pass 2 to know exactly which contracts to read
+- Use the "Inheritance Tree" to verify modifier presence before reporting "missing modifier" findings
+- Use the "Function Registry" to pre-populate the Function-State Matrix in Detection
+
+**If extraction fails completely** (not a Solidity project, script not found):
+- Proceed with manual approach in Step 3 as before
+- Note in recon.md: "AST extraction: FAILED — using manual counts (non-deterministic)"
+
+**CRITICAL: AST facts are SUPPLEMENTS, not replacements.** You still MUST read every file. The AST tells you WHAT exists; only reading the code tells you WHY it exists and whether it's correct.
+
+### Step 2b: Slither Pre-Scan (Optional, Solidity Only)
+
+If `slither` is available on PATH and the project has a Solidity compilation setup:
+
+```bash
+# Check if slither is available, run it, and extract summary
+which slither && slither <project-root> --json .audit/slither-results.json 2>/dev/null && \
+  bash .claude/skills/krait-recon/slither-summary.sh .audit/slither-results.json .audit/slither-summary.md || true
+```
+
+**If Slither runs successfully:**
+- Raw JSON saved to `.audit/slither-results.json`
+- Summary extracted to `.audit/slither-summary.md` with: detector name, severity, file:line, and one-line description for each H/M finding
+- These findings serve as ADDITIONAL SIGNAL during Detection Phase — they are NOT automatically reported
+- Slither findings that overlap with Krait candidates increase confidence
+- Slither findings that Krait missed should be investigated (potential recall boost)
+- **IMPORTANT**: Many Slither detectors produce informational/low noise (reentrancy-benign, naming-convention, etc.). Only extract HIGH and MEDIUM severity Slither findings for the summary.
+
+**If Slither is not available or fails:**
+- Skip silently. Note in recon.md: "Slither pre-scan: SKIPPED (not available)"
+- This is purely optional — Krait works without it
+
+### Step 3: File Inventory & Deterministic Risk Scoring
+
+Scan all source files. **SKIP**: test files, scripts, mocks, interfaces-only files (no function bodies), node_modules, lib/, build artifacts, files >90% comments.
+
+**SCOPE EXPANSION — Base/Parent Contracts**: If a core contract inherits from a non-library contract in the project (e.g., `base/`, `abstract/`, `common/`, `protocol-rewards/`), that base contract MUST be included in scope and scored. Any file imported and inherited by a Tier 1 file gets auto-promoted to minimum Tier 2. Standard library imports (OpenZeppelin, Solmate) are excluded — only project-specific base contracts.
+
+**For each remaining file, compute a RISK SCORE:**
+
+**If `.audit/ast-facts.md` exists**: Use the exact counts from the "Risk Score Inputs" table for `external_calls`, `state_writing_functions`, `payable_functions`, `assembly_blocks`, `unchecked_blocks`, and `LOC`. Only `novel_code_bonus` and `value_handling_bonus` require manual judgment from reading the code.
+
+**If `.audit/ast-facts.md` does NOT exist**: Fall back to manual counting by reading each file.
+
+```
+RISK_SCORE = (external_calls × 5) + (state_writing_functions × 4) + (payable_functions × 4)
+           + (assembly_blocks × 6) + (unchecked_blocks × 3) + (LOC × 0.05)
+           + (novel_code_bonus)      # +15 if NOT from OpenZeppelin/Solmate/standard library
+           + (value_handling_bonus)   # +10 if handles ETH/token transfers
+           + (immaturity_bonus)       # +10 if contract has NO prior audit coverage or is newly written
+```
+
+Where:
+- **external_calls**: Count of `.call`, `.transfer`, `.safeTransfer`, interface method calls, `delegatecall`
+- **state_writing_functions**: Count of public/external functions that write storage (use `sstore` or assign to state variables)
+- **payable_functions**: Count of `payable` functions
+- **assembly_blocks**: Count of `assembly { }` blocks
+- **unchecked_blocks**: Count of `unchecked { }` blocks
+- **novel_code_bonus**: +15 if the contract is NOT a standard OpenZeppelin/Solmate contract (check imports — if it inherits from OZ but adds significant custom logic, it gets the bonus)
+- **value_handling_bonus**: +10 if the contract transfers ETH or ERC20 tokens
+- **immaturity_bonus**: +10 if the contract meets ANY of: (a) not present in any prior audit report linked in docs/README, (b) added/significantly modified after the last audit (check git history if available), (c) has no test coverage file (no corresponding test file in test/ directory), (d) contains TODO/FIXME/HACK comments indicating unfinished work. If prior audit reports exist, contracts NOT in the audit scope are immature by default.
+
+**RANK all files by RISK_SCORE descending and assign tiers:**
+- **TIER 1 (DEEP)**: Top 5 files by score — get full 3-pass treatment in Detection
+- **TIER 2 (STANDARD)**: Next 10 files — get standard Pass 1 analysis
+- **TIER 3 (SCAN)**: Remaining files — quick scan only (function signatures + obvious patterns)
+
+For SMALL codebases (≤15 files), all files are effectively Tier 1.
+
+**This tier table is the CONTRACT between Recon and Detection. Detection MUST follow these tiers.**
 
 ### Step 3: Architecture Map
 
@@ -68,7 +145,22 @@ Identify trust assumptions:
 - Which functions are permissionless? What can any user trigger?
 - Where does the protocol trust external data? (oracles, callbacks, user input)
 
-#### 3d. Inheritance & Import Graph
+#### 3d. Contract Maturity Assessment
+
+For each core contract, assess maturity to inform the `immaturity_bonus` in RISK_SCORE:
+
+| Contract | Prior Audit? | Test File? | TODO/FIXME? | Maturity |
+|----------|-------------|------------|-------------|----------|
+
+Check:
+- **Prior audit coverage**: Does README or docs reference previous audits? Which contracts were in scope? Contracts NOT in any prior audit scope = immature.
+- **Test coverage**: Is there a corresponding test file in `test/` or `tests/`? Untested contracts = immature.
+- **Unfinished markers**: Search each file for `TODO`, `FIXME`, `HACK`, `XXX`, `TEMP`, `WORKAROUND` comments. Any present = immature.
+- **Git recency** (if git history available): Was the contract recently added or significantly modified? `git log --oneline -5 <file>` shows recent changes.
+
+Contracts flagged as immature get `immaturity_bonus = +10` in the RISK_SCORE formula, which may promote them to a higher tier.
+
+#### 3e. Inheritance & Import Graph
 
 Map which contracts inherit from which, and what they import. Flag:
 - Contracts that override virtual functions (modified behavior vs base)
@@ -143,13 +235,18 @@ Save to `.audit/recon.md` with:
 - Type: [type(s)]
 - Dependencies: [list]
 - Compiler: [version]
+- Scope size: [X files, Y total LOC]
 
-## Contract Inventory
-| File | Purpose | Risk | LOC | Key State |
-|------|---------|------|-----|-----------|
+## File Risk Table (MANDATORY — Detection phase follows this)
+| Rank | File | RISK_SCORE | Tier | LOC | Ext Calls | State Writers | Notes |
+|------|------|-----------|------|-----|-----------|---------------|-------|
+| 1 | Core.sol | 87 | DEEP | 450 | 12 | 8 | Handles all funds |
+| 2 | ... | ... | ... | ... | ... | ... | ... |
+
+Codebase size category: SMALL (≤15) / MEDIUM (16-40) / LARGE (40+)
 
 ## Fund Flows
-[Diagram or description of how value moves]
+[How value moves through the system]
 
 ## Trust Boundaries
 [Who is trusted, what can they do, permissionless surfaces]
@@ -160,7 +257,11 @@ Save to `.audit/recon.md` with:
 3. ...
 
 ## Novel Code (not from libraries)
-[List of custom implementations to scrutinize]
+[Custom implementations to scrutinize]
+
+## Detection Primer
+Loaded: [primer filename(s)]
+DEEP DIVE modules: [D1, D4, D11, ...]
 
 ## Relevant Checklists
 [Protocol-specific checks to apply]
@@ -171,4 +272,5 @@ Save to `.audit/recon.md` with:
 - **Read actual code, not just file names.** Open every core contract and understand it.
 - **Do NOT start looking for bugs yet.** This phase is strictly reconnaissance.
 - **Be honest about complexity.** If you don't understand a piece of code, flag it as needing deep analysis.
-- **Track inheritance carefully.** Many "missing" checks exist in parent contracts.
+- **Track inheritance carefully.** Many "missing" checks exist in parent contracts. Use the AST Inheritance Tree if available.
+- **AST facts override manual counts.** If `.audit/ast-facts.md` exists, its Risk Score Inputs are ground truth for the RISK_SCORE formula. Do not re-count manually.

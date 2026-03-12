@@ -1,0 +1,40 @@
+id: LEARNED-011
+source_contest: basin-2023-07
+official_finding: M-11
+category: economic-attack
+severity: medium
+title: "Imbalanced liquidity addition enables sandwich attack for value extraction"
+
+detection_signal: |
+  Any AMM that allows adding liquidity in an imbalanced ratio (not proportional
+  to current reserves). The imbalanced deposit implicitly swaps tokens at the
+  pool's rate, and this implicit swap can be sandwiched.
+
+code_pattern: |
+  // Well.sol — addLiquidity allows any ratio
+  function _addLiquidity(uint256[] memory tokenAmountsIn, ...) internal {
+      for (uint256 i; i < _tokens.length; ++i) {
+          _tokens[i].safeTransferFrom(msg.sender, address(this), tokenAmountsIn[i]);
+          reserves[i] = reserves[i] + tokenAmountsIn[i];  // any amounts allowed
+      }
+      lpAmountOut = _calcLpTokenSupply(wellFunction(), reserves) - totalSupply();
+      // If user deposits [1000 WETH, 0 USDC], this implicitly swaps some WETH for USDC
+      // Attacker: frontrun by swapping USDC→WETH (making WETH cheap)
+      // Victim deposits WETH at bad rate
+      // Attacker: backrun by swapping WETH→USDC (restoring price, profiting)
+  }
+
+check: |
+  1. Does addLiquidity allow imbalanced deposits (not proportional to reserves)?
+  2. If yes: the imbalanced portion acts as an implicit swap
+  3. Can this implicit swap be sandwiched? Check:
+     a. Is there a fee on the implicit swap? (if no fee → free sandwich)
+     b. Is there slippage protection on the LP amount? (minLpAmountOut protects somewhat)
+     c. Does the LP calculation fairly price imbalanced deposits?
+  4. Compare: Uniswap V2 also allows imbalanced adds but charges the swap fee implicitly
+  5. If no fee on the implicit swap → MEDIUM (sandwich extracts value from depositor)
+
+why_missed: |
+  Analyzed addLiquidity for correctness (reserves update, LP minting, slippage check)
+  but never modeled the adversarial scenario of sandwiching an imbalanced deposit.
+  Lesson: for every operation that implicitly moves price, check if it can be sandwiched.

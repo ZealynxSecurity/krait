@@ -1,0 +1,43 @@
+id: LEARNED-024
+name: Rounding Manipulation via Flash Loan Supply Inflation
+source: amphora-shadow-audit
+contest: 2023-07-amphora
+official_finding: H-256
+severity: High
+category: rounding-precision
+
+detection_signal: |
+  Division in exchange rate calculation where the denominator can be inflated
+  by an attacker (e.g., via flash loan deposit), causing the result to round
+  down to zero. Attacker front-runs victim's deposit, inflates denominator,
+  victim gets 0 shares for their deposit.
+
+code_pattern: |
+  // VULNERABLE: denominator (totalSupply) can be inflated via flash loan
+  function _usdaToWUSDA(uint256 amount, uint256 totalSupply) returns (uint256) {
+    return (amount * MAX_SUPPLY) / totalSupply;  // rounds to 0 if totalSupply >> amount * MAX_SUPPLY
+  }
+
+  // ATTACK:
+  // 1. Attacker deposits small amount via deposit(), gets wUSDA
+  // 2. Attacker flash loans sUSD, deposits into USDA (inflating totalSupply)
+  // 3. Victim's deposit(): _usdaToWUSDA rounds to 0, victim gets 0 wUSDA for their USDA
+  // 4. Attacker withdraws, gets victim's USDA too
+
+check: |
+  For every share/wrapper token with exchange rate math:
+  1. Can the denominator be manipulated by an attacker?
+  2. What happens when the result rounds to 0?
+  3. Is there a minimum deposit/share check?
+  4. Can flash loans be used to temporarily inflate/deflate the rate?
+  5. Is the first depositor protected?
+
+why_missed: |
+  Krait identified the WUSDA zero-supply edge case but not the much more dangerous
+  flash-loan manipulation attack. The lesson: when finding math edge cases, always
+  ask "can an attacker FORCE this condition via supply manipulation?"
+
+false_positive_notes: |
+  - Not exploitable if: minimum deposit/share amounts are enforced
+  - Not exploitable if: the denominator cannot be manipulated (e.g., uses time-weighted average)
+  - Less severe if: the protocol initializes with dead shares (ERC4626 pattern)

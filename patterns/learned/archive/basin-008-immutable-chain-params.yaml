@@ -1,0 +1,36 @@
+id: LEARNED-008
+source_contest: basin-2023-07
+official_finding: M-08
+category: infrastructure
+severity: medium
+title: "Hardcoded immutable chain parameters break when chain changes"
+
+detection_signal: |
+  Any contract that stores chain-specific parameters (block time, gas limit,
+  chain ID) as immutable/constant values. These values can change via hard forks
+  or governance, breaking the protocol.
+
+code_pattern: |
+  // MultiFlowPump constructor
+  constructor(..., uint256 _blockTime, ...) {
+      BLOCK_TIME = _blockTime;  // immutable — set once at deploy, never changes
+  }
+  // Used in update():
+  blocksPassed = (deltaTimestamp / BLOCK_TIME).fromUInt();
+  // If Ethereum changes block time (e.g., 12s → 8s after merge-like event),
+  // blocksPassed is wrong → cap calculations wrong → oracle compromised
+
+check: |
+  1. Search for immutable/constant variables related to: block time, block gas limit,
+     chain ID, base fee, any consensus parameter
+  2. For each: what happens if the chain parameter changes?
+  3. Specifically for block time: is it used in rate limiting, time-weighted calculations,
+     or MEV resistance mechanisms?
+  4. If the parameter is immutable and the protocol can't be redeployed easily
+     (e.g., it holds user funds), this is a MEDIUM
+  5. Note: Ethereum's block time DID change from ~13s to 12s at the merge
+
+why_missed: |
+  Saw BLOCK_TIME as an immutable but never questioned "what if this changes?"
+  Treated chain parameters as fixed facts rather than assumptions that can break.
+  Lesson: every immutable that encodes an external assumption is a potential finding.

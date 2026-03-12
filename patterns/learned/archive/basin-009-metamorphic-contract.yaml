@@ -1,0 +1,40 @@
+id: LEARNED-009
+source_contest: basin-2023-07
+official_finding: M-09
+category: deployment-security
+severity: medium
+title: "Factory supporting both CREATE and CREATE2 enables metamorphic contract attack"
+
+detection_signal: |
+  A factory contract that supports BOTH create (non-deterministic) and create2
+  (deterministic) deployment paths. The metamorphic contract attack allows
+  deploying different code at the same address by using CREATE2 → selfdestruct → CREATE2.
+
+code_pattern: |
+  function boreWell(address implementation, ..., bytes32 salt) external {
+      if (salt != bytes32(0)) {
+          well = implementation.cloneDeterministic(immutableData, salt);  // CREATE2
+      } else {
+          well = implementation.clone(immutableData);                     // CREATE
+      }
+      wellImplementations[well] = implementation;  // maps address → implementation
+      // Attack: deploy with CREATE2, get address X mapped to safe implementation
+      // selfdestruct X (if implementation supports it)
+      // redeploy at X with malicious implementation via CREATE2 with same salt
+      // wellImplementations[X] still points to old safe implementation
+  }
+
+check: |
+  1. Does the factory support CREATE2 (deterministic addressing)?
+  2. Can the deployed contract be selfdestructed?
+  3. If yes to both: can an attacker redeploy different code at the same address?
+  4. Does the factory cache/validate the implementation after deployment?
+  5. Do downstream consumers trust the factory's implementation mapping?
+  6. Note: post-EIP-6780 (Dencun), selfdestruct only works in the same transaction
+     as creation, limiting but not eliminating this attack
+
+why_missed: |
+  Analyzed Aquifer's deployment logic for correctness but never considered
+  the metamorphic attack vector. This requires knowing about CREATE2 + selfdestruct
+  interaction, which is an infrastructure-level concern.
+  Lesson: for any CREATE2 factory, explicitly check metamorphic contract risk.

@@ -29,6 +29,51 @@ For each candidate, you must:
 4. There is NO "likely true" or "insufficient evidence" — either you proved it or you didn't
 5. **When in doubt, KILL it.** A missed real bug is unfortunate. A false positive destroys credibility.
 
+## Step 0: AUTOMATIC KILL GATE (MANDATORY — run FIRST on every candidate)
+
+**This gate runs FIRST. Any finding matching ANY of these 8 categories is IMMEDIATELY killed. No exploit trace is attempted. No further analysis. No exceptions. No "but in this case...". KILL IT.**
+
+These 8 categories account for 95%+ of all false positives across 40 shadow audits and have NEVER produced a true positive. They are unconditional kills.
+
+**GATE A — Generic Best Practice (kill immediately):**
+"Use SafeERC20/safeTransfer" without naming specific failing token, "safeApprove" generically, "single-step ownership", "missing event emission", ".transfer() gas limit" without specific failing recipient, "weak on-chain randomness", "use a deadline" without concrete MEV profit calc, "centralization risk".
+→ **KILL. Zero TPs in 40 contests.**
+
+**GATE B — Theoretical But Not Exploitable (kill immediately):**
+Requires exotic token behavior not in protocol's actual token list, oracle returning out-of-range values, overflow in practically bounded values, condition prevented by deployment/init. **TOKEN CONTEXT CHECK**: Finding relying on token behavior MUST name the SPECIFIC token from the protocol's actual list. "If a fee-on-transfer token is used" without naming which one = KILL. **DECIMAL/INTERFACE EDGE CASES**: Only matters if it affects actual token pairs the protocol uses.
+→ **KILL. Zero TPs in 40 contests.**
+
+**GATE C — Design Is Intentional (kill immediately):**
+Code comments/docs indicate deliberate behavior, same pattern as reference implementation (Uniswap V3, Curve, etc.), function works as NatSpec describes. **FORK BEHAVIOR CHECK**: If Recon identified a fork, check if original has same behavior → inherited design, not bug. Only report code that DIFFERS from fork origin.
+→ **KILL. Zero TPs in 40 contests.**
+
+**GATE D — Speculative / No Concrete Exploit (kill immediately):**
+"Could be an issue if...", cannot specify WHO/WHAT/HOW MUCH, vague "manipulation" without exact path, "stale data" without exploitable window.
+→ Ask: "Can I write `1. Attacker calls X 2. State becomes Y 3. Profit Z`?" If no → **KILL.**
+
+**GATE E — Admin Trust Boundary (kill immediately):**
+Requires trusted admin/owner/governance to act maliciously. EXCEPTION: Missing timelock on irreversible destructive action may qualify as Medium.
+→ **KILL. Zero TPs in 40 contests.**
+
+**GATE F — Dust / Economically Insignificant (kill immediately):**
+Rounding < $1/tx, bounded truncation dust, precision loss < gas costs. If max_loss × max_iterations < $100 = dust.
+→ **KILL. Zero TPs in 40 contests.**
+
+**GATE G — Out of Context (kill immediately):**
+Token behaviors for tokens not in whitelist, chain-specific issues on unsupported chains, standards the protocol doesn't implement, external protocols not integrated with.
+→ **KILL. Zero TPs in 40 contests.**
+
+**GATE H — Publicly Known / Acknowledged Issue (kill immediately):**
+Already listed in README "Known Issues", previous audit reports, or bot reports. **PRECISION REQUIREMENT**: Match on MECHANISM, not TOPIC. "SOFT_RESTRICTED bypass via open market" ≠ "SOFT_RESTRICTED bypass via withdraw()". Two bugs in same area with different exploit paths are different bugs. Only kill if known issue describes SAME entry point, SAME root cause, SAME impact.
+→ **KILL if exact mechanism match. DO NOT KILL if only same topic but different path.**
+
+**DoS SEVERITY EXCEPTION (applies to Gates A, B, D, F):**
+If DoS permanently/repeatedly bricks a CORE lifecycle function (settlement, liquidation, withdrawal, unstaking, repayment, auction) AND unprivileged attacker can trigger at low cost AND effect is persistent → Medium minimum, survives A/B/D/F. 25% of missed findings were DoS bugs incorrectly killed.
+
+---
+
+**After Kill Gate, surviving candidates proceed to verification methods below.**
+
 ## Verification Methods
 
 ### Method A: Deep Code Trace

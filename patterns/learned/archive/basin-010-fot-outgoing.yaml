@@ -1,0 +1,46 @@
+id: LEARNED-010
+source_contest: basin-2023-07
+official_finding: M-10
+category: token-compatibility
+severity: medium
+title: "Fee-on-transfer tokens drain protocol on OUTGOING transfers"
+
+detection_signal: |
+  Protocol handles fee-on-transfer (FoT) tokens on incoming transfers
+  (using balanceBefore/After pattern) but does NOT account for FoT on
+  outgoing transfers. When the protocol sends FoT tokens out, the actual
+  balance decreases by more than expected (amount + fee), causing stored
+  reserves to exceed actual balance.
+
+code_pattern: |
+  // Well.sol handles incoming FoT correctly:
+  function _safeTransferFromFeeOnTransfer(...) internal returns (uint256 amountTransferred) {
+      uint256 balanceBefore = token.balanceOf(address(this));
+      token.safeTransferFrom(from, address(this), amount);
+      amountTransferred = token.balanceOf(address(this)) - balanceBefore; // correct
+  }
+
+  // But outgoing transfers in shift/skim/swapTo don't account for FoT:
+  function shift(...) external {
+      tokenOut.safeTransfer(recipient, amountOut);  // if FoT, recipient gets amountOut - fee
+      reserves[j] -= amountOut;                      // but Well's balance dropped by amountOut
+      _setReserves(_tokens, reserves);               // reserves[j] == balance — OK for this tx
+      // BUT: the Well "lost" the fee. Over many transfers, balance drifts below reserves
+  }
+
+check: |
+  1. Find all outgoing token transfers (safeTransfer, transfer)
+  2. For each: does the protocol assume the full amount leaves its balance?
+  3. For FoT tokens on outgoing: recipient gets (amount - fee), but sender's balance
+     decreases by exactly `amount`. So the protocol's balance accounting IS correct per-tx.
+  4. BUT: if the token charges fee from the SENDER (not recipient), then balance
+     decreases by (amount + fee) while reserves only decrease by amount.
+     Next operation: reserves > actual balance → _setReserves reverts or accounting breaks.
+  5. Key distinction: "fee on transfer" can mean fee from sender OR from amount.
+     Check the specific FoT token behavior.
+
+why_missed: |
+  Analyzed fee-on-transfer handling for incoming transfers but assumed outgoing
+  transfers were fine because the protocol uses safeTransfer. Never considered
+  that FoT deductions on outgoing can cause reserve/balance drift.
+  Lesson: check BOTH directions for every token compatibility issue.
