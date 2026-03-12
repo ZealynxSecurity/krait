@@ -28,6 +28,16 @@ v6.4 (latest):  90% precision · 0.2 FPs/contest · 4/5 contests at 100% precisi
 | v5 | 31–35 | 70% | 0.6 |
 | **v6.4** | **36–40** | **90%** | **0.2** |
 
+**Latest (v6.4) contest-by-contest:**
+
+| Contest | Type | Official H+M | TPs | FPs | Precision |
+|---------|------|-------------|-----|-----|-----------|
+| LoopFi | Lending/Looping | 45 | 2 | 0 | **100%** |
+| DittoETH | Stablecoin/OrderBook | 16 | 1 | 1 | 50% |
+| Phi | Social/NFT | 15 | 1 | 0 | **100%** |
+| Vultisig | ILO/Token | 6 | 2 | 0 | **100%** |
+| Predy | DeFi Derivatives | 12 | 1 | 0 | **100%** |
+
 Every result is verifiable in [`shadow-audits/`](shadow-audits/).
 
 ### Verification Phase (Kill Gates)
@@ -71,6 +81,14 @@ Two complementary engines sharing the same knowledge base:
 - **Both HIGHs** (Munchables) — lockOnBehalf griefing + early unlock, 100% precision
 - **Assembly encoding bug** (DittoETH M-221) — `add` vs `and` corrupts data
 - ERC4626 inflation (Basin), reentrancy (reNFT), EIP-712 mismatch (reNFT), oracle precision (Dopex), TVL error (Renzo)
+
+---
+
+## Detection Coverage
+
+**Strong on**: Reentrancy/CEI, access control gaps, oracle issues, EIP/ERC compliance, first-depositor inflation, accounting errors, assembly bugs, pause bypasses
+
+**Improving**: Complex math (CDP liquidation, options pricing), cross-chain edge cases, game mechanic exploits, protocol-specific integrations (Curve, UniV3 tick math), economic design flaws
 
 ---
 
