@@ -2,6 +2,19 @@
 
 **AI security auditor for Solidity smart contracts.** Finds real vulnerabilities with concrete exploit traces — tested blind against 40 Code4rena contests at 90% precision. Runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code) as a set of skills. Free — uses your existing Claude subscription.
 
+Krait is two things that work together:
+
+**1. Audit skills** (this repo) — run `/krait` in Claude Code, get findings locally. Free.
+
+**2. Web platform** ([krait.zealynx.io](https://krait.zealynx.io)) — upload findings for branded reports, track projects over time, run an 845+ check security assessment covering process-level gaps code analysis can't see. Also free.
+
+```
+/krait (local)  →  Upload findings  →  Save to dashboard  →  Run assessment  →  Combined score
+     |                   |                    |                      |                  |
+  Claude Code    krait.zealynx.io     Track over time      845+ checks       60/40 weighted
+   (free)         /report/findings       /dashboard             /new             /dashboard
+```
+
 Built by [Zealynx Security](https://zealynx.io).
 
 ## What Krait Does
@@ -22,21 +35,6 @@ The output is a structured report with findings at exact file:line locations, vu
 - Not a linter or regex scanner — Claude reads and reasons about code
 - Not a SaaS product with API costs — runs locally in your Claude Code session
 - Not a replacement for a professional audit — it's a tool that catches real bugs before your auditor does
-
-## The Full Platform
-
-Krait is two things that work together:
-
-**1. Audit skills** (this repo) — run `/krait` in Claude Code, get findings locally. Free.
-
-**2. Web platform** ([krait.zealynx.io](https://krait.zealynx.io)) — upload findings for branded reports, track projects over time, run an 845+ check security assessment covering process-level gaps code analysis can't see. Also free.
-
-```
-/krait (local)  →  Upload findings  →  Save to dashboard  →  Run assessment  →  Combined score
-     |                   |                    |                      |                  |
-  Claude Code    krait.zealynx.io     Track over time      845+ checks       60/40 weighted
-   (free)         /report/findings       /dashboard             /new             /dashboard
-```
 
 ---
 
