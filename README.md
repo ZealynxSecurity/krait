@@ -10,6 +10,7 @@
 | **Platform** | Claude Code (skills + commands) |
 | **Cost** | Free — uses your Claude subscription |
 | **Precision** | 90% across 40 blind Code4rena contests |
+| **Methodology** | v7.0 — Multi-mindset analysis + consensus scoring |
 | **Install** | Copy to `~/.claude/` → `/krait` works everywhere |
 
 > The methodology lives in `.claude/skills/` and `.claude/commands/` as structured prompts that Claude Code executes. No external API calls, no separate tool — just Claude, guided by 40 contests worth of battle-tested detection heuristics.
@@ -50,18 +51,68 @@ cp -r .claude/skills/* ~/.claude/skills/
 
 Both commands output findings to `.audit/` in your project directory with a full markdown report.
 
+### After the Audit
+
+Krait offers three next steps after every report:
+1. **Verify findings** — trace the exploit path in code to confirm it's real
+2. **Generate PoC** — write a Foundry proof-of-concept test for each finding
+3. **View online** — upload your report at [krait.zealynx.io/report/findings](https://krait.zealynx.io/report/findings) for a shareable, branded version
+
 ---
 
-## What Makes Krait Different
+## How It Works
 
-Most AI audit tools do: **scan code → report findings**. One pass, no verification, no benchmarks.
+### Four-Phase Pipeline
 
-### Benchmarked Against 40 Real Contests
+| Phase | What It Does |
+|-------|-------------|
+| **Recon** | Architecture map, AST extraction, deterministic file risk scoring, protocol primer selection |
+| **Detection** | Three passes × 4 parallel lenses with multi-mindset analysis + consensus scoring |
+| **State Analysis** | Coupled state pairs, mutation matrix — catches sync bugs scanning misses |
+| **Verification** | 8 kill gates + consensus-aware verification + concrete exploit trace for every H/M |
+
+### Multi-Mindset Detection (v7.0)
+
+Each of the 4 detection lenses analyzes code through **4 independent mindsets** simultaneously:
+
+| Mindset | Question |
+|---------|----------|
+| **Attacker** | "How would I exploit this to drain funds or escalate privilege?" |
+| **Accountant** | "Trace every wei — do the numbers add up?" |
+| **Spec Auditor** | "Does the code match what docs, comments, and EIPs say it should do?" |
+| **Edge Case Hunter** | "What breaks at zero, max, empty, self-referential, or reentrant?" |
+
+This means every function in high-risk files gets examined from **16 angles** (4 lenses × 4 mindsets) — without increasing token cost, since the mindsets run within each lens's existing prompt.
+
+### Consensus Scoring
+
+After detection, findings are scored by how many independent sources discovered them:
+
+| Consensus | Meaning | Critic behavior |
+|-----------|---------|----------------|
+| **Strong** (3+ sources) | Multiple passes independently found the same bug | Fast-track verification |
+| **Moderate** (2 sources) | Two passes converged on the same issue | Normal scrutiny |
+| **Single** (1 source) | Only one pass found this | Extra scrutiny — why did others miss it? |
+
+### Kill Gates (Verification)
+
+Eight automatic gates try to **disprove every finding** before it reaches you. They've never killed a true positive across 40 contests:
+
+- **A**: Generic best practice ("use SafeERC20") · **B**: Theoretical/unrealistic
+- **C**: Intentional design · **D**: Speculative (no WHO/WHAT/HOW MUCH)
+- **E**: Admin trust · **F**: Dust (<$100) · **G**: Out of context · **H**: Known issue
+
+Result: FPs dropped from 4.2/contest → 0.2/contest (**95% reduction**).
+
+---
+
+## Benchmarks
 
 No other AI audit tool publishes precision/recall against real competitions. Krait has been **blind-tested against 40 Code4rena contests**:
 
 ```
-v6.4 (latest):  90% precision · 0.2 FPs/contest · 4/5 contests at 100% precision
+v7.0 (latest):  Multi-mindset lenses + consensus scoring (built on v6.4 precision)
+v6.4:           90% precision · 0.2 FPs/contest · 4/5 contests at 100% precision
 ```
 
 | Version | Contests | Precision | FPs/Contest |
@@ -70,7 +121,7 @@ v6.4 (latest):  90% precision · 0.2 FPs/contest · 4/5 contests at 100% precisi
 | v5 | 31–35 | 70% | 0.6 |
 | **v6.4** | **36–40** | **90%** | **0.2** |
 
-**Latest (v6.4) contest-by-contest:**
+**Latest contest-by-contest (v6.4):**
 
 | Contest | Type | Official H+M | TPs | FPs | Precision |
 |---------|------|-------------|-----|-----|-----------|
@@ -81,25 +132,6 @@ v6.4 (latest):  90% precision · 0.2 FPs/contest · 4/5 contests at 100% precisi
 | Predy | DeFi Derivatives | 12 | 1 | 0 | **100%** |
 
 Every result is verifiable in [`shadow-audits/`](shadow-audits/).
-
-### Four-Phase Pipeline
-
-| Phase | What It Does |
-|-------|-------------|
-| **Recon** | Architecture map, deterministic file risk scoring, protocol primer selection |
-| **Detection** | Three passes × 4 parallel lenses on highest-risk files |
-| **State Analysis** | Coupled state pairs, mutation matrix — catches sync bugs scanning misses |
-| **Verification** | Kill gates + concrete exploit trace required for every H/M |
-
-### Verification Phase (Kill Gates)
-
-Eight automatic gates try to **disprove every finding** before it reaches you. They've never killed a true positive across 40 contests:
-
-- **A**: Generic best practice ("use SafeERC20") · **B**: Theoretical/unrealistic
-- **C**: Intentional design · **D**: Speculative (no WHO/WHAT/HOW MUCH)
-- **E**: Admin trust · **F**: Dust (<$100) · **G**: Out of context · **H**: Known issue
-
-Result: FPs dropped from 4.2/contest → 0.2/contest (**95% reduction**).
 
 ### Self-Improving
 
@@ -124,6 +156,12 @@ After each blind test: score → root-cause every miss → update methodology �
 **Strong on**: Reentrancy/CEI, access control gaps, oracle issues, EIP/ERC compliance, first-depositor inflation, accounting errors, assembly bugs, pause bypasses
 
 **Improving**: Complex math (CDP liquidation, options pricing), cross-chain edge cases, game mechanic exploits, protocol-specific integrations (Curve, UniV3 tick math), economic design flaws
+
+---
+
+## View Reports Online
+
+Upload your `.audit/krait-findings.json` at [krait.zealynx.io/report/findings](https://krait.zealynx.io/report/findings) for a branded, shareable report with severity breakdowns, exploit traces, and code blocks.
 
 ---
 
