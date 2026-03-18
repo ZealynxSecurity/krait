@@ -25,6 +25,7 @@
   "author": "Zealynx Security",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.79.0",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
     "glob": "^11.0.1",
