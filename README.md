@@ -1,29 +1,54 @@
-# Krait — Solidity Security Audit Skills for Claude Code
+# Krait
 
-**Silent. Precise. Lethal.**
+**AI security auditor for Solidity smart contracts.** Finds real vulnerabilities with concrete exploit traces — tested blind against 40 Code4rena contests at 90% precision. Runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code) as a set of skills. Free — uses your existing Claude subscription.
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills for **Solidity** smart contract security auditing. Type `/krait` in any Solidity project → structured audit with concrete exploit traces. **Free** — uses your Claude subscription, no API costs. Built by [Zealynx Security](https://zealynx.io).
+Built by [Zealynx Security](https://zealynx.io).
 
-| | |
-|---|---|
-| **Technology** | Solidity |
-| **Platform** | Claude Code (skills + commands) |
-| **Cost** | Free — uses your Claude subscription |
-| **Precision** | 90% across 40 blind Code4rena contests |
-| **Methodology** | v7.0 — Multi-mindset analysis + consensus scoring |
-| **Install** | Copy to `~/.claude/` → `/krait` works everywhere |
+## What Krait Does
 
-> The methodology lives in `.claude/skills/` and `.claude/commands/` as structured prompts that Claude Code executes. No external API calls, no separate tool — just Claude, guided by 40 contests worth of battle-tested detection heuristics.
+Krait is a structured audit methodology encoded as Claude Code skills. When you run `/krait` on a Solidity project, it executes a 4-phase pipeline:
+
+1. **Recon** — maps the architecture, extracts the AST, scores every file by risk, selects protocol-specific detection primers
+2. **Detection** — analyzes each high-risk function from 16 angles (4 technical lenses x 4 independent mindsets), with consensus scoring across passes
+3. **State Analysis** — finds coupled state pairs and mutation patterns that per-function scanning misses
+4. **Verification** — 8 kill gates try to disprove every finding. Only those with a concrete exploit trace (WHO does WHAT to steal HOW MUCH) survive
+
+The output is a structured report with findings at exact file:line locations, vulnerable code, suggested fixes, and exploit traces. Saved as both markdown and JSON.
+
+<!-- TODO: Add screenshot of report viewer at krait.zealynx.io/report/findings -->
+
+## What Krait Is Not
+
+- Not a linter or regex scanner — Claude reads and reasons about code
+- Not a SaaS product with API costs — runs locally in your Claude Code session
+- Not a replacement for a professional audit — it's a tool that catches real bugs before your auditor does
+
+## The Full Platform
+
+Krait is two things that work together:
+
+**1. Audit skills** (this repo) — run `/krait` in Claude Code, get findings locally. Free.
+
+**2. Web platform** ([krait.zealynx.io](https://krait.zealynx.io)) — upload findings for branded reports, track projects over time, run an 845+ check security assessment covering process-level gaps code analysis can't see. Also free.
+
+```
+/krait (local)  →  Upload findings  →  Save to dashboard  →  Run assessment  →  Combined score
+     |                   |                    |                      |                  |
+  Claude Code    krait.zealynx.io     Track over time      845+ checks       60/40 weighted
+   (free)         /report/findings       /dashboard             /new             /dashboard
+```
 
 ---
 
-## Requirements
+## Quick Start
+
+### Requirements
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI, VS Code extension, or Cursor)
 - A Claude subscription (Pro, Max, or Team)
 - A Solidity project to audit
 
-## Installation
+### Install
 
 ```bash
 git clone https://github.com/ZealynxSecurity/krait.git
@@ -32,9 +57,9 @@ cp -r krait/.claude/commands/* ~/.claude/commands/
 cp -r krait/.claude/skills/* ~/.claude/skills/
 ```
 
-That's it. Open Claude Code in **any** Solidity project and run `/krait`.
+Open Claude Code in any Solidity project and run `/krait`.
 
-To update to the latest methodology:
+### Update
 
 ```bash
 cd krait && git pull
@@ -42,18 +67,18 @@ cp -r .claude/commands/* ~/.claude/commands/
 cp -r .claude/skills/* ~/.claude/skills/
 ```
 
-## Commands
+### Commands
 
 | Command | What it does |
 |---------|-------------|
 | `/krait` | Full 4-phase audit: Recon → Detection → State Analysis → Verification → Report |
-| `/krait-quick` | Same pipeline but skips state analysis — faster for quick checks |
+| `/krait-quick` | Same pipeline, skips state analysis — ~2x faster |
 
-Both commands output findings to `.audit/` in your project directory with a full markdown report.
+Both output to `.audit/` in your project directory.
 
 ### After the Audit
 
-Every `/krait` run saves structured findings to `.audit/krait-findings.json` and shows:
+Every run saves findings to `.audit/krait-findings.json` and shows:
 
 ```
 ───────────────────────────────────────────────────
@@ -67,24 +92,15 @@ Every `/krait` run saves structured findings to `.audit/krait-findings.json` and
 ───────────────────────────────────────────────────
 ```
 
-Findings are already verified — the critic phase requires a concrete `WHO → WHAT → HOW MUCH` exploit trace for every H/M before it reaches the report. After the banner, Krait offers to complete the [security assessment](https://krait.zealynx.io/new) (845+ process-level checks covering operational security, deployment practices, and gaps that code analysis can't see).
+Findings are already verified — the critic phase requires a concrete exploit trace for every H/M before it reaches the report.
 
 ---
 
-## How It Works
+## How Detection Works
 
-### Four-Phase Pipeline
+### Multi-Mindset Analysis (v7.0)
 
-| Phase | What It Does |
-|-------|-------------|
-| **Recon** | Architecture map, AST extraction, deterministic file risk scoring, protocol primer selection |
-| **Detection** | Three passes × 4 parallel lenses with multi-mindset analysis + consensus scoring |
-| **State Analysis** | Coupled state pairs, mutation matrix — catches sync bugs scanning misses |
-| **Verification** | 8 kill gates + consensus-aware verification + concrete exploit trace for every H/M |
-
-### Multi-Mindset Detection (v7.0)
-
-Each of the 4 detection lenses analyzes code through **4 independent mindsets** simultaneously:
+Each of the 4 detection lenses analyzes code through 4 independent mindsets simultaneously:
 
 | Mindset | Question |
 |---------|----------|
@@ -93,46 +109,31 @@ Each of the 4 detection lenses analyzes code through **4 independent mindsets** 
 | **Spec Auditor** | "Does the code match what docs, comments, and EIPs say it should do?" |
 | **Edge Case Hunter** | "What breaks at zero, max, empty, self-referential, or reentrant?" |
 
-This means every function in high-risk files gets examined from **16 angles** (4 lenses × 4 mindsets) — without increasing token cost, since the mindsets run within each lens's existing prompt.
-
-### Consensus Scoring
-
-After detection, findings are scored by how many independent sources discovered them:
-
-| Consensus | Meaning | Critic behavior |
-|-----------|---------|----------------|
-| **Strong** (3+ sources) | Multiple passes independently found the same bug | Fast-track verification |
-| **Moderate** (2 sources) | Two passes converged on the same issue | Normal scrutiny |
-| **Single** (1 source) | Only one pass found this | Extra scrutiny — why did others miss it? |
+Every function in high-risk files gets examined from **16 angles** (4 lenses x 4 mindsets). Findings discovered by multiple mindsets get a consensus boost; single-source findings get extra scrutiny.
 
 ### Kill Gates (Verification)
 
-Eight automatic gates try to **disprove every finding** before it reaches you. They've never killed a true positive across 40 contests:
+Eight automatic gates try to **disprove every finding** before it reaches you:
 
 - **A**: Generic best practice ("use SafeERC20") · **B**: Theoretical/unrealistic
 - **C**: Intentional design · **D**: Speculative (no WHO/WHAT/HOW MUCH)
 - **E**: Admin trust · **F**: Dust (<$100) · **G**: Out of context · **H**: Known issue
 
-Result: FPs dropped from 4.2/contest → 0.2/contest (**95% reduction**).
+Result: FPs dropped from 4.2/contest → 0.2/contest (**95% reduction**). They've never killed a true positive across 40 contests.
 
 ---
 
 ## Benchmarks
 
-No other AI audit tool publishes precision/recall against real competitions. Krait has been **blind-tested against 40 Code4rena contests**:
-
-```
-v7.0 (latest):  Multi-mindset lenses + consensus scoring (built on v6.4 precision)
-v6.4:           90% precision · 0.2 FPs/contest · 4/5 contests at 100% precision
-```
+Tested blind against 40 Code4rena contests. No other AI audit tool publishes precision/recall against real competitions.
 
 | Version | Contests | Precision | FPs/Contest |
 |---------|----------|-----------|-------------|
-| v1 | 1–3 | 12% | 1.3 |
-| v5 | 31–35 | 70% | 0.6 |
-| **v6.4** | **36–40** | **90%** | **0.2** |
+| v1 | 1-3 | 12% | 1.3 |
+| v5 | 31-35 | 70% | 0.6 |
+| **v6.4** | **36-40** | **90%** | **0.2** |
 
-**Latest contest-by-contest (v6.4):**
+**Latest 5 contests (v6.4):**
 
 | Contest | Type | Official H+M | TPs | FPs | Precision |
 |---------|------|-------------|-----|-----|-----------|
@@ -172,30 +173,19 @@ After each blind test: score → root-cause every miss → update methodology �
 
 ## Web Platform — [krait.zealynx.io](https://krait.zealynx.io)
 
-Krait's web platform turns local audit results into a tracked, shareable security profile. Free, no API costs.
-
 ### Upload & View Reports
 
-Upload your `.audit/krait-findings.json` at [krait.zealynx.io/report/findings](https://krait.zealynx.io/report/findings) → branded report with severity breakdowns, exploit traces, and code diffs. Save to your dashboard to track findings over time.
+Upload `.audit/krait-findings.json` at [krait.zealynx.io/report/findings](https://krait.zealynx.io/report/findings) for a branded report with severity breakdowns, exploit traces, and code diffs. Save to your dashboard to track over time.
 
 ### Security Assessment (845+ Checks)
 
-Interactive audit readiness checklist covering **39 DeFi verticals** — operational security, deployment practices, documentation, upgrade procedures, and process gaps that code analysis can't see. Backed by 4,500+ real findings from Solodit.
+Interactive audit readiness checklist covering **39 DeFi verticals** — operational security, deployment practices, documentation, upgrade procedures, and process gaps code analysis can't see. Backed by 4,500+ real findings from [Solodit](https://solodit.xyz).
 
-Start at [krait.zealynx.io/new](https://krait.zealynx.io/new). If you ran `/krait:assess` in Claude Code, import the `.zealynx-run.json` to pre-fill checks.
+Start at [krait.zealynx.io/new](https://krait.zealynx.io/new).
 
 ### Dashboard
 
-[krait.zealynx.io/dashboard](https://krait.zealynx.io/dashboard) — all your projects in one place. Assessment scores, scan findings, combined readiness score (60% assessment + 40% scan), and activity timeline.
-
-### The Full Pipeline
-
-```
-/krait (local)  →  Upload findings  →  Save to dashboard  →  Run assessment  →  Combined score
-     │                   │                    │                      │                  │
-  Claude Code    krait.zealynx.io     Track over time      845+ checks       60% assess + 40% scan
-   (free)         /report/findings       /dashboard             /new              /dashboard/{id}
-```
+[krait.zealynx.io/dashboard](https://krait.zealynx.io/dashboard) — all projects in one place. Assessment scores, scan findings, combined readiness score (60% assessment + 40% scan), activity timeline.
 
 ---
 
