@@ -4,7 +4,7 @@ Run Phase 3 of the Krait audit pipeline standalone. Requires candidate files in 
 
 ## Instructions
 
-Follow ONLY the "Phase 3: VERIFICATION" section from the full `/krait` command methodology. Read `.claude/skills/krait-critic/SKILL.md` for the full verification methodology and 10 FP patterns.
+Follow ONLY the "Phase 3: VERIFICATION" section from the full `/krait` command methodology. Read `~/.claude/skills/krait-critic/SKILL.md` for the full verification methodology and 10 FP patterns.
 
 Read ALL candidate files:
 - `.audit/findings/detector-candidates.md` (if exists)

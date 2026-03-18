@@ -4,7 +4,7 @@ Run Phase 2 of the Krait audit pipeline standalone. Requires `.audit/recon.md` a
 
 ## Instructions
 
-Follow ONLY the "Phase 2: STATE INCONSISTENCY ANALYSIS" section from the full `/krait` command methodology. Read `.claude/skills/krait-state-auditor/SKILL.md` for the detailed 8-phase methodology.
+Follow ONLY the "Phase 2: STATE INCONSISTENCY ANALYSIS" section from the full `/krait` command methodology. Read `~/.claude/skills/krait-state-auditor/SKILL.md` for the detailed 8-phase methodology.
 
 Save output to `.audit/findings/state-candidates.md`.
 

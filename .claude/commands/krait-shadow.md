@@ -72,11 +72,11 @@ For each MISSED finding:
 
 1. **Root-cause the miss**: Was it a missing heuristic? Missing question category? Missing module? Wrong reasoning?
 2. **Integrate directly into the skills**:
-   - If it's a new bug class → add a new heuristic trigger (e.g., EXT-01) to `.claude/skills/krait-detector/SKILL.md`
+   - If it's a new bug class → add a new heuristic trigger (e.g., EXT-01) to `~/.claude/skills/krait-detector/SKILL.md`
    - If it's a new check methodology → add a new Module (e.g., Module D15) to the detector skill
    - If it's a new question angle → add to the relevant Feynman category (1-9) in the detector skill
-   - If it's a FP pattern → add to the FP elimination list in `.claude/skills/krait-critic/SKILL.md`
-3. **Mirror changes** in `.claude/commands/krait.md` (the command must match the skill)
+   - If it's a FP pattern → add to the FP elimination list in `~/.claude/skills/krait-critic/SKILL.md`
+3. **Mirror changes** in `~/.claude/commands/krait.md` (the command must match the skill)
 4. **Optionally archive** raw analysis to `patterns/learned/` for reference — but this is documentation, not detection
 
 For each FP:
@@ -146,4 +146,4 @@ Cumulative improvement: {recall_contest_1}% → {recall_this_contest}%
 3. **For EVERY miss, upgrade the methodology** — add a heuristic, question, or module to the detector skill
 4. **Be honest about FPs** — don't rationalize false positives as "valid but not reported"
 5. **Track cumulative metrics** — the whole point is measuring improvement over time
-6. **SKILL.md files are the single source of truth.** `krait.md` is a lean orchestrator that references them — do NOT duplicate methodology content into `krait.md`. Make all detection changes in `.claude/skills/krait-detector/SKILL.md`, all FP/kill gate changes in `.claude/skills/krait-critic/SKILL.md`, all recon changes in `.claude/skills/krait-recon/SKILL.md`.
+6. **SKILL.md files are the single source of truth.** `krait.md` is a lean orchestrator that references them — do NOT duplicate methodology content into `krait.md`. Make all detection changes in `~/.claude/skills/krait-detector/SKILL.md`, all FP/kill gate changes in `~/.claude/skills/krait-critic/SKILL.md`, all recon changes in `~/.claude/skills/krait-recon/SKILL.md`.

@@ -35,7 +35,7 @@ Before manually reading code for risk scoring, extract compiler-verified structu
 
 **Run this command:**
 ```bash
-bash .claude/skills/krait-recon/ast-extract.sh <project-root> .audit/ast-facts.md
+bash ~/.claude/skills/krait-recon/ast-extract.sh <project-root> .audit/ast-facts.md
 ```
 
 This script will:
@@ -63,7 +63,7 @@ If `slither` is available on PATH and the project has a Solidity compilation set
 ```bash
 # Check if slither is available, run it, and extract summary
 which slither && slither <project-root> --json .audit/slither-results.json 2>/dev/null && \
-  bash .claude/skills/krait-recon/slither-summary.sh .audit/slither-results.json .audit/slither-summary.md || true
+  bash ~/.claude/skills/krait-recon/slither-summary.sh .audit/slither-results.json .audit/slither-summary.md || true
 ```
 
 **If Slither runs successfully:**

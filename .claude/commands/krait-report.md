@@ -4,7 +4,7 @@ Run Phase 4 of the Krait audit pipeline standalone. Requires `.audit/findings/cr
 
 ## Instructions
 
-Follow ONLY the "Phase 4: REPORT" section from the full `/krait` command methodology. Read `.claude/skills/krait-reporter/SKILL.md` for detailed formatting rules.
+Follow ONLY the "Phase 4: REPORT" section from the full `/krait` command methodology. Read `~/.claude/skills/krait-reporter/SKILL.md` for detailed formatting rules.
 
 Save output to `.audit/krait-report.md` and `.audit/krait-findings.json`.
 

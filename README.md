@@ -96,22 +96,16 @@ Two complementary engines sharing the same knowledge base:
 
 ### Claude Code Skills (Recommended — Zero Cost)
 
-Copy Krait's `.claude/` directory into the project you want to audit:
+Install Krait's skills and commands into your global Claude Code directory:
 
 ```bash
-# Clone Krait
 git clone https://github.com/ZealynxSecurity/krait.git
-
-# Go to your target project
-cd /path/to/your-solidity-project
-
-# Copy skills + commands into it
-mkdir -p .claude
-cp -r /path/to/krait/.claude/commands .claude/commands
-cp -r /path/to/krait/.claude/skills .claude/skills
+mkdir -p ~/.claude/commands ~/.claude/skills
+cp -r krait/.claude/commands/* ~/.claude/commands/
+cp -r krait/.claude/skills/* ~/.claude/skills/
 ```
 
-Then open Claude Code in that project and run:
+Then open Claude Code in **any** Solidity project and run:
 
 ```
 /krait                  # Full 4-phase audit
@@ -123,13 +117,12 @@ Individual phases: `/krait-recon` · `/krait-detect` · `/krait-state` · `/krai
 To update to the latest methodology:
 
 ```bash
-cd /path/to/krait && git pull
-# Re-copy into your target project
-cp -r .claude/commands /path/to/your-project/.claude/commands
-cp -r .claude/skills /path/to/your-project/.claude/skills
+cd krait && git pull
+cp -r .claude/commands/* ~/.claude/commands/
+cp -r .claude/skills/* ~/.claude/skills/
 ```
 
-> Works with Claude Code CLI, VS Code Claude extension, and Cursor. The `.claude/` directory can be gitignored in your target project if you don't want to commit it.
+> Works with Claude Code CLI, VS Code extension, and Cursor. Once installed, `/krait` is available in every project — no per-project setup needed.
 
 ### CLI (API-Powered — Development)
 
@@ -144,6 +137,8 @@ node dist/cli.js audit /path/to/project --quick  # Fast mode
 node dist/cli.js audit /path/to/project --dry-run # Preview without API calls
 node dist/cli.js patterns                         # List loaded patterns
 ```
+
+> The CLI is not yet published to npm. For now, clone and build locally.
 
 ---
 

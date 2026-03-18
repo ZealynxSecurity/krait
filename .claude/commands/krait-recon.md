@@ -4,7 +4,7 @@ Run Phase 0 of the Krait audit pipeline standalone.
 
 ## Instructions
 
-Follow ONLY the "Phase 0: RECON" section from the full `/krait` command methodology. Read the `.claude/skills/krait-recon/SKILL.md` file for the detailed methodology.
+Follow ONLY the "Phase 0: RECON" section from the full `/krait` command methodology. Read the `~/.claude/skills/krait-recon/SKILL.md` file for the detailed methodology.
 
 Save output to `.audit/recon.md`.
 

@@ -1001,4 +1001,11 @@ function inferProjectName(projectPath: string): string {
   return parts[parts.length - 1] || 'project';
 }
 
+program
+  .command('version')
+  .description('Show version number')
+  .action(() => {
+    console.log(VERSION);
+  });
+
 program.parse();

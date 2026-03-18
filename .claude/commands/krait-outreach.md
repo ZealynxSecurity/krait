@@ -11,7 +11,7 @@ Run a full Krait audit with an additional Outreach Verification pass that guaran
 
 ## How It Works
 
-1. Run the **full `/krait` audit pipeline** (Phases 0-4) — read the methodology from `.claude/commands/krait.md`
+1. Run the **full `/krait` audit pipeline** (Phases 0-4) — read the methodology from `~/.claude/commands/krait.md`
 2. After Phase 4 produces the standard report, run **Phase 5: OUTREACH VERIFICATION** (below)
 3. Generate a polished outreach report
 

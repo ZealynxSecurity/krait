@@ -29,12 +29,12 @@ You are Krait, an AI security auditor by Zealynx Security. Run the 4-phase pipel
 
 **Goal**: Understand the protocol before looking for bugs.
 
-**Read and follow**: `.claude/skills/krait-recon/SKILL.md` — contains the complete recon methodology.
+**Read and follow**: `~/.claude/skills/krait-recon/SKILL.md` — contains the complete recon methodology.
 
 **Key steps** (details in SKILL.md):
 1. Create `.audit/` and `.audit/findings/` directories
 2. Read README, docs, config files. **Extract known issues to `.audit/known-issues.md`** (Gate H)
-3. AST Fact Extraction (Solidity): `bash .claude/skills/krait-recon/ast-extract.sh <project-root> .audit/ast-facts.md`
+3. AST Fact Extraction (Solidity): `bash ~/.claude/skills/krait-recon/ast-extract.sh <project-root> .audit/ast-facts.md`
 4. Slither Pre-Scan (optional): `slither <project-root> --json .audit/slither-results.json 2>/dev/null || true`
 5. **Deterministic File Risk Scoring** — RISK_SCORE formula, tier assignments (DEEP/STANDARD/SCAN)
 6. Architecture map: fund flows, trust boundaries, contract roles
@@ -59,9 +59,9 @@ RISK_SCORE = (external_calls × 5) + (state_writing_functions × 4) + (payable_f
 
 **Goal**: Find all CANDIDATE vulnerabilities. Maximize recall — the Critic filters later.
 
-**Read and follow**: `.claude/skills/krait-detector/SKILL.md` — contains the complete detection methodology with all question categories, heuristics, modules, and lenses.
+**Read and follow**: `~/.claude/skills/krait-detector/SKILL.md` — contains the complete detection methodology with all question categories, heuristics, modules, and lenses.
 
-**Also read**: The protocol-specific primer from `.claude/skills/krait-detector/primers/` (selected during Recon).
+**Also read**: The protocol-specific primer from `~/.claude/skills/krait-detector/primers/` (selected during Recon).
 
 **Pipeline summary** (details in SKILL.md):
 
@@ -101,7 +101,7 @@ Save candidates to `.audit/findings/detector-candidates.md`.
 
 **Goal**: Find bugs where one piece of coupled state changes without its dependent counterpart.
 
-**Read and follow**: `.claude/skills/krait-state-auditor/SKILL.md` — contains the complete state analysis methodology.
+**Read and follow**: `~/.claude/skills/krait-state-auditor/SKILL.md` — contains the complete state analysis methodology.
 
 **Key steps** (details in SKILL.md):
 1. Coupled State Dependency Map — identify all state pairs with invariants
@@ -124,7 +124,7 @@ Masking code → what invariant is broken underneath?
 
 **Goal**: ZERO FALSE POSITIVES. Only provably real findings ship.
 
-**Read and follow**: `.claude/skills/krait-critic/SKILL.md` — contains Kill Gates A-H, DoS exception, 10 FP patterns, verification methods, and verdict format.
+**Read and follow**: `~/.claude/skills/krait-critic/SKILL.md` — contains Kill Gates A-H, DoS exception, 10 FP patterns, verification methods, and verdict format.
 
 **Pipeline summary** (details in SKILL.md):
 

@@ -38,7 +38,7 @@ For each MISSED or PARTIAL finding, answer these questions:
 
 ## Step 3: Upgrade the Detection Methodology
 
-For each miss, make ONE of these changes to `.claude/skills/krait-detector/SKILL.md`:
+For each miss, make ONE of these changes to `~/.claude/skills/krait-detector/SKILL.md`:
 
 ### Option A: Add a new heuristic trigger
 Add to Step 4 (Audit Heuristics) in the appropriate category:
@@ -56,13 +56,13 @@ Add to the relevant Category (1-9) in Step 3:
 Add to Step 5 (Targeted Analysis Modules) or upgrade an existing module with new checks.
 
 ### Option D: Add a new FP elimination pattern
-If a FP was generated, add to `.claude/skills/krait-critic/SKILL.md`:
+If a FP was generated, add to `~/.claude/skills/krait-critic/SKILL.md`:
 ```
 FP-{N}: {pattern description}
 ```
 
 ### Source of Truth
-**SKILL.md files are the single source of truth.** `krait.md` is a lean orchestrator that references them. Make detection changes in `.claude/skills/krait-detector/SKILL.md`, FP/kill gate changes in `.claude/skills/krait-critic/SKILL.md`. Do NOT duplicate into `krait.md`.
+**SKILL.md files are the single source of truth.** `krait.md` is a lean orchestrator that references them. Make detection changes in `~/.claude/skills/krait-detector/SKILL.md`, FP/kill gate changes in `~/.claude/skills/krait-critic/SKILL.md`. Do NOT duplicate into `krait.md`.
 
 ## Step 4: Archive Raw Analysis (Optional)
 
@@ -87,9 +87,9 @@ FP: {F} ({list})
 - Upgraded {existing check}: {what changed}
 
 ### Files Modified:
-- .claude/skills/krait-detector/SKILL.md
-- .claude/commands/krait.md
-- .claude/skills/krait-critic/SKILL.md (if FP patterns added)
+- ~/.claude/skills/krait-detector/SKILL.md
+- ~/.claude/commands/krait.md
+- ~/.claude/skills/krait-critic/SKILL.md (if FP patterns added)
 ```
 
 ## Important
