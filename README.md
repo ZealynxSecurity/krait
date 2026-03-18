@@ -2,17 +2,47 @@
 
 **Silent. Precise. Lethal.**
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills for **Solidity** smart contract security auditing. Type `/krait` in any Solidity project → structured audit with concrete exploit traces, zero API cost. Built by [Zealynx Security](https://zealynx.io).
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills for **Solidity** smart contract security auditing. Type `/krait` in any Solidity project → structured audit with concrete exploit traces. **Free** — uses your Claude subscription, no API costs. Built by [Zealynx Security](https://zealynx.io).
 
 | | |
 |---|---|
 | **Technology** | Solidity |
 | **Platform** | Claude Code (skills + commands) |
-| **Cost** | Zero — uses your Claude subscription |
+| **Cost** | Free — uses your Claude subscription |
 | **Precision** | 90% across 40 blind Code4rena contests |
 | **Install** | Copy to `~/.claude/` → `/krait` works everywhere |
 
 > The methodology lives in `.claude/skills/` and `.claude/commands/` as structured prompts that Claude Code executes. No external API calls, no separate tool — just Claude, guided by 40 contests worth of battle-tested detection heuristics.
+
+---
+
+## Installation
+
+```bash
+git clone https://github.com/ZealynxSecurity/krait.git
+mkdir -p ~/.claude/commands ~/.claude/skills
+cp -r krait/.claude/commands/* ~/.claude/commands/
+cp -r krait/.claude/skills/* ~/.claude/skills/
+```
+
+Then open Claude Code in **any** Solidity project and run:
+
+```
+/krait                  # Full 4-phase audit
+/krait-quick            # Fast mode (skips state analysis)
+```
+
+Individual phases: `/krait-recon` · `/krait-detect` · `/krait-state` · `/krait-critic` · `/krait-report`
+
+To update:
+
+```bash
+cd krait && git pull
+cp -r .claude/commands/* ~/.claude/commands/
+cp -r .claude/skills/* ~/.claude/skills/
+```
+
+> Works with Claude Code CLI, VS Code extension, and Cursor. Once installed, `/krait` is available in every project — no per-project setup needed.
 
 ---
 
@@ -46,6 +76,15 @@ v6.4 (latest):  90% precision · 0.2 FPs/contest · 4/5 contests at 100% precisi
 
 Every result is verifiable in [`shadow-audits/`](shadow-audits/).
 
+### Four-Phase Pipeline
+
+| Phase | What It Does |
+|-------|-------------|
+| **Recon** | Architecture map, deterministic file risk scoring, protocol primer selection |
+| **Detection** | Three passes × 4 parallel lenses on highest-risk files |
+| **State Analysis** | Coupled state pairs, mutation matrix — catches sync bugs scanning misses |
+| **Verification** | Kill gates + concrete exploit trace required for every H/M |
+
 ### Verification Phase (Kill Gates)
 
 Eight automatic gates try to **disprove every finding** before it reaches you. They've never killed a true positive across 40 contests:
@@ -59,22 +98,6 @@ Result: FPs dropped from 4.2/contest → 0.2/contest (**95% reduction**).
 ### Self-Improving
 
 After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 50+ heuristics, 30 modules, and 7 protocol-specific primers from real missed findings.
-
-### Four-Phase Pipeline
-
-| Phase | What It Does |
-|-------|-------------|
-| **Recon** | Architecture map, deterministic file risk scoring, protocol primer selection |
-| **Detection** | Three passes × 4 parallel lenses on highest-risk files |
-| **State Analysis** | Coupled state pairs, mutation matrix — catches sync bugs scanning misses |
-| **Verification** | Kill gates + concrete exploit trace required for every H/M |
-
-### Dual-Engine Architecture
-
-Two complementary engines sharing the same knowledge base:
-
-- **CLI Agent** (this repo): 4-phase adversarial pipeline for security researchers who want automated vulnerability analysis with concrete exploit traces.
-- **Web Platform** ([krait.zealynx.io](https://krait.zealynx.io)): Protocol-specific security assessment — 39 DeFi verticals, 845+ checks, smart filtering, auto-generated architectural observations, branded exportable reports.
 
 ---
 
@@ -98,63 +121,9 @@ Two complementary engines sharing the same knowledge base:
 
 ---
 
-## Installation
+## Web Assessment Platform
 
-### Claude Code Skills (Recommended — Zero Cost)
-
-Install Krait's skills and commands into your global Claude Code directory:
-
-```bash
-git clone https://github.com/ZealynxSecurity/krait.git
-mkdir -p ~/.claude/commands ~/.claude/skills
-cp -r krait/.claude/commands/* ~/.claude/commands/
-cp -r krait/.claude/skills/* ~/.claude/skills/
-```
-
-Then open Claude Code in **any** Solidity project and run:
-
-```
-/krait                  # Full 4-phase audit
-/krait-quick            # Fast mode (skips state analysis)
-```
-
-Individual phases: `/krait-recon` · `/krait-detect` · `/krait-state` · `/krait-critic` · `/krait-report`
-
-To update to the latest methodology:
-
-```bash
-cd krait && git pull
-cp -r .claude/commands/* ~/.claude/commands/
-cp -r .claude/skills/* ~/.claude/skills/
-```
-
-> Works with Claude Code CLI, VS Code extension, and Cursor. Once installed, `/krait` is available in every project — no per-project setup needed.
-
-### CLI (API-Powered)
-
-For automated batch processing via the Anthropic API:
-
-```bash
-npx krait audit /path/to/project                 # Full audit
-npx krait audit /path/to/project --quick          # Fast mode
-npx krait audit /path/to/project --dry-run        # Preview without API calls
-npx krait patterns                                # List loaded patterns
-```
-
-Requires `ANTHROPIC_API_KEY` environment variable. Install globally with `npm install -g krait`.
-
----
-
-## Project Status
-
-| Component | Status |
-|-----------|--------|
-| Claude Code skills (4-phase audit) | Production |
-| Kill gates + shadow benchmarking (40 contests) | Production |
-| Detection primers (7 protocol types) | Production |
-| Web assessment platform (39 verticals) | Live |
-| CLI tool (`npx krait`) | Published |
-| Multi-domain (Rust, TypeScript, AI) | Planned |
+For process-level security (not code-level), see [krait.zealynx.io](https://krait.zealynx.io) — interactive audit readiness assessment covering 39 DeFi verticals with 845+ security checks.
 
 ---
 
