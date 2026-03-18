@@ -130,21 +130,18 @@ cp -r .claude/skills/* ~/.claude/skills/
 
 > Works with Claude Code CLI, VS Code extension, and Cursor. Once installed, `/krait` is available in every project — no per-project setup needed.
 
-### CLI (API-Powered — Development)
+### CLI (API-Powered)
 
 For automated batch processing via the Anthropic API:
 
 ```bash
-git clone https://github.com/ZealynxSecurity/krait.git
-cd krait && npm install && npm run build
-export ANTHROPIC_API_KEY=your-key-here
-node dist/cli.js audit /path/to/project         # Full audit
-node dist/cli.js audit /path/to/project --quick  # Fast mode
-node dist/cli.js audit /path/to/project --dry-run # Preview without API calls
-node dist/cli.js patterns                         # List loaded patterns
+npx krait audit /path/to/project                 # Full audit
+npx krait audit /path/to/project --quick          # Fast mode
+npx krait audit /path/to/project --dry-run        # Preview without API calls
+npx krait patterns                                # List loaded patterns
 ```
 
-> The CLI is not yet published to npm. For now, clone and build locally.
+Requires `ANTHROPIC_API_KEY` environment variable. Install globally with `npm install -g krait`.
 
 ---
 
@@ -156,7 +153,7 @@ node dist/cli.js patterns                         # List loaded patterns
 | Kill gates + shadow benchmarking (40 contests) | Production |
 | Detection primers (7 protocol types) | Production |
 | Web assessment platform (39 verticals) | Live |
-| CLI tool | Development |
+| CLI tool (`npx krait`) | Published |
 | Multi-domain (Rust, TypeScript, AI) | Planned |
 
 ---

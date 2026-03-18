@@ -1,11 +1,19 @@
 {
-  "name": "@zealynx/krait",
+  "name": "krait",
   "version": "0.1.0",
-  "description": "AI-first multi-domain security auditor powered by Claude",
+  "description": "Solidity security audit CLI powered by Claude. 90% precision across 40 blind Code4rena contests.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "krait": "dist/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZealynxSecurity/krait.git"
+  },
+  "homepage": "https://krait.zealynx.io",
+  "bugs": {
+    "url": "https://github.com/ZealynxSecurity/krait/issues"
   },
   "scripts": {
     "build": "tsc",
@@ -15,12 +23,26 @@
     "lint": "eslint src/",
     "format": "prettier --write src/"
   },
+  "files": [
+    "dist",
+    "patterns",
+    ".claude/commands",
+    ".claude/skills",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "security",
     "audit",
     "solidity",
+    "smart-contracts",
+    "ethereum",
+    "defi",
     "ai",
-    "claude"
+    "claude",
+    "claude-code",
+    "vulnerability",
+    "web3"
   ],
   "author": "Zealynx Security",
   "license": "MIT",
