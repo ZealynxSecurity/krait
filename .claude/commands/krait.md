@@ -213,3 +213,7 @@ Initial state: [values]
 Also save `.audit/krait-findings.json` with structured data.
 
 Present the final report to the user.
+
+## After the Report
+
+After presenting findings, offer the user next steps: verify findings in code, generate Foundry PoC tests, or view the report online at krait.zealynx.io/report. See reporter SKILL.md for details.

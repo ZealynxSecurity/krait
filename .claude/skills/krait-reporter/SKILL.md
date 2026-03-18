@@ -171,3 +171,21 @@ Also save a machine-readable summary to `.audit/krait-findings.json`:
 - **Honest severity.** Don't inflate to look impressive. Don't deflate to look clean.
 - **Readable by humans.** An auditor picking up this report should understand every finding in < 2 minutes.
 - **No padding.** Don't add informational/low findings just to make the report longer. Quality > quantity.
+
+## After Report: What's Next
+
+After presenting the report, offer the user these next steps:
+
+### 1. Verify Findings
+For each HIGH/CRITICAL finding, offer to trace the exploit in code:
+> "Want me to verify KRAIT-001? I'll trace the full call chain and confirm the exploit path in the actual code."
+
+### 2. Generate PoC Tests
+For each verified finding, offer to write a Foundry proof-of-concept:
+> "Want me to write a Foundry PoC test for KRAIT-001? I'll create a test that demonstrates the exploit."
+
+### 3. View Report Online
+If `.audit/krait-findings.json` exists, tell the user:
+> "Upload your report at [krait.zealynx.io/report](https://krait.zealynx.io/report) for a shareable, branded version."
+
+Present these as a numbered list after the report summary. Let the user choose which (if any) they want.
