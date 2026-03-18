@@ -96,15 +96,22 @@ Two complementary engines sharing the same knowledge base:
 
 ### Claude Code Skills (Recommended — Zero Cost)
 
-Clone and copy the skills into your global Claude Code directory:
+Copy Krait's `.claude/` directory into the project you want to audit:
 
 ```bash
+# Clone Krait
 git clone https://github.com/ZealynxSecurity/krait.git
-cp -r krait/.claude/skills/* ~/.claude/skills/
-cp -r krait/.claude/commands/* ~/.claude/commands/
+
+# Go to your target project
+cd /path/to/your-solidity-project
+
+# Copy skills + commands into it
+mkdir -p .claude
+cp -r /path/to/krait/.claude/commands .claude/commands
+cp -r /path/to/krait/.claude/skills .claude/skills
 ```
 
-Then open Claude Code in any Solidity project and run:
+Then open Claude Code in that project and run:
 
 ```
 /krait                  # Full 4-phase audit
@@ -116,19 +123,26 @@ Individual phases: `/krait-recon` · `/krait-detect` · `/krait-state` · `/krai
 To update to the latest methodology:
 
 ```bash
-cd krait && git pull
-cp -r .claude/skills/* ~/.claude/skills/
-cp -r .claude/commands/* ~/.claude/commands/
+cd /path/to/krait && git pull
+# Re-copy into your target project
+cp -r .claude/commands /path/to/your-project/.claude/commands
+cp -r .claude/skills /path/to/your-project/.claude/skills
 ```
 
-> Works with Claude Code CLI, VS Code Claude extension, and Cursor.
+> Works with Claude Code CLI, VS Code Claude extension, and Cursor. The `.claude/` directory can be gitignored in your target project if you don't want to commit it.
 
-### CLI (API-Powered)
+### CLI (API-Powered — Development)
+
+For automated batch processing via the Anthropic API:
 
 ```bash
+git clone https://github.com/ZealynxSecurity/krait.git
 cd krait && npm install && npm run build
 export ANTHROPIC_API_KEY=your-key-here
-npx krait audit /path/to/project
+node dist/cli.js audit /path/to/project         # Full audit
+node dist/cli.js audit /path/to/project --quick  # Fast mode
+node dist/cli.js audit /path/to/project --dry-run # Preview without API calls
+node dist/cli.js patterns                         # List loaded patterns
 ```
 
 ---
@@ -141,7 +155,7 @@ npx krait audit /path/to/project
 | Kill gates + shadow benchmarking (40 contests) | Production |
 | Detection primers (7 protocol types) | Production |
 | Web assessment platform (39 verticals) | Live |
-| CLI tool | Beta |
+| CLI tool | Development |
 | Multi-domain (Rust, TypeScript, AI) | Planned |
 
 ---
