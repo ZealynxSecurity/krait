@@ -15,7 +15,7 @@ Krait is a structured audit methodology encoded as Claude Code skills. When you 
 
 The output is a structured report with findings at exact file:line locations, vulnerable code, suggested fixes, and exploit traces. Saved as both markdown and JSON.
 
-<!-- TODO: Add screenshot of report viewer at krait.zealynx.io/report/findings -->
+![Krait report viewer showing findings with severity, file locations, and exploit traces](assets/report-viewer.png)
 
 ## What Krait Is Not
 
