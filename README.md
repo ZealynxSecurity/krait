@@ -53,10 +53,24 @@ Both commands output findings to `.audit/` in your project directory with a full
 
 ### After the Audit
 
-Krait offers three next steps after every report:
+Every `/krait` run saves structured findings to `.audit/krait-findings.json` and shows:
+
+```
+───────────────────────────────────────────────────
+📋 N findings saved to .audit/krait-findings.json
+
+🔗 View this report online:
+   https://krait.zealynx.io/report/findings
+
+📊 Track findings over time:
+   https://krait.zealynx.io/dashboard
+───────────────────────────────────────────────────
+```
+
+Then offers three next steps:
 1. **Verify findings** — trace the exploit path in code to confirm it's real
 2. **Generate PoC** — write a Foundry proof-of-concept test for each finding
-3. **View online** — upload your report at [krait.zealynx.io/report/findings](https://krait.zealynx.io/report/findings) for a shareable, branded version
+3. **Complete security assessment** — 845+ process-level checks at [krait.zealynx.io/new](https://krait.zealynx.io/new)
 
 ---
 
@@ -159,15 +173,32 @@ After each blind test: score → root-cause every miss → update methodology �
 
 ---
 
-## View Reports Online
+## Web Platform — [krait.zealynx.io](https://krait.zealynx.io)
 
-Upload your `.audit/krait-findings.json` at [krait.zealynx.io/report/findings](https://krait.zealynx.io/report/findings) for a branded, shareable report with severity breakdowns, exploit traces, and code blocks.
+Krait's web platform turns local audit results into a tracked, shareable security profile. Free, no API costs.
 
----
+### Upload & View Reports
 
-## Web Assessment Platform
+Upload your `.audit/krait-findings.json` at [krait.zealynx.io/report/findings](https://krait.zealynx.io/report/findings) → branded report with severity breakdowns, exploit traces, and code diffs. Save to your dashboard to track findings over time.
 
-For process-level security (not code-level), see [krait.zealynx.io](https://krait.zealynx.io) — interactive audit readiness assessment covering 39 DeFi verticals with 845+ security checks.
+### Security Assessment (845+ Checks)
+
+Interactive audit readiness checklist covering **39 DeFi verticals** — operational security, deployment practices, documentation, upgrade procedures, and process gaps that code analysis can't see. Backed by 4,500+ real findings from Solodit.
+
+Start at [krait.zealynx.io/new](https://krait.zealynx.io/new). If you ran `/krait:assess` in Claude Code, import the `.zealynx-run.json` to pre-fill checks.
+
+### Dashboard
+
+[krait.zealynx.io/dashboard](https://krait.zealynx.io/dashboard) — all your projects in one place. Assessment scores, scan findings, combined readiness score (60% assessment + 40% scan), and activity timeline.
+
+### The Full Pipeline
+
+```
+/krait (local)  →  Upload findings  →  Save to dashboard  →  Run assessment  →  Combined score
+     │                   │                    │                      │                  │
+  Claude Code    krait.zealynx.io     Track over time      845+ checks       60% assess + 40% scan
+   (free)         /report/findings       /dashboard             /new              /dashboard/{id}
+```
 
 ---
 
