@@ -16,6 +16,12 @@
 
 ---
 
+## Requirements
+
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI, VS Code extension, or Cursor)
+- A Claude subscription (Pro, Max, or Team)
+- A Solidity project to audit
+
 ## Installation
 
 ```bash
@@ -25,16 +31,9 @@ cp -r krait/.claude/commands/* ~/.claude/commands/
 cp -r krait/.claude/skills/* ~/.claude/skills/
 ```
 
-Then open Claude Code in **any** Solidity project and run:
+That's it. Open Claude Code in **any** Solidity project and run `/krait`.
 
-```
-/krait                  # Full 4-phase audit
-/krait-quick            # Fast mode (skips state analysis)
-```
-
-Individual phases: `/krait-recon` · `/krait-detect` · `/krait-state` · `/krait-critic` · `/krait-report`
-
-To update:
+To update to the latest methodology:
 
 ```bash
 cd krait && git pull
@@ -42,7 +41,14 @@ cp -r .claude/commands/* ~/.claude/commands/
 cp -r .claude/skills/* ~/.claude/skills/
 ```
 
-> Works with Claude Code CLI, VS Code extension, and Cursor. Once installed, `/krait` is available in every project — no per-project setup needed.
+## Commands
+
+| Command | What it does |
+|---------|-------------|
+| `/krait` | Full 4-phase audit: Recon → Detection → State Analysis → Verification → Report |
+| `/krait-quick` | Same pipeline but skips state analysis — faster for quick checks |
+
+Both commands output findings to `.audit/` in your project directory with a full markdown report.
 
 ---
 
