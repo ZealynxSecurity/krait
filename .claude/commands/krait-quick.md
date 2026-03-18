@@ -12,3 +12,5 @@ Follow the `/krait` methodology but:
 5. Run Phase 4 (Report) — full
 
 This is ~2x faster but may miss state desynchronization bugs.
+
+After the report, always show the web links banner from reporter SKILL.md (krait.zealynx.io/report/findings and /dashboard links).

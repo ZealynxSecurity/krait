@@ -216,4 +216,4 @@ Present the final report to the user.
 
 ## After the Report
 
-After presenting findings, offer the user next steps: verify findings in code, generate Foundry PoC tests, or view the report online at krait.zealynx.io/report. See reporter SKILL.md for details.
+After presenting the report, **always show the web links banner** from reporter SKILL.md (the block with krait.zealynx.io/report/findings and /dashboard links). Then offer next steps: verify findings in code, generate Foundry PoC tests, or complete the security assessment online. See reporter SKILL.md for the exact format.
