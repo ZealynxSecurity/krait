@@ -111,6 +111,13 @@ If a DEEP DIVE module maps to a lens, that lens MUST execute it fully (not just 
 **From Pass 1 Brief**: Check which files had NO access-control candidates. Prioritize those.
 **Mandatory modules**: H (Ownership/Permission Persistence), L (Derived Class/Override Completeness), R (Governance Voting Integrity), W (Missing Functionality — missing unsetters/pause)
 **Mandatory heuristics**: MODIFIER-01, AC-01 to AC-04, GOV-01, GOV-02, MISSING-01, MISSING-02, ZERO-WEIGHT-01
+
+**Multi-Mindset Analysis** — For each function, ask ALL FOUR questions:
+1. **[Attacker]** How would I exploit these permissions to drain funds or escalate privilege?
+2. **[Accountant]** Do the access checks match the value at risk? Is a low-privilege function guarding high-value state?
+3. **[Spec Auditor]** Do the modifiers/roles match what docs, comments, and NatSpec promise?
+4. **[Edge Case]** What happens if caller is the contract itself, address(0), the owner, or a self-delegating governance token?
+
 Focus EXCLUSIVELY on:
 - WHO can call each function? Is that the right set of callers?
 - Can functions execute in an order that breaks invariants?
@@ -126,6 +133,13 @@ Focus EXCLUSIVELY on:
 **From Pass 1 Brief**: Check which value-handling functions had NO candidates. Trace those first.
 **Mandatory modules**: D (Fee Consistency), I (Weight/Proportionality), K (Multi-Transaction Attacks), O (Payment/Distribution), V (Economic Design)
 **Mandatory heuristics**: ECON-01, ECON-02, FDC-01, FDC-02, PR-01 to PR-03, FL-01, SI-01, TVL-01
+
+**Multi-Mindset Analysis** — For each value-handling function, ask ALL FOUR questions:
+1. **[Attacker]** How would I extract more value than I put in? Flash loan paths? Fee manipulation?
+2. **[Accountant]** Trace every wei: entry amount → fees → shares → exit amount. Do debits equal credits?
+3. **[Spec Auditor]** Do fee percentages, distribution ratios, and reward rates match what docs/comments specify?
+4. **[Edge Case]** What happens with amount=0, amount=1 wei, amount=type(uint256).max, or first/last depositor?
+
 Focus EXCLUSIVELY on:
 - Where does value enter and exit? Trace every ETH/token transfer
 - Fee calculations: consistent basis? consistent destination? zero-fee edge case?
@@ -140,6 +154,13 @@ Focus EXCLUSIVELY on:
 **From Pass 1 Brief**: Check which external calls were NOT investigated. Prioritize uncovered cross-contract interactions.
 **Mandatory modules**: A (Untrusted Recipient), C (Transfer Order/Implicit Flash Loans), J (External Protocol Integration), P (Cross-Chain Bridge), S (Cross-Contract State on Transfer)
 **Mandatory heuristics**: AEC-01 to AEC-03, ROR-01, RE-01, EXT-01 to EXT-03, CALLBACK-01, HOOK-01, BRIDGE-01 to BRIDGE-04
+
+**Multi-Mindset Analysis** — For each external call, ask ALL FOUR questions:
+1. **[Attacker]** Can I deploy a malicious contract at the target address? What callbacks can I trigger?
+2. **[Accountant]** Does value sent out match value expected back? Are return values checked and used correctly?
+3. **[Spec Auditor]** Does the integration match the external protocol's documented interface and assumptions?
+4. **[Edge Case]** What if the external contract reverts, returns empty data, self-destructs, or is upgraded?
+
 Focus EXCLUSIVELY on:
 - **MANDATORY Cross-Contract Read**: For each external call in Tier 1 files, ACTUALLY open and read the target. **FIRST**: Check the Call Graph in `.audit/ast-facts.md` for exact targets. Then read each target and check: state modifications, callbacks, permissionless functions, ignored return values.
 - CEI violations: ALL state updates BEFORE external calls?
@@ -152,6 +173,13 @@ Focus EXCLUSIVELY on:
 **From Pass 1 Brief**: Check which math-heavy functions and standard implementations had NO candidates. Those are likely under-analyzed.
 **Mandatory modules**: B (Type Cast Safety), E (EIP/Standard Compliance), F (Token Compatibility), G (Factory/Deployment), M (State Variable Lifecycle), X (Version & Standard Compliance)
 **Mandatory heuristics**: SIG-01, SIG-02, TOK-01 to TOK-03, ETH-01, ETH-02, PRX-01, PRX-02, INJ-01, PACKED-01, PERMIT-01, HASH-01, ID-01, LIB-01, CHAIN-01
+
+**Multi-Mindset Analysis** — For each math-heavy or standards function, ask ALL FOUR questions:
+1. **[Attacker]** Can I craft inputs that cause overflow, underflow, or division by zero to extract value?
+2. **[Accountant]** Trace 3 concrete value sets through the arithmetic — does the output match what's expected?
+3. **[Spec Auditor]** Does this ERC implementation match the EIP spec exactly? Character-by-character for EIP-712.
+4. **[Edge Case]** What happens at param=0, param=1, param=MAX, empty array, sender==receiver, tokenA==tokenB?
+
 Focus EXCLUSIVELY on:
 - Parameter boundary testing: param=0, param=1, param=MAX, input=0
 - Type cast safety: every uint128(x), uint96(x) — can source exceed target max?
@@ -165,10 +193,16 @@ Focus EXCLUSIVELY on:
 - **Mechanical arithmetic verification**: For the TOP 3 most complex arithmetic functions (by operator count), do NOT just read and judge. TRACE with concrete values: pick 3 sets of inputs (normal case, zero/boundary case, adversarial case) and manually compute each step. Compare your result with what the code produces. If they diverge → candidate. This catches bugs like `debtCeiling()` where 5 findings hid in one function that "looked correct."
 - **Self-transfer / self-referential edge case**: For every transfer/swap function, check: what happens when sender==receiver, tokenA==tokenB, from==to? Memory-cached state may not reflect storage updates within the same call.
 
-**After all 4 lenses complete:**
-1. Merge all candidates from all lenses
-2. Deduplicate: same file + same lines + same root cause → keep the most detailed version
+**After all 4 lenses complete — Consensus Merge:**
+1. Merge all candidates from Pass 1 + all 4 lenses
+2. Deduplicate: same file + same function + same root cause → keep the most detailed version
 3. **Cross-lens amplification**: If Lens A found a missing guard AND Lens B found a value extraction on the same function → the combined finding is stronger than either alone. Combine into a single high-confidence candidate.
+4. **Consensus scoring** — count how many independent sources (Pass 1 + 4 lenses) found each candidate:
+   - **STRONG consensus (3+ sources)**: Almost certainly real. Tag as `consensus: strong`. Fast-track through critic.
+   - **MODERATE consensus (2 sources)**: Confidence boost. Tag as `consensus: moderate`. Normal critic scrutiny.
+   - **NO consensus (1 source)**: Tag as `consensus: single`. Critic applies extra scrutiny — why did the other passes miss it?
+   - The consensus tag travels with the finding into state analysis and critic phases.
+5. **Multi-mindset convergence bonus**: If the SAME finding was discovered by different mindset questions across lenses (e.g., Lens A's [Attacker] question and Lens B's [Accountant] question both found the same drain path), this is the strongest possible signal — independent reasoning paths converged on the same bug.
 
 **SAFE Verdict Challenge (applies to ALL lenses):** For every area verified as "safe," you MUST write: (a) the SPECIFIC invariant verified, (b) at least 3 edge cases explicitly checked. If you can't name 3 edge cases → not verified thoroughly enough. **13% of missed findings were in areas explicitly marked "safe."**
 

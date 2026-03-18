@@ -74,6 +74,14 @@ If DoS permanently/repeatedly bricks a CORE lifecycle function (settlement, liqu
 
 **After Kill Gate, surviving candidates proceed to verification methods below.**
 
+## Consensus-Aware Verification
+
+Before applying verification methods, check the candidate's **consensus tag** from detection:
+
+- **STRONG consensus (3+ sources)**: This finding was independently discovered by multiple analysis passes with different mindsets. If it passed kill gates A-H, fast-track to VERIFIED — write the exploit trace for documentation but the convergent evidence is strong.
+- **MODERATE consensus (2 sources)**: Normal verification — full kill gate + exploit trace. The dual discovery adds confidence but doesn't skip any steps.
+- **NO consensus (1 source only)**: Apply EXTRA scrutiny. Ask: why did the other 4 passes miss this? Acceptable reasons: different lens domain, file wasn't in that lens's scope. Suspicious reasons: it's in a Tier 1 file that all lenses analyzed. Require an especially concrete exploit trace with specific values.
+
 ## Verification Methods
 
 ### Method A: Deep Code Trace
