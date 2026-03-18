@@ -190,17 +190,9 @@ After presenting the report, **always show this block** (copy exactly, filling i
 ───────────────────────────────────────────────────
 ```
 
-Then offer these next steps:
+Then offer this next step:
 
-### 1. Verify Findings
-For each HIGH/CRITICAL finding, offer to trace the exploit in code:
-> "Want me to verify KRAIT-001? I'll trace the full call chain and confirm the exploit path in the actual code."
-
-### 2. Generate PoC Tests
-For each verified finding, offer to write a Foundry proof-of-concept:
-> "Want me to write a Foundry PoC test for KRAIT-001? I'll create a test that demonstrates the exploit."
-
-### 3. Complete Security Assessment
+### Complete Security Assessment
 > "Want a full security readiness score? Run the 845+ check assessment at https://krait.zealynx.io/new — it covers operational security, deployment practices, and process gaps that code analysis can't see."
 
 Present these as a numbered list after the banner. Let the user choose which (if any) they want.

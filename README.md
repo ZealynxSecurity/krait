@@ -67,10 +67,7 @@ Every `/krait` run saves structured findings to `.audit/krait-findings.json` and
 ───────────────────────────────────────────────────
 ```
 
-Then offers three next steps:
-1. **Verify findings** — trace the exploit path in code to confirm it's real
-2. **Generate PoC** — write a Foundry proof-of-concept test for each finding
-3. **Complete security assessment** — 845+ process-level checks at [krait.zealynx.io/new](https://krait.zealynx.io/new)
+Findings are already verified — the critic phase requires a concrete `WHO → WHAT → HOW MUCH` exploit trace for every H/M before it reaches the report. After the banner, Krait offers to complete the [security assessment](https://krait.zealynx.io/new) (845+ process-level checks covering operational security, deployment practices, and gaps that code analysis can't see).
 
 ---
 
