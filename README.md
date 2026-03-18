@@ -1,12 +1,18 @@
-# Krait — AI-First Smart Contract Security Auditor
+# Krait — Solidity Security Audit Skills for Claude Code
 
 **Silent. Precise. Lethal.**
 
-A set of [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that turn Claude into a rigorous smart contract security auditor. Built by [Zealynx Security](https://zealynx.io).
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills for **Solidity** smart contract security auditing. Type `/krait` in any Solidity project → structured audit with concrete exploit traces, zero API cost. Built by [Zealynx Security](https://zealynx.io).
 
-Type `/krait` in Claude Code on any Solidity project → get a structured security audit with concrete exploit traces, zero API cost.
+| | |
+|---|---|
+| **Technology** | Solidity |
+| **Platform** | Claude Code (skills + commands) |
+| **Cost** | Zero — uses your Claude subscription |
+| **Precision** | 90% across 40 blind Code4rena contests |
+| **Install** | Copy to `~/.claude/` → `/krait` works everywhere |
 
-> Krait is **skill-based**: the methodology lives in `.claude/skills/` and `.claude/commands/` as structured prompts that Claude Code executes. No external API calls, no separate tool — just Claude, guided by 40 contests worth of battle-tested detection heuristics.
+> The methodology lives in `.claude/skills/` and `.claude/commands/` as structured prompts that Claude Code executes. No external API calls, no separate tool — just Claude, guided by 40 contests worth of battle-tested detection heuristics.
 
 ---
 
