@@ -85,22 +85,16 @@ cp -r .claude/commands/* ~/.claude/commands/
 cp -r .claude/skills/* ~/.claude/skills/
 ```
 
-### Optional: Live Solodit Search (MCP)
+### Optional: Pattern Search MCP Server
 
-Krait can search Solodit in real-time during audits for exploit corroboration. This is optional — the skills work without it using static patterns.
+Krait includes an MCP server that lets the detector search 41+ vulnerability patterns during analysis. No API key needed — searches the local pattern database.
 
 ```bash
 cd krait/mcp-servers/solodit
 npm install && npm run build
 ```
 
-Set your Cyfrin API key (free at [solodit.cyfrin.io](https://solodit.cyfrin.io)):
-
-```bash
-export CYFRIN_API_KEY=your_key_here
-```
-
-The `.mcp.json` in the repo root auto-configures the server for Claude Code. When running `/krait`, the detector will search Solodit for similar exploits and the critic will validate findings against historical data.
+The `.mcp.json` in the repo root auto-configures it for Claude Code. When running `/krait`, the detector will search patterns for corroboration and the critic will validate findings against historical data. The skills work fine without the MCP server — it's an additive enrichment.
 
 ### Commands
 
