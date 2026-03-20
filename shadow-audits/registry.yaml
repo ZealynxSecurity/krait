@@ -754,3 +754,96 @@ contests:
       f1: 15.3
       fp_count: 0
       notes: "Found Chainlink staleness (M-69 exact). 0 FPs."
+
+  - id: loop
+    name: "Loop"
+    contest: "2024-05-loop"
+    repo: "https://github.com/code-423n4/2024-05-loop"
+    findings_repo: "code-423n4/2024-05-loop-findings"
+    type: "Prelaunch Points / ETH Staking"
+    estimated_loc: 296
+    status: completed
+    date: "2026-03-20"
+    results:
+      high_total: 1
+      high_found: 1
+      medium_total: 0
+      medium_found: 0
+      precision: 50
+      recall: 100
+      fp_count: 1
+
+  - id: neobase
+    name: "Neobase"
+    contest: "2024-03-neobase"
+    repo: "https://github.com/code-423n4/2024-03-neobase"
+    findings_repo: "code-423n4/2024-03-neobase-findings"
+    type: "ve(3,3) / Liquidity Gauges"
+    estimated_loc: 895
+    status: completed
+    date: "2026-03-20"
+    results:
+      high_total: 1
+      high_found: 1
+      medium_total: 7
+      medium_found: 0
+      precision: 100
+      recall: 12.5
+      fp_count: 0
+      notes: "Found H-01 but rated as MEDIUM — severity calibration issue"
+
+  - id: coinbase
+    name: "Coinbase Smart Wallet"
+    contest: "2024-03-coinbase"
+    repo: "https://github.com/code-423n4/2024-03-coinbase"
+    findings_repo: "code-423n4/2024-03-coinbase-findings"
+    type: "ERC-4337 Smart Account / Paymaster"
+    estimated_loc: 786
+    status: completed
+    date: "2026-03-20"
+    results:
+      high_total: 1
+      high_found: 0
+      medium_total: 2
+      medium_found: 0
+      precision: 0
+      recall: 0
+      fp_count: 1
+      notes: "No ERC-4337/AA module coverage — missed cross-chain replay H-01"
+
+  - id: opendollar
+    name: "Open Dollar"
+    contest: "2023-10-opendollar"
+    repo: "https://github.com/code-423n4/2023-10-opendollar"
+    findings_repo: "code-423n4/2023-10-opendollar-findings"
+    type: "CDP Lending + NFT Vaults"
+    estimated_loc: 998
+    status: completed
+    date: "2026-03-20"
+    results:
+      high_total: 2
+      high_found: 0
+      medium_total: 15
+      medium_found: 1
+      precision: 25
+      recall: 5.9
+      fp_count: 3
+      notes: "Missed H-01 wrong constant (ONE_HUNDRED_WAD) and H-02 missing debt check"
+
+  - id: bakerfi
+    name: "BakerFi"
+    contest: "2024-05-bakerfi"
+    repo: "https://github.com/code-423n4/2024-05-bakerfi"
+    findings_repo: "code-423n4/2024-05-bakerfi-findings"
+    type: "Leveraged Yield Vault / Flash Loans"
+    estimated_loc: 1683
+    status: completed
+    date: "2026-03-20"
+    results:
+      high_total: 4
+      high_found: 2
+      medium_total: 8
+      medium_found: 2
+      precision: 60
+      recall: 33
+      fp_count: 1

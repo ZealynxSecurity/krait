@@ -33,7 +33,7 @@ Read `.audit/recon.md` and `.audit/known-issues.md` to understand:
 - **Fork origin** — If this is a fork, what is the original? Inherited behavior = intentional design (Gate C)
 - **Token context** — What SPECIFIC tokens does this protocol use? Every token-behavior finding must name a specific token from this list (Gate B)
 - **Detection primer** — Read the protocol-specific primer from `primers/` directory (loaded during Recon). The primer's CRITICAL checks are your DEEP DIVE priorities. Primers: `defi-dex-amm.md`, `defi-lending.md`, `defi-staking-governance.md`, `gamefi-nft.md`, `bridge-crosschain.md`, `proxy-upgrades.md`, `wallet-safe-aa.md`.
-- **Protocol-targeted modules** — Which 6 modules from Step 5 are marked DEEP DIVE in recon.md? Spend 2-3x more time on these.
+- **Activated modules** — Read the "Activated Modules" table in recon.md. For each listed module, read the full skill file from `~/.claude/skills/krait/detector/modules/[filename]`. These contain structured tables and step-by-step methodology. Spend 2-3x more time on activated modules vs general heuristics.
 
 **Also read `.audit/ast-facts.md` if it exists** — these are compiler-verified structural facts (ground truth):
 - **Inheritance Tree**: Use to verify modifier presence. A "missing" modifier may exist in a parent listed here. Do NOT report missing modifiers without checking the full inheritance chain.
@@ -47,18 +47,6 @@ Read `.audit/recon.md` and `.audit/known-issues.md` to understand:
 - If a Slither finding overlaps with one of your candidates → increased confidence
 - If Slither flagged something you missed → investigate that area during Pass 2 lenses (reentrancy → Lens C, access control → Lens A, precision → Lens D)
 - Focus on HIGH/MEDIUM Slither findings only; ignore informational/low
-
-### Step 1b: Live Solodit Enrichment (if MCP available)
-
-If the `krait-solodit` MCP server is available, use it to enrich detection with real-time Solodit data:
-
-1. **Protocol enrichment** — Call `mcp__krait-solodit__get_enrichment` with the protocol type from recon (e.g., "DEX / AMM", "Lending"). This returns 10-15 HIGH-severity findings from real audits of similar protocols. Use these as additional reference when analyzing code — they show what went wrong in production.
-
-2. **During detection** — When you identify a suspected vulnerability, call `mcp__krait-solodit__search_similar_findings` with a description. If Solodit returns similar findings, this is strong corroboration. Note the match count in your candidate output.
-
-3. **During verification (optional)** — Call `mcp__krait-solodit__validate_hypothesis` to check historical precedent. HIGH confidence from Solodit = the bug pattern is real. LOW confidence = either novel or false positive — verify more carefully.
-
-**IMPORTANT**: MCP tools can fail (timeout, API down, no API key). If any call fails, continue without it — the static patterns and heuristics are sufficient. MCP enrichment is additive, never blocking.
 
 ### ADAPTIVE PASS STRATEGY
 
@@ -110,18 +98,29 @@ Re-read the Tier 1 files from the recon.md risk table. Each lens receives the **
 
 Analyze through **4 independent focused lenses**. Each lens looks at the SAME code but with a DIFFERENT mental model. This catches bugs that a single-pass analysis misses because it's impossible to hold all attack models simultaneously.
 
-**Protocol-specific lens loading**: Check recon.md for the DEEP DIVE modules selected in Phase 0 (D1-D30 numbers). Map each to the correct lens:
-- **Lens A**: D8, D17, D23, D28(partial), D29 (Ownership, Derived Class, Governance, Missing Functionality, Restrictions)
-- **Lens B**: D4, D9, D11, D14, D16, D20, D27 (Fees, Weight, Economic Attack, Params, Multi-Tx, Payment, Economic Design)
-- **Lens C**: D1, D3, D13, D15, D21, D24, D25, D26 (Recipients, Transfer Order, Token Compat, External Protocol, Bridge, State Transfer, Batch, DeFi Integration)
-- **Lens D**: D2, D5, D6, D7, D10, D12, D18, D19, D22, D30 (Type Cast, Standards, Token Compat, Factory, Assembly, Infra, State Lifecycle, DoS, NFT, Version Compliance)
-If a DEEP DIVE module maps to a lens, that lens MUST execute it fully (not just skim).
+**Module-to-lens mapping**: Check the "Activated Modules" table in recon.md. Each activated module injects into specific lenses. Read the full module file and apply its methodology during the corresponding lens:
+
+| Module File | Injects Into |
+|---|---|
+| `access-control-state.md` | Lens A |
+| `governance-voting.md` | Lens A |
+| `economic-design.md` | Lens B |
+| `flash-loan-interaction.md` | Lens B + Lens C |
+| `multi-tx-attack.md` | Lens B + Lens C |
+| `oracle-analysis.md` | Lens B + Lens C |
+| `token-flow-tracing.md` | Lens B + Lens C |
+| `external-protocol-integration.md` | Lens C |
+| `cross-chain-bridge.md` | Lens C |
+| `eip-standard-compliance.md` | Lens D |
+
+If a module is activated and maps to a lens, that lens MUST execute the module's full methodology (structured tables, step-by-step checks — not just skim).
 
 **Run all 4 lenses, then merge candidates. Each lens produces its own candidate list.**
 
 #### Lens A: Access Control, State Integrity & Governance
 **From Pass 1 Brief**: Check which files had NO access-control candidates. Prioritize those.
-**Mandatory modules**: H (Ownership/Permission Persistence), L (Derived Class/Override Completeness), R (Governance Voting Integrity), W (Missing Functionality — missing unsetters/pause)
+**Activated modules (if in recon.md)**: `access-control-state.md`, `governance-voting.md` — read full file methodology
+**Inline modules (always)**: L (Derived Class/Override Completeness), W (Missing Functionality)
 **Mandatory heuristics**: MODIFIER-01, AC-01 to AC-04, GOV-01, GOV-02, MISSING-01, MISSING-02, ZERO-WEIGHT-01
 
 **Multi-Mindset Analysis** — For each function, ask ALL FOUR questions:
@@ -143,7 +142,8 @@ Focus EXCLUSIVELY on:
 
 #### Lens B: Value Flow & Economic Logic
 **From Pass 1 Brief**: Check which value-handling functions had NO candidates. Trace those first.
-**Mandatory modules**: D (Fee Consistency), I (Weight/Proportionality), K (Multi-Transaction Attacks), O (Payment/Distribution), V (Economic Design)
+**Activated modules (if in recon.md)**: `economic-design.md`, `flash-loan-interaction.md`, `multi-tx-attack.md`, `oracle-analysis.md`, `token-flow-tracing.md` — read full file methodology
+**Inline modules (always)**: D (Fee Consistency), I (Weight/Proportionality), O (Payment/Distribution)
 **Mandatory heuristics**: ECON-01, ECON-02, FDC-01, FDC-02, PR-01 to PR-03, FL-01, SI-01, TVL-01
 
 **Multi-Mindset Analysis** — For each value-handling function, ask ALL FOUR questions:
@@ -164,7 +164,8 @@ Focus EXCLUSIVELY on:
 
 #### Lens C: External Interactions & Cross-Contract
 **From Pass 1 Brief**: Check which external calls were NOT investigated. Prioritize uncovered cross-contract interactions.
-**Mandatory modules**: A (Untrusted Recipient), C (Transfer Order/Implicit Flash Loans), J (External Protocol Integration), P (Cross-Chain Bridge), S (Cross-Contract State on Transfer)
+**Activated modules (if in recon.md)**: `external-protocol-integration.md`, `cross-chain-bridge.md`, `token-flow-tracing.md`, `flash-loan-interaction.md` — read full file methodology
+**Inline modules (always)**: A (Untrusted Recipient), C (Transfer Order/Implicit Flash Loans), S (Cross-Contract State on Transfer)
 **Mandatory heuristics**: AEC-01 to AEC-03, ROR-01, RE-01, EXT-01 to EXT-03, CALLBACK-01, HOOK-01, BRIDGE-01 to BRIDGE-04
 
 **Multi-Mindset Analysis** — For each external call, ask ALL FOUR questions:
@@ -183,7 +184,8 @@ Focus EXCLUSIVELY on:
 
 #### Lens D: Edge Cases, Math & Standards
 **From Pass 1 Brief**: Check which math-heavy functions and standard implementations had NO candidates. Those are likely under-analyzed.
-**Mandatory modules**: B (Type Cast Safety), E (EIP/Standard Compliance), F (Token Compatibility), G (Factory/Deployment), M (State Variable Lifecycle), X (Version & Standard Compliance)
+**Activated modules (if in recon.md)**: `eip-standard-compliance.md` — read full file methodology
+**Inline modules (always)**: B (Type Cast Safety), F (Token Compatibility), G (Factory/Deployment), M (State Variable Lifecycle)
 **Mandatory heuristics**: SIG-01, SIG-02, TOK-01 to TOK-03, ETH-01, ETH-02, PRX-01, PRX-02, INJ-01, PACKED-01, PERMIT-01, HASH-01, ID-01, LIB-01, CHAIN-01
 
 **Multi-Mindset Analysis** — For each math-heavy or standards function, ask ALL FOUR questions:
@@ -504,26 +506,18 @@ For each file, check these 40 heuristic triggers from real exploits. If the code
 **Zero-Weight Actor (ZERO-WEIGHT-01):**
 - Can an actor with 0 weight/stake still trigger state changes affecting other users? Slashed validator voting, 0-balance user distributing, etc.
 
+**Wrong Constant / Magic Number (CONST-01) — missed in 2 shadow audits:**
+- For EVERY named constant (WAD, RAY, ONE_HUNDRED_WAD, BPS, PRECISION, etc.), verify: (1) its value matches its name — `ONE_HUNDRED_WAD` should be `100 * 1e18` not `1e20` (these ARE different if WAD != 1e18 in the codebase), (2) it's used in the correct context — a percentage constant used where an absolute constant is needed, or vice versa, (3) compare every usage site — if the same formula uses WAD in one function and ONE_HUNDRED_WAD in another, one is wrong. This is mechanical: `grep` for all constant definitions, verify values, trace every usage.
+
+**Gauge/Voting Removal Safety (GAUGE-01) — missed in 1 shadow audit:**
+- When a gauge, market, pool, or entity can be REMOVED or DEACTIVATED: can users who interacted with it before removal still unwind their positions? Check: (1) Can users withdraw votes/stake/liquidity from removed entities? (2) Does the removal function properly update all user-facing state (voting power, rewards, balances)? (3) Is there a contradiction between "allow cleanup on removed entity" guards and "entity must exist" guards that prevents unwinding? If users' voting power, staked tokens, or rewards get permanently locked when an entity is removed → HIGH.
+
+**Cross-Chain Replay / Domain Separation (REPLAY-01):**
+- For multi-chain deployments: (1) Is chainId included in ALL signature domains? (2) Can a UserOperation/signature executed on chain A be replayed on chain B? (3) Are nonces chain-specific or global? (4) Does account creation use CREATE2 with chain-dependent salt? If cross-chain replay is possible with user funds at risk → HIGH.
+
 ### Step 5: Targeted Analysis Modules (MANDATORY)
 
-These modules address specific bug classes consistently missed by general interrogation. Apply each relevant module.
-
-**Deep module files** are in `modules/` directory. When a trigger pattern matches, READ the full module file for the detailed methodology:
-
-| Module File | Trigger | When to Read |
-|-------------|---------|-------------|
-| `modules/oracle-analysis.md` | Chainlink, TWAP, Pyth, price feeds | Protocol uses any external data feed |
-| `modules/flash-loan-interaction.md` | `balanceOf(this)`, spot prices, deposit+withdraw | Any balance-dependent or share-based logic |
-| `modules/token-flow-tracing.md` | `transfer`, `mint`, `burn`, `balanceOf` | Any token handling (always) |
-| `modules/external-protocol-integration.md` | Uniswap, Aave, Curve, Convex, Lido | DeFi composability |
-| `modules/economic-design.md` | Fees, liquidation, incentives, tokenomics | Protocol has economic mechanics |
-| `modules/eip-standard-compliance.md` | ERC-20, ERC-721, ERC-4626, EIP-712 | Any standard implementation |
-| `modules/governance-voting.md` | Voting, proposals, delegation, quorum | Governance features |
-| `modules/cross-chain-bridge.md` | LayerZero, CCIP, Wormhole, relayers | Cross-chain messaging |
-| `modules/access-control-state.md` | State-writing functions, roles, admin | Always (core module) |
-| `modules/multi-tx-attack.md` | Deposit+withdraw, staking, sequenced ops | Multi-operation protocols |
-
-Read the trigger-matched module files for the FULL methodology with tables and step-by-step analysis. The inline modules below are the quick-reference summaries.
+These modules address specific bug classes consistently missed by general interrogation. Apply each one.
 
 #### Module A: Untrusted Recipient Analysis
 For every ETH/token transfer to an address that is NOT msg.sender or a known trusted protocol address:
@@ -552,13 +546,7 @@ List ALL fee-charging functions. For each, compare:
 - Zero-fee edge case handling (transfer of 0 attempted?)
 Flag ANY inconsistency between functions.
 
-#### Module E: EIP/Standard Compliance
-For every implemented standard: compare actual implementation against spec. Check:
-- ERC-3156: Fee from receiver, not msg.sender. Callback return value checked.
-- ERC-721: tokenURI checks token exists. safeTransferFrom triggers onReceived.
-- ERC-2981: Royalties actually paid at correct amounts.
-- ERC-4626: Conversion rounding directions correct.
-- **EIP-712 (CRITICAL — #1 missed standard compliance bug)**: For EVERY typehash, compare the keccak256 string EXACTLY against the struct definition: field names must match character-by-character, types must be canonical Solidity types (e.g., `uint256` not `uint`), order must match struct order. Check nested structs are encoded per spec. Check domain separator fields.
+#### Module E: → See `eip-standard-compliance.md`
 
 #### Module F: Token Compatibility
 - setApprovalForAll: Some tokens revert if already set to same value. Check loops.
@@ -569,31 +557,15 @@ For every implemented standard: compare actual implementation against spec. Chec
 - CREATE2 with user-controlled salt: frontrun deployment? pre-deployment deposits?
 - Gap between deploy and initialize: can someone else initialize?
 
-#### Module H: Ownership/Permission Persistence
-- After ownership transfer, do approvals from old owner persist?
-- Can old owner still execute pending/queued operations?
+#### Module H: → See `access-control-state.md`
 
 #### Module I: Weight/Proportionality
 - When operations involve multiple weighted items: are fees/royalties per-item by weight, or averaged?
 - If averaged: high-value items subsidize low-value → underpayment to fee recipients.
 
-#### Module J: External Protocol Integration Audit (MANDATORY for DeFi composability)
+#### Module J: → See `external-protocol-integration.md`
 
-For EVERY external protocol the contract integrates with (Convex, Aave, Uniswap, Curve, Compound, Chainlink, etc.):
-
-1. **Permissionless function check**: For each external function the contract calls, ask: can ANYONE call this function on behalf of the contract's address? Read the external protocol's code/docs. Convex `getReward(address,bool)` is callable by anyone. Aave `claimRewards` is callable by anyone. If yes → the contract cannot assume it's the only caller.
-2. **Shutdown/deprecation check**: What happens if the external pool/market/vault is shut down? Does the contract's function revert, silently fail, or handle it? If revert → users are bricked with no recovery path. Check: is there a governance function to update/migrate the dependency?
-3. **Silent failure check**: Does the external function ever return without effect instead of reverting? (e.g., CVX.mint() returns silently when operator != msg.sender.) If the contract calculates an expected amount and then tries to transfer it, but the external call didn't actually produce that amount → revert or wrong accounting.
-4. **Assumed return value check**: Does the contract use a calculated/expected value instead of the actual return value or post-call balance? If `earned()` is read before `getReward()`, but someone front-runs `getReward()`, then `earned()` returns 0 but tokens are in the contract.
-
-#### Module K: Multi-Transaction Attack Sequences
-
-Go beyond single-call analysis. For the protocol's key operations:
-
-1. **Front-run + back-run**: Can an attacker sandwich a victim's transaction? What's the profit? (deposit large → victim's tx → withdraw large.)
-2. **Flash loan escalation**: For every rounding/edge-case finding from other modules, ask: can an attacker use a flash loan to FORCE the edge condition? Inflate a denominator, drain a pool temporarily, manipulate a price within one tx.
-3. **Sequence-dependent state**: Can calling functions in a specific ORDER create a state that single-call analysis misses? (e.g., deposit → claim rewards → withdraw in the same block creates different outcome than each individually.)
-4. **Cross-function reentrancy paths**: If function A makes an external call, can the callee re-enter function B? Map all reachable functions during each external call window.
+#### Module K: → See `multi-tx-attack.md` and `flash-loan-interaction.md`
 
 #### Module L: Derived Class / Override Completeness
 
@@ -630,13 +602,7 @@ For EVERY function that distributes ETH or tokens to multiple recipients:
 3. **Payment-on-failure**: When a target call fails, are tokens/ETH properly refunded? Check: is the refund to the right address? Does the refund include ALL tokens (not just native ETH)?
 4. **Conditional payment with unconditional cost**: If payment is conditional (`if (recipient != address(0))`) but the cost was already deducted unconditionally, funds are silently lost.
 
-#### Module P: Cross-Chain Bridge Security (MANDATORY for bridge/cross-chain protocols)
-
-1. **Minimum destination gas**: Does the bridge enforce minimum gas for destination chain execution? LayerZero requires adapterParams with minDstGas. Without it, messages arrive but execution fails.
-2. **Destination liquidity**: Does the destination contract assume tokens exist? If it needs WETH to complete but router is empty, user's TX fails with no refund.
-3. **Parameter staleness**: Cross-chain has latency. Swap params set on source chain may be stale when message arrives. Is there slippage protection? A recovery path?
-4. **Refund routing**: When destination execution fails, where do refunds go? To the adapter (stuck), to msg.sender on destination (wrong), or back to user on source (correct)?
-5. **Access control on bridge tokens**: Bridge token contracts (like DcntEth, wrapped tokens) often have setter functions for router/bridge addresses. Are these access-controlled?
+#### Module P: → See `cross-chain-bridge.md`
 
 #### Module Q: NFT Attribute & Randomness Integrity
 
@@ -647,13 +613,7 @@ For NFT/Gaming protocols with attribute assignment:
 3. **Type parameter validation**: If per-type limits exist, verify the type parameter matches the actual item type. `reRoll(tokenId, wrongFighterType)` bypassing per-type limits.
 4. **Initialization for new generations/collections**: When new NFT collections/generations are created, are ALL required mappings initialized? (numElements, maxSupply, etc.)
 
-#### Module R: Governance Voting Integrity
-
-For governance/voting protocols:
-
-1. **Phantom voting power**: When governance NFTs are burned/auctioned/transferred, is their voting power removed from totalVotesSupply/quorum calculations? Inaccessible voting power → quorum becomes unreachable.
-2. **Delegation griefing**: Can a delegatee prevent the delegator from redelegating? If delegatee accumulates many checkpoints → gas exhaustion on redelegate.
-3. **Supply-dependent quorum**: If quorum is % of totalSupply, what happens at totalSupply=0? Quorum=0 means any piece/proposal passes with 0 votes.
+#### Module R: → See `governance-voting.md`
 
 #### Module S: Cross-Contract State on Transfer
 
@@ -672,25 +632,9 @@ For protocols with batch/multicall/router patterns:
 3. **Shared state mutation order**: If batch operations A and B both read/write the same storage slot, does the order matter? Can reordering interactions within a batch create a different (exploitable) outcome?
 4. **Balance snapshot timing**: When are balances snapshotted for each operation in the batch? Before the batch starts (stale for later ops) or inline (affected by earlier ops)?
 
-#### Module U: DeFi Integration Library
+#### Module U: → See `external-protocol-integration.md` and `oracle-analysis.md`
 
-For protocols integrating with external DeFi primitives:
-
-1. **Curve pool specifics**: Does the adapter handle killed/paused pools? Does it distinguish native ETH vs WETH (Ocean ID mismatch)? Does tricrypto indexing differ from 2pool? Is `get_dy` vs `exchange` return value properly used?
-2. **Uniswap V3 tick math**: Negative ticks are valid. Does `int24` handling account for sign extension? Are `tickLower < tickUpper` always enforced? Is sqrtPriceX96 properly bounded? Missing slippage/deadline params?
-3. **Chainlink feed assumptions**: Stale price check (how old is too old)? Zero/negative price handling? L2 sequencer uptime feed checked? Decimals assumption matches actual feed?
-4. **Aave/Compound integration**: Are aToken/cToken exchange rates queried correctly? Can permissionless `claimRewards` front-run the protocol's claim? Is the health factor calculation current?
-5. **Lido/stETH rebasing**: Is stETH balance tracked correctly (changes between blocks)? Should wstETH be used instead? Does the protocol account for rebasing in its accounting?
-
-#### Module V: Economic Design Reasoning
-
-For protocol-level economic analysis:
-
-1. **Circular collateral valuation**: Is the protocol's own token counted as collateral in the TVL that determines the token's value? If kerosine value = f(TVL) and kerosine is IN the TVL → reflexive death spiral risk on downturn.
-2. **Liquidation profitability**: At what collateral ratio does liquidation become unprofitable? If liquidator must repay debt to seize collateral, and gas + slippage > profit margin → bad debt accumulates.
-3. **First/last mover advantage**: Can the first depositor or last withdrawer extract disproportionate value? Classic: first depositor inflates share price. Less obvious: last withdrawer gets all remaining dust.
-4. **Fee-free arbitrage paths**: If operation A has a fee but the equivalent via B+C doesn't → rational users bypass A → protocol loses revenue.
-5. **Incentive misalignment**: When is it rational to NOT do what the protocol expects? If staking rewards < opportunity cost → no stakers → protocol breaks.
+#### Module V: → See `economic-design.md`
 
 #### Module W: Missing Functionality Detection
 
@@ -702,20 +646,7 @@ For identifying what SHOULD exist but doesn't:
 4. **Incomplete restriction coverage**: If address X is restricted/blocklisted, check ALL exit paths: transfer, burn, withdraw, bridge, delegate. If ANY path is unrestricted → the restriction is useless.
 5. **Missing return value handling**: External calls that return data — is the return value checked? Especially for ERC20 approve/transfer which may return false instead of reverting.
 
-#### Module X: Version & Standard Compliance Audit (MANDATORY)
-
-The #1 missed bug category across 35 shadow audits. Mechanically verifiable.
-
-1. **EIP-712 Typehash Verification**: Find every `keccak256("TypeName(...")` typehash. Find the corresponding struct. Compare CHARACTER BY CHARACTER: field names, types, order. Check nested struct encoding (appended alphabetically). Check domain separator (chainId, verifyingContract, name, version).
-2. **External Dependency Versions**: What Safe version? (1.3.0 guard interface has 2 params, 1.5.0 differs; `execTransactionFromModule` return data changes). What OZ version? (`_beforeTokenTransfer` vs `_update` in v4 vs v5). What Solidity version? (0.8.20+ PUSH0 breaks on older chains).
-3. **Token Interface**: Does code assume `transfer` returns `bool`? (USDT doesn't). Assumes 18 decimals? (USDC=6, WBTC=8). Handles rebasing tokens? Transfer hooks?
-4. **Proxy Initialization**: Can implementation be initialized directly? Does constructor call `_disableInitializers()`? Can initialized implementation be `selfdestruct`ed (pre-Cancun)? For UUPS: does implementation have `upgradeTo`?
-5. **ERC Standard Compliance Checklists** — For each standard the contract implements, check mechanically:
-   - *ERC-20*: transfer returns true? transferFrom decrements allowance? Self-transfer safe? Zero-amount transfer safe? Rebasing: totalSupply == sum(balanceOf)?
-   - *ERC-721*: `ownerOf` reverts for nonexistent tokens? `tokenURI` reverts for nonexistent tokens? `safeTransferFrom` calls `onERC721Received`? `transferFrom` clears approvals? `balanceOf(address(0))` reverts?
-   - *ERC-4626*: Rounding directions correct? (deposit rounds shares DOWN, mint rounds assets UP, withdraw rounds shares UP, redeem rounds assets DOWN). `maxDeposit`/`maxMint` return 0 when paused (not revert)? First depositor protection exists? `totalAssets` includes yield but is donation-safe?
-   - *ERC-2981*: `royaltyInfo` receiver is untrusted — can it revert on ETH receive (DoS)?
-   - *ERC-3156*: `onFlashLoan` return value checked? Fee charged on top of principal? Receiver approved lender for principal+fee?
+#### Module X: → See `eip-standard-compliance.md`
 
 ### Step 5b: Cross-Function Analysis
 
@@ -738,6 +669,12 @@ For EVERY suspected vulnerability, create a candidate entry:
 **File**: path/to/file.sol
 **Lines**: XX-YY
 **Category**: [category]
+
+**Severity calibration** (apply BEFORE recording):
+- **HIGH**: Direct fund loss, permanent fund lock, or permanent DoS on core function (deposit/withdraw/liquidate). If ANY user can lose >$100 or funds are permanently inaccessible → HIGH.
+- **MEDIUM**: Conditional fund loss (requires specific timing/state), temporary DoS, broken invariant without direct fund loss, governance manipulation.
+- Do NOT downgrade to MEDIUM just because the exploit requires multiple steps or specific ordering. Multi-step exploits that lead to fund loss are still HIGH.
+- **Severity under-rating was the #1 calibration error in shadow audits.** When in doubt between H and M, rate HIGH — the Critic will downgrade if warranted.
 
 **Discovery Method**: [Which question/heuristic exposed this]
 

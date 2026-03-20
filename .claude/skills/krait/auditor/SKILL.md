@@ -60,6 +60,7 @@ Run the krait-recon methodology:
 - Build architecture map, fund flows, trust boundaries
 - Identify attack surfaces and prioritize files
 - Select protocol-specific vulnerability checklists
+- **Select detection modules** — evaluate trigger conditions for each module in `~/.claude/skills/krait/detector/modules/` and output an "Activated Modules" table with trigger evidence
 - Save to `.audit/recon.md`
 
 **Gate**: Recon must be complete before proceeding. You must understand the protocol.
@@ -67,9 +68,11 @@ Run the krait-recon methodology:
 ### 3. Phase 1: Detection
 
 Run the krait-detector methodology on ALL core source files:
+- **Load activated modules** from recon.md's "Activated Modules" table — read each module file from `~/.claude/skills/krait/detector/modules/`
 - Build Function-State Matrix per contract
 - Apply 7-category Feynman interrogation to every entry point
 - Check 40 audit heuristics against code patterns
+- Execute activated module methodologies during the corresponding Pass 2 lenses
 - Cross-function consistency analysis
 - Record ALL candidates (maximize recall)
 - Save to `.audit/findings/detector-candidates.md`

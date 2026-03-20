@@ -11,3 +11,4 @@ krait-report-*
 .claude/projects/
 *.jsonl
 CLAUDE.md
+shadow-audits/contests/

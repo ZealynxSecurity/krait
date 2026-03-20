@@ -223,15 +223,30 @@ Based on protocol type, select the relevant vulnerability checklist:
 
 **Uniswap Integration**: slot0 is manipulable (never use as oracle), use TWAP via observe(), price impact/slippage, tick rounding on concentrated liquidity.
 
-## Live Solodit Enrichment (if MCP available)
+### Step 6: Module Selection (Trigger Flag System)
 
-After completing recon, if the `krait-solodit` MCP server is available:
+Based on what you discovered in Steps 1-5, evaluate each detection module's trigger condition and select the ones that apply. **This is deterministic — if the trigger condition is met, the module is selected.**
 
-Call `mcp__krait-solodit__get_enrichment` with the protocol type identified above (e.g., "DEX / AMM", "Lending", "Staking"). This fetches 10-15 HIGH-severity findings from real audits of similar protocols.
+Evaluate each module file in `~/.claude/skills/krait/detector/modules/` against what you found:
 
-Append the results to the recon output under `## Solodit Context` — the detector phase will use these as additional reference during analysis.
+| Module File | Trigger Condition | Select If... |
+|---|---|---|
+| `oracle-analysis.md` | Protocol uses Chainlink, TWAP, Pyth, Band, or any external price feed | You found oracle imports, `latestRoundData`, `getPrice`, TWAP calls, or price-dependent logic |
+| `flash-loan-interaction.md` | Protocol reads `balanceOf(address(this))`, uses spot prices, has deposit/withdraw, or integrates with flash-loan-capable protocols | You found `balanceOf(address(this))`, spot price reads, or deposit+withdraw in same-tx-capable flows |
+| `token-flow-tracing.md` | Any `transfer`, `transferFrom`, `safeTransfer`, `mint`, `burn`, `balanceOf(this)` | You found token transfers (virtually always selected for DeFi) |
+| `external-protocol-integration.md` | Protocol integrates with Uniswap, Aave, Compound, Curve, Chainlink, Convex, Lido, or any external DeFi protocol | You found external protocol imports or interface calls to known DeFi protocols |
+| `economic-design.md` | Protocol has token economics, fee structures, liquidation mechanics, or incentive systems | You found fee calculations, reward distributions, liquidation logic, or tokenomics |
+| `eip-standard-compliance.md` | Protocol implements ERC-20, ERC-721, ERC-4626, ERC-1155, ERC-2981, ERC-3156, EIP-712 | You found ERC/EIP interface implementations or standard compliance claims |
+| `governance-voting.md` | Protocol has voting, proposals, delegation, quorum, or governance tokens | You found governance contracts, voting functions, delegation, or quorum logic |
+| `cross-chain-bridge.md` | Protocol bridges assets/messages across chains | You found LayerZero, CCIP, Wormhole, Axelar, Hyperlane, or custom bridge/relayer code |
+| `access-control-state.md` | Always active | Always selected — every protocol has access control |
+| `multi-tx-attack.md` | Protocol has deposit+withdraw, staking+claiming, or sequenceable operations | You found operations that can be called in sequence within the same block |
 
-If MCP is unavailable, skip this step. The detector has static patterns as fallback.
+**Selection rules:**
+- Select ALL modules whose trigger condition is met — do not cap the count
+- `access-control-state.md` is ALWAYS selected
+- For DeFi protocols, `token-flow-tracing.md` and `economic-design.md` are almost always selected
+- Record the trigger evidence (what you found that triggered the module)
 
 ## Output
 
@@ -271,7 +286,14 @@ Codebase size category: SMALL (≤15) / MEDIUM (16-40) / LARGE (40+)
 
 ## Detection Primer
 Loaded: [primer filename(s)]
-DEEP DIVE modules: [D1, D4, D11, ...]
+
+## Activated Modules
+| Module | Trigger Evidence |
+|--------|-----------------|
+| access-control-state.md | Always active |
+| oracle-analysis.md | Found Chainlink latestRoundData in PriceFeed.sol |
+| token-flow-tracing.md | Found safeTransfer in Vault.sol, Pool.sol |
+| ... | ... |
 
 ## Relevant Checklists
 [Protocol-specific checks to apply]

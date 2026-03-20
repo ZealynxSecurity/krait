@@ -16,7 +16,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { readFileSync, readdirSync } from "fs";
-import { join, resolve } from "path";
+import { join, resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+import yaml from "js-yaml";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // ── Load and index patterns at startup ──
 
@@ -38,6 +43,46 @@ interface Pattern {
   tags: string[];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toStringArray(val: any): string[] {
+  if (Array.isArray(val)) return val.map(String);
+  return [];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseRawPattern(raw: any, fallbackCategory: string): Pattern | null {
+  if (!raw || typeof raw !== "object" || !raw.id) return null;
+
+  const detection = raw.detection || {};
+  const indicators = toStringArray(detection.indicators || raw.indicators);
+  const tags = toStringArray(raw.tags);
+
+  const examples: Pattern["realExamples"] = [];
+  const rawExamples = raw.real_examples || [];
+  for (const ex of rawExamples) {
+    if (!ex || typeof ex !== "object") continue;
+    examples.push({
+      source: String(ex.source || ""),
+      project: String(ex.project || ""),
+      description: String(ex.finding_id || ex.description || ""),
+      codeVulnerable: String(ex.code_vulnerable || ""),
+      codeFixed: String(ex.code_fixed || ""),
+    });
+  }
+
+  return {
+    id: String(raw.id),
+    name: String(raw.name || ""),
+    category: String(raw.category || fallbackCategory),
+    severity: String(raw.severity || "medium"),
+    description: String(detection.strategy || raw.description || ""),
+    indicators,
+    realExamples: examples,
+    falsePositiveNotes: String(raw.false_positive_notes || ""),
+    tags,
+  };
+}
+
 const patterns: Pattern[] = [];
 
 function loadPatterns() {
@@ -56,75 +101,38 @@ function loadPatterns() {
   for (const file of files) {
     try {
       const content = readFileSync(join(patternsDir, file), "utf-8");
-      // Simple YAML parser for our pattern structure
-      // Each pattern starts with "- id:" at the top level
-      const patternBlocks = content.split(/^- id:/m).slice(1);
+      const parsed = yaml.load(content);
+      const fallbackCategory = file.replace(".yaml", "");
 
-      for (const block of patternBlocks) {
-        const fullBlock = "- id:" + block;
-        const id = extractField(fullBlock, "id") || "unknown";
-        const name = extractField(fullBlock, "name") || "";
-        const category = extractField(fullBlock, "category") || file.replace(".yaml", "");
-        const severity = extractField(fullBlock, "severity") || "medium";
-        const strategy = extractField(fullBlock, "strategy") || "";
-        const indicators = extractList(fullBlock, "indicators");
-        const fpNotes = extractField(fullBlock, "false_positive_notes") || "";
-        const tags = extractList(fullBlock, "tags");
-
-        // Extract real examples
-        const examples: Pattern["realExamples"] = [];
-        const exampleBlocks = fullBlock.split(/^\s{4}- source:/m).slice(1);
-        for (const ex of exampleBlocks) {
-          examples.push({
-            source: extractField("    - source:" + ex, "source") || "",
-            project: extractField(ex, "project") || "",
-            description: extractField(ex, "finding_id") || extractField(ex, "description") || "",
-            codeVulnerable: extractMultiline(ex, "code_vulnerable"),
-            codeFixed: extractMultiline(ex, "code_fixed"),
-          });
-        }
-
-        patterns.push({
-          id,
-          name,
-          category,
-          severity,
-          description: strategy,
-          indicators,
-          realExamples: examples,
-          falsePositiveNotes: fpNotes,
-          tags,
-        });
+      // Handle both formats:
+      // 1. Top-level array: [{ id: ..., name: ... }, ...]
+      // 2. Wrapped in "patterns" key: { patterns: [{ id: ..., name: ... }, ...] }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let rawPatterns: any[];
+      if (Array.isArray(parsed)) {
+        rawPatterns = parsed;
+      } else if (parsed && typeof parsed === "object" && Array.isArray((parsed as Record<string, unknown>).patterns)) {
+        rawPatterns = (parsed as Record<string, unknown>).patterns as unknown[];
+      } else {
+        console.error(`Warning: unexpected YAML structure in ${file} — skipping`);
+        continue;
       }
+
+      let fileCount = 0;
+      for (const raw of rawPatterns) {
+        const pattern = parseRawPattern(raw, fallbackCategory);
+        if (pattern) {
+          patterns.push(pattern);
+          fileCount++;
+        }
+      }
+      console.error(`  ${file}: ${fileCount} patterns`);
     } catch (e) {
       console.error(`Warning: failed to parse ${file}: ${e}`);
     }
   }
 
   console.error(`Loaded ${patterns.length} vulnerability patterns from ${files.length} files`);
-}
-
-function extractField(block: string, field: string): string {
-  const regex = new RegExp(`^\\s*${field}:\\s*["']?(.+?)["']?\\s*$`, "m");
-  const match = block.match(regex);
-  return match ? match[1].trim().replace(/^["']|["']$/g, "") : "";
-}
-
-function extractList(block: string, field: string): string[] {
-  const regex = new RegExp(`${field}:\\s*\\n((?:\\s+-\\s+.+\\n?)*)`, "m");
-  const match = block.match(regex);
-  if (!match) return [];
-  return match[1]
-    .split("\n")
-    .map((l) => l.replace(/^\s+-\s+/, "").replace(/^["']|["']$/g, "").trim())
-    .filter(Boolean);
-}
-
-function extractMultiline(block: string, field: string): string {
-  const regex = new RegExp(`${field}:\\s*\\|\\n((?:\\s{6,}.+\\n?)*)`, "m");
-  const match = block.match(regex);
-  if (!match) return "";
-  return match[1].split("\n").map((l) => l.trim()).join("\n").trim();
 }
 
 // ── Search logic ──

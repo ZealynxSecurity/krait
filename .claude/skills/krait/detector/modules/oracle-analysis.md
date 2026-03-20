@@ -50,6 +50,3 @@ For each oracle → consumer path:
 - What if oracle returns a negative price? (`int256` from Chainlink — checked?)
 - **Circuit breaker**: Does the protocol detect extreme deviations? What happens at 50% price drop in 1 block?
 
-## 6. Solodit Corroboration
-
-If MCP available, call `mcp__krait-solodit__search_similar_findings` with the specific oracle pattern found (e.g., "chainlink staleness lending liquidation"). Cross-reference with the check.
