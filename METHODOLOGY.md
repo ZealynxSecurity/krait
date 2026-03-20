@@ -142,6 +142,8 @@ Each heuristic was extracted from a real missed finding in shadow audits:
 
 Protocol-specific deep dives, triggered by recon findings:
 
+Each high-impact module has a dedicated skill file in [`detector/modules/`](.claude/skills/krait/detector/modules/) with structured tables, step-by-step methodology, and trigger patterns. The detector reads the relevant module files based on what recon identifies.
+
 | Module | Focus |
 |--------|-------|
 | A | Untrusted recipient analysis |
