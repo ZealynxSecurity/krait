@@ -506,7 +506,24 @@ For each file, check these 40 heuristic triggers from real exploits. If the code
 
 ### Step 5: Targeted Analysis Modules (MANDATORY)
 
-These modules address specific bug classes consistently missed by general interrogation. Apply each one.
+These modules address specific bug classes consistently missed by general interrogation. Apply each relevant module.
+
+**Deep module files** are in `modules/` directory. When a trigger pattern matches, READ the full module file for the detailed methodology:
+
+| Module File | Trigger | When to Read |
+|-------------|---------|-------------|
+| `modules/oracle-analysis.md` | Chainlink, TWAP, Pyth, price feeds | Protocol uses any external data feed |
+| `modules/flash-loan-interaction.md` | `balanceOf(this)`, spot prices, deposit+withdraw | Any balance-dependent or share-based logic |
+| `modules/token-flow-tracing.md` | `transfer`, `mint`, `burn`, `balanceOf` | Any token handling (always) |
+| `modules/external-protocol-integration.md` | Uniswap, Aave, Curve, Convex, Lido | DeFi composability |
+| `modules/economic-design.md` | Fees, liquidation, incentives, tokenomics | Protocol has economic mechanics |
+| `modules/eip-standard-compliance.md` | ERC-20, ERC-721, ERC-4626, EIP-712 | Any standard implementation |
+| `modules/governance-voting.md` | Voting, proposals, delegation, quorum | Governance features |
+| `modules/cross-chain-bridge.md` | LayerZero, CCIP, Wormhole, relayers | Cross-chain messaging |
+| `modules/access-control-state.md` | State-writing functions, roles, admin | Always (core module) |
+| `modules/multi-tx-attack.md` | Deposit+withdraw, staking, sequenced ops | Multi-operation protocols |
+
+Read the trigger-matched module files for the FULL methodology with tables and step-by-step analysis. The inline modules below are the quick-reference summaries.
 
 #### Module A: Untrusted Recipient Analysis
 For every ETH/token transfer to an address that is NOT msg.sender or a known trusted protocol address:
