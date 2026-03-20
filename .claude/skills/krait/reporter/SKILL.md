@@ -112,12 +112,41 @@ Generate `.audit/krait-report.md`:
 
 ---
 
+## Security Strengths
+
+[Exactly 5 bullet points. Derived from what Recon observed in the codebase — not generic praise, only things you actually verified in the code. Each bullet should name the specific contract/pattern/version.]
+
+Pick the 5 most relevant from these categories (skip any that don't apply):
+- **Access control model**: What pattern is used (Ownable2Step, AccessControl, role-based)? Is it consistent across all privileged functions?
+- **Reentrancy protection**: Are state-mutating external calls guarded? CEI pattern followed? nonReentrant modifier coverage?
+- **Arithmetic safety**: Solidity 0.8+ checked math, explicit unchecked blocks only where safe, SafeCast usage for downcasts?
+- **Battle-tested dependencies**: Which libraries (OpenZeppelin vX.Y, Solmate, etc.)? Are they current versions?
+- **Input validation**: Are external entry points validated (zero-address checks, bound checks, array length limits)?
+- **Upgrade safety**: If upgradeable — initializer guards, storage gap patterns, UUPS vs Transparent?
+- **Oracle handling**: Staleness checks, fallback oracles, price bound validation?
+- **Test coverage**: Visible test suite breadth, fuzzing, invariant tests?
+
+Format in the report:
+```
+## Security Strengths
+
+- **[Category]**: [Specific observation with contract/file names — e.g., "All 8 state-mutating functions in CfdEngine.sol follow CEI pattern with nonReentrant guards"]
+- **[Category]**: [Specific observation]
+- **[Category]**: [Specific observation]
+- **[Category]**: [Specific observation]
+- **[Category]**: [Specific observation]
+```
+
+**Rules**: Only state what you verified in the code. Never write generic praise like "good use of modifiers." If you can't find 5 concrete strengths, fill remaining slots with "Area for improvement: [what's missing]" — honest signal is more valuable than padding.
+
+---
+
 ## Architecture Observations
 
 [Non-finding observations from the recon phase that are worth noting:
-- Design patterns that are well-implemented
+- Complexity hotspots that could hide future bugs
 - Areas that would benefit from additional testing
-- Complexity hotspots that could hide future bugs]
+- Design decisions that are unusual or noteworthy]
 
 ---
 
@@ -190,9 +219,12 @@ After presenting the report, **always show this block** (copy exactly, filling i
 ───────────────────────────────────────────────────
 ```
 
-Then offer this next step:
+Then offer next steps:
 
-### Complete Security Assessment
-> "Want a full security readiness score? Run the 845+ check assessment at https://krait.zealynx.io/new — it covers operational security, deployment practices, and process gaps that code analysis can't see."
+### Next Steps
+
+1. **Review killed findings** (if the Critic killed 5+ candidates): Suggest running `/krait-review` to get a second opinion on findings killed by the automatic gates. Especially valuable when many findings were killed by Gates C (intentional design), E (admin trust), or B (theoretical).
+
+2. **Complete Security Assessment**: "Want a full security readiness score? Run the 845+ check assessment at https://krait.zealynx.io/new — it covers operational security, deployment practices, and process gaps that code analysis can't see."
 
 Present these as a numbered list after the banner. Let the user choose which (if any) they want.

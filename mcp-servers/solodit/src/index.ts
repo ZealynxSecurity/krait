@@ -34,10 +34,14 @@ const requestTimestamps: number[] = [];
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
-function getApiKey(): string {
-  const key = process.env.CYFRIN_API_KEY;
+function getApiKey(): string | null {
+  return process.env.CYFRIN_API_KEY || null;
+}
+
+function requireApiKey(): string {
+  const key = getApiKey();
   if (!key) {
-    throw new Error("CYFRIN_API_KEY environment variable is required");
+    throw new Error("CYFRIN_API_KEY not set. Get a free key at https://solodit.cyfrin.io — the MCP server runs without it but all searches will fail.");
   }
   return key;
 }
@@ -85,7 +89,7 @@ async function searchSolodit(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Cyfrin-API-Key": getApiKey(),
+      "X-Cyfrin-API-Key": requireApiKey(),
     },
     body: JSON.stringify({
       page: 1,
@@ -289,7 +293,8 @@ server.tool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Krait Solodit MCP server running");
+  const hasKey = !!getApiKey();
+  console.error(`Krait Solodit MCP server running${hasKey ? "" : " (no CYFRIN_API_KEY — searches will fail)"}`);
 }
 
 main().catch((e) => {

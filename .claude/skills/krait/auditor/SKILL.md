@@ -181,7 +181,8 @@ After a complete audit:
 ├── findings/
 │   ├── detector-candidates.md            # Phase 1: All candidates
 │   ├── state-candidates.md               # Phase 2: State desync candidates
-│   └── critic-verdicts.md                # Phase 3: Verification results
+│   ├── critic-verdicts.md                # Phase 3: Verification results
+│   └── review-second-opinion.md          # /krait-review: Re-examined killed findings
 ├── krait-report.md                       # Phase 4: Final report
 └── krait-findings.json                   # Phase 4: Machine-readable
 ```

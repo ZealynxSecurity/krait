@@ -85,6 +85,23 @@ cp -r .claude/commands/* ~/.claude/commands/
 cp -r .claude/skills/* ~/.claude/skills/
 ```
 
+### Optional: Live Solodit Search (MCP)
+
+Krait can search Solodit in real-time during audits for exploit corroboration. This is optional — the skills work without it using static patterns.
+
+```bash
+cd krait/mcp-servers/solodit
+npm install && npm run build
+```
+
+Set your Cyfrin API key (free at [solodit.cyfrin.io](https://solodit.cyfrin.io)):
+
+```bash
+export CYFRIN_API_KEY=your_key_here
+```
+
+The `.mcp.json` in the repo root auto-configures the server for Claude Code. When running `/krait`, the detector will search Solodit for similar exploits and the critic will validate findings against historical data.
+
 ### Commands
 
 | Command | What it does |
