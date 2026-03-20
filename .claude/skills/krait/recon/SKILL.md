@@ -223,6 +223,16 @@ Based on protocol type, select the relevant vulnerability checklist:
 
 **Uniswap Integration**: slot0 is manipulable (never use as oracle), use TWAP via observe(), price impact/slippage, tick rounding on concentrated liquidity.
 
+## Live Solodit Enrichment (if MCP available)
+
+After completing recon, if the `krait-solodit` MCP server is available:
+
+Call `mcp__krait-solodit__get_enrichment` with the protocol type identified above (e.g., "DEX / AMM", "Lending", "Staking"). This fetches 10-15 HIGH-severity findings from real audits of similar protocols.
+
+Append the results to the recon output under `## Solodit Context` — the detector phase will use these as additional reference during analysis.
+
+If MCP is unavailable, skip this step. The detector has static patterns as fallback.
+
 ## Output
 
 Save to `.audit/recon.md` with:

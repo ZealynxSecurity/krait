@@ -1,0 +1,21 @@
+{
+  "name": "@krait/solodit-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for live Solodit vulnerability search — used by Krait skills during detection",
+  "type": "module",
+  "bin": {
+    "krait-solodit-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod 755 build/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "krait-solodit": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["mcp-servers/solodit/build/index.js"],
+      "env": {
+        "CYFRIN_API_KEY": "${CYFRIN_API_KEY}"
+      }
+    }
+  }
+}

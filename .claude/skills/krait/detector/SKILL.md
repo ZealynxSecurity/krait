@@ -48,6 +48,18 @@ Read `.audit/recon.md` and `.audit/known-issues.md` to understand:
 - If Slither flagged something you missed → investigate that area during Pass 2 lenses (reentrancy → Lens C, access control → Lens A, precision → Lens D)
 - Focus on HIGH/MEDIUM Slither findings only; ignore informational/low
 
+### Step 1b: Live Solodit Enrichment (if MCP available)
+
+If the `krait-solodit` MCP server is available, use it to enrich detection with real-time Solodit data:
+
+1. **Protocol enrichment** — Call `mcp__krait-solodit__get_enrichment` with the protocol type from recon (e.g., "DEX / AMM", "Lending"). This returns 10-15 HIGH-severity findings from real audits of similar protocols. Use these as additional reference when analyzing code — they show what went wrong in production.
+
+2. **During detection** — When you identify a suspected vulnerability, call `mcp__krait-solodit__search_similar_findings` with a description. If Solodit returns similar findings, this is strong corroboration. Note the match count in your candidate output.
+
+3. **During verification (optional)** — Call `mcp__krait-solodit__validate_hypothesis` to check historical precedent. HIGH confidence from Solodit = the bug pattern is real. LOW confidence = either novel or false positive — verify more carefully.
+
+**IMPORTANT**: MCP tools can fail (timeout, API down, no API key). If any call fails, continue without it — the static patterns and heuristics are sufficient. MCP enrichment is additive, never blocking.
+
 ### ADAPTIVE PASS STRATEGY
 
 **The codebase size determines analysis depth. Count scope files from the recon.md risk table:**

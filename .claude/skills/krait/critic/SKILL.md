@@ -84,6 +84,17 @@ Before applying verification methods, check the candidate's **consensus tag** fr
 
 ## Verification Methods
 
+### Method 0: Solodit Validation (if MCP available)
+
+Before deep code tracing, check if the `krait-solodit` MCP server is available. If so, for each candidate:
+
+Call `mcp__krait-solodit__validate_hypothesis` with the candidate title and category. This checks historical precedent:
+- **HIGH confidence** (3+ similar findings) → the bug pattern is real and has been exploited before. Proceed to Method A with increased confidence.
+- **MEDIUM confidence** (1-2 similar findings) → some precedent exists. Standard verification.
+- **LOW confidence** (0 similar findings) → either a novel bug or a false positive. Apply extra scrutiny in Method A.
+
+Note the Solodit match count in the verdict output. If MCP is unavailable, skip this step — it's additive.
+
 ### Method A: Deep Code Trace
 
 For each candidate:
