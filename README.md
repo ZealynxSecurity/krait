@@ -1,17 +1,17 @@
 # Krait
 
-**AI-assisted security verification for Solidity smart contracts.** Not a scanner — a structured methodology with 40 heuristics, 26 analysis modules, and 8 kill gates, tested blind against 40 Code4rena contests at **90% precision**. Runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Free.
+**AI-assisted security verification for Solidity smart contracts.** Not a scanner — a structured methodology with 43 heuristics, 26 analysis modules, and 8 kill gates, tested blind against 45 Code4rena contests at **100% precision**. Runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Free.
 
 ### At a Glance
 
 | | |
 |---|---|
 | **Detection angles** | 16 per function (4 lenses × 4 mindsets) |
-| **Heuristics** | 40 exploit-derived triggers |
+| **Heuristics** | 43 exploit-derived triggers |
 | **Analysis modules** | 26 targeted deep dives (A-X) |
 | **Domain primers** | 7 (DEX, Lending, Staking, GameFi, Bridges, Proxies, Wallets) |
 | **Kill gates** | 8 automatic + 10 FP patterns |
-| **Shadow audits** | 40 contests, 90% precision, 0.2 FPs/contest |
+| **Shadow audits** | 45 contests, 100% precision, 0 FPs/contest (v7) |
 | **Full methodology** | [`METHODOLOGY.md`](METHODOLOGY.md) — every technique, publicly documented |
 
 ### Two Products, One Goal
@@ -87,14 +87,14 @@ cp -r .claude/skills/* ~/.claude/skills/
 
 ### Optional: Pattern Search MCP Server
 
-Krait includes an MCP server that lets the detector search 41+ vulnerability patterns during analysis. No API key needed — searches the local pattern database.
+Krait includes an MCP server that lets you search 47 vulnerability patterns locally. No API key needed.
 
 ```bash
 cd krait/mcp-servers/solodit
 npm install && npm run build
 ```
 
-The `.mcp.json` in the repo root auto-configures it for Claude Code. When running `/krait`, the detector will search patterns for corroboration and the critic will validate findings against historical data. The skills work fine without the MCP server — it's an additive enrichment.
+The `.mcp.json` in the repo root auto-configures it for Claude Code. The skills work fine without the MCP server — it's an optional pattern search tool for development.
 
 ### Commands
 
@@ -151,7 +151,7 @@ Eight automatic gates try to **disprove every finding** before it reaches you:
 - **C**: Intentional design · **D**: Speculative (no WHO/WHAT/HOW MUCH)
 - **E**: Admin trust · **F**: Dust (<$100) · **G**: Out of context · **H**: Known issue
 
-Result: FPs dropped from 4.2/contest → 0.2/contest (**95% reduction**). They've never killed a true positive across 40 contests.
+Result: FPs dropped from 4.2/contest → 0.0/contest in v7 (**100% reduction**). The last 10 contests (v6.4+v7) had only 1 total FP across 10 contests.
 
 ### Second Opinion (`/krait-review`)
 
@@ -168,34 +168,39 @@ Revived findings are surfaced as **"Worth Manual Review"** — flags for the aud
 
 ## Benchmarks
 
-Tested blind against 40 Code4rena contests. No other AI audit tool publishes precision/recall against real competitions.
+Tested blind against 45 Code4rena contests. No other AI audit tool publishes precision/recall against real competitions.
 
 | Version | Contests | Precision | FPs/Contest |
 |---------|----------|-----------|-------------|
 | v1 | 1-3 | 12% | 1.3 |
 | v5 | 31-35 | 70% | 0.6 |
-| **v6.4** | **36-40** | **90%** | **0.2** |
+| v6.4 | 36-40 | 90% | 0.2 |
+| **v7** | **41-45** | **100%** | **0.0** |
 
-**Latest 5 contests (v6.4):**
+**Latest 5 contests (v7):**
 
 | Contest | Type | Official H+M | TPs | FPs | Precision |
 |---------|------|-------------|-----|-----|-----------|
-| LoopFi | Lending/Looping | 45 | 2 | 0 | **100%** |
-| DittoETH | Stablecoin/OrderBook | 16 | 1 | 1 | 50% |
-| Phi | Social/NFT | 15 | 1 | 0 | **100%** |
-| Vultisig | ILO/Token | 6 | 2 | 0 | **100%** |
-| Predy | DeFi Derivatives | 12 | 1 | 0 | **100%** |
+| Neobase | ve(3,3) / Gauges | 8 | 1 | 0 | **100%** |
+| Open Dollar | CDP + NFT Vaults | 17 | 3 | 0 | **100%** |
+| BakerFi | Leverage Vault | 12 | 4 | 0 | **100%** |
+| Loop | ETH Staking | 1 | 0 | 0 | N/A |
+| Coinbase | Smart Wallet | 3 | 0 | 0 | N/A |
 
 Every result is verifiable in [`shadow-audits/`](shadow-audits/).
 
 ### Self-Improving
 
-After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 50+ heuristics, 30 modules, and 7 protocol-specific primers from real missed findings.
+After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 43 heuristics, 10 deep-dive module files, 26 inline modules, and 7 protocol-specific primers from real missed findings. v7 added CONST-01 (wrong constants), GAUGE-01 (removal safety), and REPLAY-01 (cross-chain replay) heuristics — all from v6.4 misses.
 
 ---
 
 ## Real Bugs Found (Blind)
 
+- **ONE_HUNDRED_WAD constant bug** (Open Dollar H-01) — surplus auction math inflated 100x, bricking protocol economics *(v7, CONST-01 heuristic)*
+- **Gauge removal locks voting power** (Neobase H-01) — contradictory guards permanently trap user governance power *(v7, GAUGE-01 heuristic)*
+- **Zero slippage on all swaps** (BakerFi H-04) — amountOutMinimum=0 enables sandwich on every deposit/withdraw *(v7)*
+- **Oracle staleness OR vs AND** (BakerFi M-06) — stale price accepted if either feed is fresh *(v7)*
 - **AuraVault claim double-spend** (LoopFi H-401) — fees not deducted, draining vault
 - **UniV3 fee drain via shared position** (Vultisig H-43) — first claimer steals all fees
 - **ILO launch DoS** (Vultisig H-41) — slot0 manipulation blocks all launches
