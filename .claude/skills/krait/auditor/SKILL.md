@@ -77,7 +77,7 @@ Run the krait-detector methodology on ALL core source files:
 - Record ALL candidates (maximize recall)
 - Save to `.audit/findings/detector-candidates.md`
 
-**If `--quick`**: Skip to Phase 3 (verification) after this. No state analysis, no iteration.
+**If `--quick`**: Skip to Phase 3 (verification) after this. No state analysis, no iteration. Review (Phase 3b) still runs.
 
 ### 4. Phase 2: State Analysis
 
@@ -125,13 +125,31 @@ Run the krait-critic methodology on ALL candidates from Detection + State Analys
 
 **Gate**: No finding reaches the report without a verdict.
 
+### 6b. Phase 3b: Review (Automatic Second Opinion)
+
+Run the krait-reviewer methodology on ALL killed candidates from Phase 3:
+- Re-examine findings killed by Gates C (intentional design), E (admin trust), B (theoretical), F (dust), and D (speculative)
+- Do NOT re-examine Gates A (best practice) or G (out of context) — they're reliably correct
+- For Gate H (known issue) kills: only re-examine if the mechanism match seems weak (same topic but different exploit path)
+- Apply gate-specific re-examination with fresh eyes: re-read the code FIRST, then the critic's dismissal
+- Try flash loan attack paths and multi-block MEV sequences that the critic might have missed
+- Check if dust accumulates unboundedly or if rounding is attacker-controlled
+- Assign review verdicts: REVIVE (Worth Manual Review), REVIVE (Informational), or CONFIRM KILL
+- Revived findings go into the report as a separate "Second Opinion" section — clearly marked as flags for manual review, NOT verified TPs
+- Save to `.audit/findings/review-second-opinion.md`
+
+**This phase recovers real findings that aggressive kill gates dismiss.** In benchmarks, Gates D/F over-killed 3 real HIGH findings. The review phase catches these without compromising the main report's zero-FP standard.
+
 ### 7. Phase 4: Report
 
 Run the krait-reporter methodology:
-- Load only verified findings (TP + LT)
+- Load verified findings (TP + LT) from critic verdicts
+- Load revived findings from reviewer second opinion (if any)
 - Deduplicate overlapping findings
 - Final severity ranking
-- Generate professional Markdown report
+- Generate professional Markdown report with two sections:
+  1. **Verified Findings** — survived all kill gates, concrete exploit traces
+  2. **Worth Manual Review** — revived by reviewer, flagged for human auditor attention
 - Generate machine-readable JSON
 - Save to `.audit/krait-report.md` and `.audit/krait-findings.json`
 
