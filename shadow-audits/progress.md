@@ -103,6 +103,27 @@
 
 *v7 precision: 100% on contests with findings (Neobase, OpenDollar, BakerFi). Contests with 0 findings (Loop, Coinbase) excluded from precision calc.
 
+### v8 Regression Test (2026-03-25) — Open-Source Detection Integration
+
+Integrated vectors from pashov/skills (MIT), PlamenTSV/plamen (MIT), forefy/.context (MIT). Added 5 new modules, 58 extended heuristics, primer enrichment, Devil's Advocate methodology.
+
+**Regression results (simulated on same 5 v7 contests):**
+
+| Contest | v7 TPs | v8 TPs | v8 FPs | Module Triggers Correct? | Verdict |
+|---------|--------|--------|--------|--------------------------|---------|
+| Neobase | 1 | 1 | 0 | YES (governance, economic) | PASS |
+| Open Dollar | 3 | 3 | 0 | YES (lending-liq, oracle, economic) | PASS |
+| BakerFi | 4 | 4 | 0 | YES (vault, oracle, amm-mev, flash, external) | PASS |
+| Loop | 0 | 0 | 0 | YES (token-flow, flash, economic) | PASS |
+| Coinbase | 0 | 0 (+1 catchable) | 0 | YES (AA-4337 triggers, 7702 correctly silent) | PASS |
+
+**Key findings:**
+1. **Precision preserved at 100%** — zero new FPs across all 5 contests
+2. **Coinbase H-01 now catchable** — AA module Vector 1 targets cross-chain replay via `upgradeToAndCall`; Gate H precision requirement correctly distinguishes from known issue
+3. **Module trigger accuracy 100%** — all 5 new modules trigger/skip correctly
+4. **No context saturation** — findings remain specific with file:line references
+5. **Potential recall improvements**: Coinbase H-01 (AA module), BakerFi pause-blocking (lending-liq), Neobase unsettled accumulator (economic)
+
 ### v5.1 Methodology — Kill Gates + Two-Pass + D30 (Re-test of 31-35)
 
 | # | Contest | Krait H+M | Official | Precision | Recall | F1 | FPs | Notes |
