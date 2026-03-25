@@ -58,5 +58,15 @@ If fallback handler can be changed by module → attacker enables malicious modu
 If social recovery or guardian system exists, can guardians collude to take over the Safe? Is there a delay period?
 **Check**: What's the recovery threshold? Is there a timelock on recovery? Can the owner cancel a recovery?
 
+## STATISTICAL CONTEXT — Protocol-Type Enrichment
+
+From analysis of wallet, Safe, and account abstraction findings:
+- **#1 root cause**: EIP-712 typehash mismatches and signature domain separation failures — 40%+ of wallet audits
+- **#2 root cause**: Safe version incompatibility (interface changes between 1.3/1.4/1.5) — 25%+
+- **AA-specific**: EntryPoint caller validation, signature not bound to nonce/chainId, banned opcodes in validation phase
+- **Most missed**: Guard bypass via module execution path (guard protects execTransaction but not execTransactionFromModule)
+
+*(Source: forefy/.context, MIT)*
+
 ---
 *Source: Krait shadow audit analysis (Brahma Safe integration — 4 official findings, 3 related to Safe version compatibility and EIP-712). Addresses the #1 missed category in wallet/Safe audits.*

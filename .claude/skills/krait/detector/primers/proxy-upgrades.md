@@ -66,5 +66,15 @@ Configuration set in constructor doesn't affect proxy (different storage). All c
 If salt is user-controlled or predictable → attacker pre-computes address, sends funds before deployment, or front-runs to deploy malicious version.
 **Check**: Is CREATE2 salt derived from user input alone? Or includes `msg.sender` + nonce?
 
+## STATISTICAL CONTEXT — Protocol-Type Enrichment
+
+From analysis of proxy/upgrade audit findings:
+- **#1 root cause**: Unprotected initialization (missing _disableInitializers, frontrunnable initialize) — most common proxy finding
+- **#2 root cause**: Storage layout collision across upgrades (missing __gap, slot overlap) — 30%+
+- **Deployment patterns**: CREATE2 predictable salt, gap between deploy and initialize, clone init races
+- **Most missed**: UUPS implementation losing upgrade capability after upgrade (missing UUPSUpgradeable inheritance in new impl)
+
+*(Source: forefy/.context, MIT)*
+
 ---
 *Source: Zealynx proxy-security checklist (33 checks). Distilled to top 15 attack patterns.*

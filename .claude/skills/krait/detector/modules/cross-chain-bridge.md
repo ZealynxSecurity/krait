@@ -49,3 +49,11 @@ Bridge token contracts (wrapped tokens, DcntEth, etc.):
 - Setter functions for router/bridge addresses — access controlled?
 - Can a compromised bridge address mint unlimited tokens?
 - Is there a supply cap on the bridge token?
+
+## 7. Advanced Cross-Chain Vectors
+<!-- Vectors from pashov/skills (MIT) -->
+
+- **L2 sequencer downtime exploitation**: During L2 sequencer downtime, oracle prices aren't updated but may still be used. When sequencer restarts, stale prices enable unfair liquidations/trades. Check: is there an L2 sequencer uptime feed check before price-dependent operations?
+- **Forced inclusion attacks**: On L2s with forced inclusion (Arbitrum delayed inbox), users can bypass sequencer censorship. If protocol relies on sequencer ordering for fairness (auctions, FCFS) → forced inclusion breaks assumptions. Check: does protocol logic depend on sequencer ordering guarantees?
+- **Cross-chain supply accounting violation**: If minted on destination exceeds locked on source due to race conditions, incomplete finality, or relayer errors → infinite mint. Check: are supply invariants enforced atomically?
+- **Bridge global rate limit griefing**: If bridge has a global rate limit (not per-user), attacker fills the limit with self-transfers → blocks all legitimate bridge transfers. Check: are rate limits global or per-user?

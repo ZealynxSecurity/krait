@@ -50,3 +50,11 @@ For each oracle → consumer path:
 - What if oracle returns a negative price? (`int256` from Chainlink — checked?)
 - **Circuit breaker**: Does the protocol detect extreme deviations? What happens at 50% price drop in 1 block?
 
+## 6. Protocol-Specific Oracle Patterns
+<!-- Vectors from pashov/skills (MIT) -->
+
+- **Pyth price staleness**: Pyth prices require explicit `updatePriceFeeds()` call before reading — if protocol reads without updating, price may be arbitrarily stale (unlike Chainlink which auto-updates via heartbeat). Check: is `updatePriceFeeds` called before `getPrice`?
+- **Multi-oracle disagreement**: If protocol uses Chainlink primary + Pyth fallback, what happens when they disagree significantly? Attacker can manipulate the cheaper oracle to trigger fallback and exploit the price difference. Check: is there a max deviation threshold between oracles?
+- **Oracle price update front-running**: Attacker sees pending oracle update in mempool → executes trade at old price → oracle updates → profit from price delta. Check: can users trade in same block as oracle update? Is there a delay?
+- **Wrong price feed for derivative assets**: Using BTC feed for WBTC, ETH feed for stETH, USD feed for USDT — all have depeg risk. Check: does each asset have its OWN price feed, or does it borrow from the underlying?
+

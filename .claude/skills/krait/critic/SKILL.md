@@ -16,6 +16,8 @@ Invoked by `/krait` (as part of full audit) or `/krait-critic` (standalone).
 
 **Every CRITICAL, HIGH, and MEDIUM candidate must be VERIFIED before it reaches the user.** This phase is the devil's advocate — its job is to DISPROVE findings. Only findings that survive attempted falsification are TRUE POSITIVES.
 
+**Devil's Advocate methodology** *(Source: PlamenTSV/plamen, MIT)*: For every finding, FIRST argue why it is NOT a bug — construct the strongest possible defense. Only if that defense fails does the finding stand. Before marking anything as FALSE POSITIVE, also ask: "Does ANY other finding in this audit enable the missing precondition?" A finding dismissed in isolation may become exploitable when combined with another.
+
 The goal is **zero false positives** on H/M findings. A false positive wastes the auditor's time and destroys trust. Better to miss a real bug than report a fake one.
 
 ## Core Rule

@@ -104,7 +104,12 @@ Analyze through **4 independent focused lenses**. Each lens looks at the SAME co
 |---|---|
 | `access-control-state.md` | Lens A |
 | `governance-voting.md` | Lens A |
+| `eip7702-delegation.md` | Lens A + Lens D |
+| `account-abstraction-erc4337.md` | Lens A + Lens D |
 | `economic-design.md` | Lens B |
+| `erc4626-vault-deep.md` | Lens B + Lens D |
+| `lending-liquidation-deep.md` | Lens B + Lens C |
+| `amm-mev-deep.md` | Lens B + Lens C |
 | `flash-loan-interaction.md` | Lens B + Lens C |
 | `multi-tx-attack.md` | Lens B + Lens C |
 | `oracle-analysis.md` | Lens B + Lens C |
@@ -119,7 +124,7 @@ If a module is activated and maps to a lens, that lens MUST execute the module's
 
 #### Lens A: Access Control, State Integrity & Governance
 **From Pass 1 Brief**: Check which files had NO access-control candidates. Prioritize those.
-**Activated modules (if in recon.md)**: `access-control-state.md`, `governance-voting.md` — read full file methodology
+**Activated modules (if in recon.md)**: `access-control-state.md`, `governance-voting.md`, `eip7702-delegation.md`, `account-abstraction-erc4337.md` — read full file methodology
 **Inline modules (always)**: L (Derived Class/Override Completeness), W (Missing Functionality)
 **Mandatory heuristics**: MODIFIER-01, AC-01 to AC-04, GOV-01, GOV-02, MISSING-01, MISSING-02, ZERO-WEIGHT-01
 
@@ -142,7 +147,7 @@ Focus EXCLUSIVELY on:
 
 #### Lens B: Value Flow & Economic Logic
 **From Pass 1 Brief**: Check which value-handling functions had NO candidates. Trace those first.
-**Activated modules (if in recon.md)**: `economic-design.md`, `flash-loan-interaction.md`, `multi-tx-attack.md`, `oracle-analysis.md`, `token-flow-tracing.md` — read full file methodology
+**Activated modules (if in recon.md)**: `economic-design.md`, `erc4626-vault-deep.md`, `lending-liquidation-deep.md`, `amm-mev-deep.md`, `flash-loan-interaction.md`, `multi-tx-attack.md`, `oracle-analysis.md`, `token-flow-tracing.md` — read full file methodology
 **Inline modules (always)**: D (Fee Consistency), I (Weight/Proportionality), O (Payment/Distribution)
 **Mandatory heuristics**: ECON-01, ECON-02, FDC-01, FDC-02, PR-01 to PR-03, FL-01, SI-01, TVL-01
 
@@ -164,7 +169,7 @@ Focus EXCLUSIVELY on:
 
 #### Lens C: External Interactions & Cross-Contract
 **From Pass 1 Brief**: Check which external calls were NOT investigated. Prioritize uncovered cross-contract interactions.
-**Activated modules (if in recon.md)**: `external-protocol-integration.md`, `cross-chain-bridge.md`, `token-flow-tracing.md`, `flash-loan-interaction.md` — read full file methodology
+**Activated modules (if in recon.md)**: `external-protocol-integration.md`, `cross-chain-bridge.md`, `lending-liquidation-deep.md`, `amm-mev-deep.md`, `token-flow-tracing.md`, `flash-loan-interaction.md` — read full file methodology
 **Inline modules (always)**: A (Untrusted Recipient), C (Transfer Order/Implicit Flash Loans), S (Cross-Contract State on Transfer)
 **Mandatory heuristics**: AEC-01 to AEC-03, ROR-01, RE-01, EXT-01 to EXT-03, CALLBACK-01, HOOK-01, BRIDGE-01 to BRIDGE-04
 
@@ -184,7 +189,8 @@ Focus EXCLUSIVELY on:
 
 #### Lens D: Edge Cases, Math & Standards
 **From Pass 1 Brief**: Check which math-heavy functions and standard implementations had NO candidates. Those are likely under-analyzed.
-**Activated modules (if in recon.md)**: `eip-standard-compliance.md` — read full file methodology
+**Activated modules (if in recon.md)**: `eip-standard-compliance.md`, `erc4626-vault-deep.md`, `eip7702-delegation.md`, `account-abstraction-erc4337.md` — read full file methodology
+**Extended heuristics**: For Tier 1 deep analysis, also reference `~/.claude/skills/krait/detector/heuristics-extended.md` — 58 advanced vectors covering assembly, storage, accounting, time-dependent, array/mapping, emergency, token, and cross-contract patterns.
 **Inline modules (always)**: B (Type Cast Safety), F (Token Compatibility), G (Factory/Deployment), M (State Variable Lifecycle)
 **Mandatory heuristics**: SIG-01, SIG-02, TOK-01 to TOK-03, ETH-01, ETH-02, PRX-01, PRX-02, INJ-01, PACKED-01, PERMIT-01, HASH-01, ID-01, LIB-01, CHAIN-01
 
@@ -206,6 +212,8 @@ Focus EXCLUSIVELY on:
 - **State variable lifecycle (Module M)**: Trace every user-state variable through mint/burn/re-mint cycles. Admin functions update ALL related variables?
 - **Mechanical arithmetic verification**: For the TOP 3 most complex arithmetic functions (by operator count), do NOT just read and judge. TRACE with concrete values: pick 3 sets of inputs (normal case, zero/boundary case, adversarial case) and manually compute each step. Compare your result with what the code produces. If they diverge → candidate. This catches bugs like `debtCeiling()` where 5 findings hid in one function that "looked correct."
 - **Self-transfer / self-referential edge case**: For every transfer/swap function, check: what happens when sender==receiver, tokenA==tokenB, from==to? Memory-cached state may not reflect storage updates within the same call.
+
+**Cross-cutting perspective** *(Source: PlamenTSV/plamen, MIT)*: For every finding, also ask the INVERSE: "What adjacent bug does this analysis OBSCURE?" and "What is the OPPOSITE interpretation of this code?" If a finding was refuted in one lens, re-examine in the next: "What enabler makes this exploitable after all?"
 
 **After all 4 lenses complete — Consensus Merge:**
 1. Merge all candidates from Pass 1 + all 4 lenses

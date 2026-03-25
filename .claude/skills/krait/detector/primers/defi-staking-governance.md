@@ -66,6 +66,19 @@ If quorum is calculated as `% of totalSupply` and `totalSupply` can reach 0 → 
 If lock period is checked BEFORE an external call that allows re-entry → attacker bypasses lock during callback.
 **Check**: Is lock check + state update atomic? Can reentrancy during a callback skip the lock enforcement?
 
+## STATISTICAL CONTEXT — Protocol-Type Enrichment
+
+From analysis of 465 staking and 800 governance findings across real audits:
+- **#1 staking root cause**: Reward accumulator ordering (must settle BEFORE state change) — 40%+ of staking audits
+- **#2 staking root cause**: Flash stake/unstake exploiting instant reward claims — 30%+
+- **#1 governance root cause**: Checkpoint overwrite on same-block operations — 35%+ of governance audits
+- **#2 governance root cause**: Flash-loan vote manipulation / proxy upgrade hijack — 25%+
+- **Delegation patterns**: Self-delegation doubling voting power, delegation to address(0) blocking transfers, MAX_DELEGATES DoS
+- **Cooldown bypass**: Via self-transfer, via reentrancy, via dust message griefing (TON-specific but applicable pattern)
+- **Most missed**: Voting power desync between governance token and staking positions after partial unstake
+
+*(Source: forefy/.context, MIT)*
+
 ## FROM MISS ANALYSIS — Patterns Krait Has Missed in Real Contests
 
 ### 16. Quorum Manipulation via Token Supply Inflation

@@ -74,5 +74,16 @@ If game has cross-chain asset transfers, can an asset exist on BOTH chains simul
 If pause blocks ALL functions including withdrawals → user assets trapped during emergency.
 **Check**: Can users withdraw/rescue their NFTs/tokens when contract is paused? Is there an emergency exit path?
 
+## STATISTICAL CONTEXT — Protocol-Type Enrichment
+
+From analysis of 570 NFT/gaming findings across real audits:
+- **#1 root cause**: Reentrancy via ERC721/1155 callbacks during claims, mints, and transfers — 35%+ of NFT audits
+- **#2 root cause**: Randomness manipulation (on-chain sources, revert-to-reroll) — 30%+
+- **#3 root cause**: Metadata mutability / injection without validation — 20%+
+- **VRF gaming**: Callback can be selectively submitted, request can be retried if result unfavorable
+- **Most missed**: Royalty accounting errors in marketplace (double-counted, wrong recipient, unchecked ERC-2981 return)
+
+*(Source: forefy/.context, MIT)*
+
 ---
 *Source: Zealynx gamefi-security checklist (55 checks). Distilled to top 17 attack patterns.*

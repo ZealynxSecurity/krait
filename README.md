@@ -7,8 +7,8 @@
 | | |
 |---|---|
 | **Detection angles** | 16 per function (4 lenses × 4 mindsets) |
-| **Heuristics** | 43 exploit-derived triggers |
-| **Analysis modules** | 26 targeted deep dives (A-X) |
+| **Heuristics** | 43 original + 58 extended (from open-source community) |
+| **Analysis modules** | 15 deep-dive module files + 26 inline modules (A-X) |
 | **Domain primers** | 7 (DEX, Lending, Staking, GameFi, Bridges, Proxies, Wallets) |
 | **Kill gates** | 8 automatic + 10 FP patterns |
 | **Shadow audits** | 45 contests, 100% precision, 0 FPs/contest (v7) |
@@ -252,6 +252,18 @@ Start at [krait.zealynx.io/new](https://krait.zealynx.io/new).
 ### Dashboard
 
 [krait.zealynx.io/dashboard](https://krait.zealynx.io/dashboard) — all projects in one place. Scan findings, verification scores, shareable reports, activity timeline.
+
+---
+
+## Detection Sources
+
+Krait's detection layer combines original research with curated knowledge from the open-source security community. See [`ATTRIBUTION.md`](.claude/skills/krait/ATTRIBUTION.md) for details.
+
+| Source | What We Integrated | License |
+|--------|-------------------|---------|
+| [pashov/skills](https://github.com/pashov/skills) | ~100 attack vectors across 8 modules + 58 extended heuristics | MIT |
+| [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen) | Devil's Advocate verification methodology | MIT |
+| [forefy/.context](https://github.com/forefy/.context) | Protocol-type context enrichment (10,600+ findings) | MIT |
 
 ---
 

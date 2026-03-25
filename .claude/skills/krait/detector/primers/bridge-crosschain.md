@@ -54,5 +54,17 @@ If no volume/velocity limits → attacker who finds any exploit can drain entire
 When destination execution fails, where do refunds go? If to the adapter/router contract (not the user) → funds stuck forever.
 **Check**: Trace the full refund path. Does the user get their funds back on source chain? Or are they stuck in a contract?
 
+## STATISTICAL CONTEXT — Protocol-Type Enrichment
+
+From analysis of 833 bridge findings across real audits:
+- **#1 root cause**: Access control failures (unauthorized message processing, missing trusted remote verification) — 40%+ of bridge audits
+- **#2 root cause**: Message replay (missing nonce, weak uniqueness, cross-chain replay) — 35%+
+- **#3 root cause**: Supply invariant violations (minted > locked, burn-without-unlock) — 30%+
+- **Gas griefing**: Relayer underpaying gas, message arrives but execution fails with no refund, destination OOG
+- **Signature validation**: Malleability, missing expiry, aggregation bypass
+- **Most missed**: Cross-chain state synchronization failures — source and destination diverge during partial failures
+
+*(Source: forefy/.context, MIT)*
+
 ---
 *Source: Zealynx bridge-security checklist (17 checks). Distilled to top 12 attack patterns.*

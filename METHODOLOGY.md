@@ -2,7 +2,9 @@
 
 This document describes exactly how Krait finds vulnerabilities. Every technique here was derived from real missed findings in blind shadow audits against Code4rena contests, then validated by measuring precision/recall improvements.
 
-Current version: **v7.0** (methodology) / **v6.4** (shadow audit scoring)
+Current version: **v8.0** (methodology) / **v7** (shadow audit scoring)
+
+> **v8 changes**: Integrated open-source detection knowledge from [pashov/skills](https://github.com/pashov/skills) (MIT), [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen) (MIT), and [forefy/.context](https://github.com/forefy/.context) (MIT). Added 5 new detection modules (ERC-4626 vault, lending/liquidation, AMM/MEV, EIP-7702, ERC-4337), 58 extended heuristics, protocol-type statistical enrichment across all 7 primers, and Devil's Advocate verification methodology. Module trigger system now uses tier hierarchy (Tier 0 always-load, Tier 1 protocol-type, Tier 2 feature-detected). See [ATTRIBUTION.md](.claude/skills/krait/ATTRIBUTION.md) for full source details.
 
 ---
 

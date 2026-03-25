@@ -229,18 +229,28 @@ Based on what you discovered in Steps 1-5, evaluate each detection module's trig
 
 Evaluate each module file in `~/.claude/skills/krait/detector/modules/` against what you found:
 
-| Module File | Trigger Condition | Select If... |
-|---|---|---|
-| `oracle-analysis.md` | Protocol uses Chainlink, TWAP, Pyth, Band, or any external price feed | You found oracle imports, `latestRoundData`, `getPrice`, TWAP calls, or price-dependent logic |
-| `flash-loan-interaction.md` | Protocol reads `balanceOf(address(this))`, uses spot prices, has deposit/withdraw, or integrates with flash-loan-capable protocols | You found `balanceOf(address(this))`, spot price reads, or deposit+withdraw in same-tx-capable flows |
-| `token-flow-tracing.md` | Any `transfer`, `transferFrom`, `safeTransfer`, `mint`, `burn`, `balanceOf(this)` | You found token transfers (virtually always selected for DeFi) |
-| `external-protocol-integration.md` | Protocol integrates with Uniswap, Aave, Compound, Curve, Chainlink, Convex, Lido, or any external DeFi protocol | You found external protocol imports or interface calls to known DeFi protocols |
-| `economic-design.md` | Protocol has token economics, fee structures, liquidation mechanics, or incentive systems | You found fee calculations, reward distributions, liquidation logic, or tokenomics |
-| `eip-standard-compliance.md` | Protocol implements ERC-20, ERC-721, ERC-4626, ERC-1155, ERC-2981, ERC-3156, EIP-712 | You found ERC/EIP interface implementations or standard compliance claims |
-| `governance-voting.md` | Protocol has voting, proposals, delegation, quorum, or governance tokens | You found governance contracts, voting functions, delegation, or quorum logic |
-| `cross-chain-bridge.md` | Protocol bridges assets/messages across chains | You found LayerZero, CCIP, Wormhole, Axelar, Hyperlane, or custom bridge/relayer code |
-| `access-control-state.md` | Always active | Always selected — every protocol has access control |
-| `multi-tx-attack.md` | Protocol has deposit+withdraw, staking+claiming, or sequenceable operations | You found operations that can be called in sequence within the same block |
+**Module tier hierarchy:**
+- **Tier 0 (always-load)**: `access-control-state.md` — always active for every audit
+- **Tier 1 (protocol-type)**: Core domain modules — selected when protocol matches a specific type (lending, DEX, vault, etc.)
+- **Tier 2 (feature-detected)**: Specialized modules — selected when specific features/patterns are detected in code
+
+| Module File | Tier | Trigger Condition | Select If... |
+|---|---|---|---|
+| `access-control-state.md` | 0 | Always active | Always selected — every protocol has access control |
+| `oracle-analysis.md` | 1 | Protocol uses Chainlink, TWAP, Pyth, Band, or any external price feed | You found oracle imports, `latestRoundData`, `getPrice`, TWAP calls, or price-dependent logic |
+| `erc4626-vault-deep.md` | 1 | Protocol implements ERC-4626 or custom share-based vault | You found ERC4626 inheritance, `convertToShares`, `convertToAssets`, share-based deposit/withdraw |
+| `lending-liquidation-deep.md` | 1 | Protocol has lending/borrowing/liquidation mechanics | You found `borrow`, `repay`, `liquidate`, health factor checks, or interest accrual |
+| `amm-mev-deep.md` | 1 | Protocol is DEX/AMM or deeply integrates with liquidity pools | You found swap functions, liquidity provision, tick math, or pool interaction |
+| `economic-design.md` | 1 | Protocol has token economics, fee structures, liquidation mechanics, or incentive systems | You found fee calculations, reward distributions, liquidation logic, or tokenomics |
+| `governance-voting.md` | 1 | Protocol has voting, proposals, delegation, quorum, or governance tokens | You found governance contracts, voting functions, delegation, or quorum logic |
+| `flash-loan-interaction.md` | 2 | Protocol reads `balanceOf(address(this))`, uses spot prices, has deposit/withdraw, or integrates with flash-loan-capable protocols | You found `balanceOf(address(this))`, spot price reads, or deposit+withdraw in same-tx-capable flows |
+| `token-flow-tracing.md` | 2 | Any `transfer`, `transferFrom`, `safeTransfer`, `mint`, `burn`, `balanceOf(this)` | You found token transfers (virtually always selected for DeFi) |
+| `external-protocol-integration.md` | 2 | Protocol integrates with Uniswap, Aave, Compound, Curve, Chainlink, Convex, Lido, or any external DeFi protocol | You found external protocol imports or interface calls to known DeFi protocols |
+| `eip-standard-compliance.md` | 2 | Protocol implements ERC-20, ERC-721, ERC-4626, ERC-1155, ERC-2981, ERC-3156, EIP-712 | You found ERC/EIP interface implementations or standard compliance claims |
+| `cross-chain-bridge.md` | 2 | Protocol bridges assets/messages across chains | You found LayerZero, CCIP, Wormhole, Axelar, Hyperlane, or custom bridge/relayer code |
+| `multi-tx-attack.md` | 2 | Protocol has deposit+withdraw, staking+claiming, or sequenceable operations | You found operations that can be called in sequence within the same block |
+| `eip7702-delegation.md` | 2 | Protocol uses EIP-7702 or handles delegated EOAs | You found `EXTCODESIZE` checks for EOA detection, `tx.origin` usage, or EIP-7702 delegation handling |
+| `account-abstraction-erc4337.md` | 2 | Protocol implements ERC-4337 or handles UserOperations | You found `validateUserOp`, `IEntryPoint`, `UserOperation` struct, paymaster logic, or bundler interaction |
 
 **Selection rules:**
 - Select ALL modules whose trigger condition is met — do not cap the count

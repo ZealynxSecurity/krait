@@ -108,6 +108,18 @@ If NFT swap doesn't verify the collection matches the pool → attacker swaps ag
 - L2 sequencer uptime feed checked?
 - BTC feed used for WBTC? (depeg risk)
 
+## STATISTICAL CONTEXT — Protocol-Type Enrichment
+
+From analysis of 508 DEX/AMM findings across real audits:
+- **#1 root cause**: Front-running/MEV (sandwich, JIT, first-swap extraction) — appears in 40%+ of DEX audits
+- **#2 root cause**: Pool reserve manipulation via flash loans or direct transfers — 30%+ of audits
+- **#3 root cause**: Fee accounting errors (sequential fees, decimal mismatch, fee-on-transfer) — 25%+ of audits
+- **Concentrated liquidity specific**: Tick crossing fee manipulation, position boundary errors, negative tick math — increasing frequency with V3-style forks
+- **LP position manipulation**: Same-asset swap rounding, removal front-running, virtual price oracle gaming
+- **Most missed**: Implicit flash loans via callback windows (assets out before payment in), loss-vs-rebalancing in active LP management
+
+*(Source: forefy/.context, MIT)*
+
 ## FROM MISS ANALYSIS — Patterns Krait Has Missed in Real Contests
 
 ### 21. External Call to User-Controlled Address Reverts = HoneyPot

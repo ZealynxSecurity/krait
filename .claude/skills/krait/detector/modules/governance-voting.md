@@ -39,3 +39,15 @@ When governance NFTs/tokens are burned, transferred, or auctioned:
 - Is there a time delay between vote end and execution?
 - Can a proposal be canceled after passing but before execution?
 - Front-running: can someone submit a counter-proposal that executes first?
+
+## 6. Advanced Governance Vectors
+<!-- Vectors from pashov/skills (MIT) -->
+
+- **Timelock collision**: If timelock uses `keccak256(target, value, data)` as key, identical proposals can collide — second proposal silently overwrites first. Check: is proposal ID unique beyond just the call data?
+- **Vote buying via flash-loaned delegation**: Attacker flash-loans governance tokens → delegates to self → votes → undelegates → returns tokens. All in one tx if no snapshot. Check: is voting power snapshot-based or live?
+- **Quorum racing**: If quorum is from live supply (not snapshot), attacker can mint/burn to manipulate the threshold mid-vote. Check: quorum calculated from snapshot or `totalSupply()`?
+- **Cancellation front-running**: Attacker sees a proposal they oppose about to pass → front-runs with a cancel tx (if cancel requires only proposer threshold and they meet it). Check: who can cancel? When?
+- **Voting dust inflation**: Creating many tiny governance positions to increase checkpoint gas, griefing redelegate operations. Check: minimum governance token position size?
+- **Self-delegation doubling**: If delegating to self counts as both holder AND delegatee voting power → 2x votes. Check: does `_delegate(msg.sender)` double-count?
+- **Same-block deposit-withdraw-vote**: Deposit to get tokens, vote (snapshot not yet updated), withdraw. Check: does deposit update voting power in same block?
+- **Proposal executable before voting ends**: If `execute()` checks `state == Succeeded` but state transitions are based on `block.number >= endBlock` and execution is in same block as end → race condition. Check: is there a gap between vote end and execution start?

@@ -66,6 +66,19 @@ If lending protocol integrates with Aave/Compound/Curve for yield and the extern
 If protocol takes a reserve cut from interest but the cut is applied inconsistently between accrue/withdraw/liquidate → accounting drift.
 **Check**: Is reserve factor applied in ALL interest-bearing code paths? Compare accrual in deposit vs withdraw vs liquidate.
 
+## STATISTICAL CONTEXT — Protocol-Type Enrichment
+
+From analysis of 720 lending protocol findings across real audits:
+- **#1 root cause**: Oracle manipulation / stale price acceptance — appears in 45%+ of lending audits
+- **#2 root cause**: Precision/rounding errors in interest accrual, share calculations, and health factor math — 35%+
+- **#3 root cause**: Liquidation logic flaws (bad debt socialization ordering, partial liquidation leaving worse state, self-liquidation profit) — 30%+
+- **Interest accrual patterns**: Rate ordering bugs (accrue BEFORE state change), accrued interest omitted from health factor, interest at 100% utilization creating unliquidatable positions
+- **Vault-specific**: ERC-4626 compliance gaps, share mismatch between deposit/withdraw, inflation attack on first deposit
+- **Dust positions**: Small borrows creating bad debt below liquidation threshold (gas cost > liquidation profit)
+- **Most missed**: Accrued interest not included in health factor calculation — positions appear healthy but are actually undercollateralized
+
+*(Source: forefy/.context, MIT)*
+
 ## FROM MISS ANALYSIS — Patterns Krait Has Missed in Real Contests
 
 ### 16. Debt Ceiling / Borrow Cap Math Errors (Credit Guild: 5 findings from ONE function)
