@@ -11,7 +11,7 @@
 | **Analysis modules** | 15 deep-dive module files + 26 inline modules (A-X) |
 | **Domain primers** | 7 (DEX, Lending, Staking, GameFi, Bridges, Proxies, Wallets) |
 | **Kill gates** | 8 automatic + 10 FP patterns |
-| **Shadow audits** | 45 contests, 100% precision, 0 FPs/contest (v7) |
+| **Shadow audits** | 50 contests, 100% precision, 0 FPs/contest (v8) |
 | **Full methodology** | [`METHODOLOGY.md`](METHODOLOGY.md) — every technique, publicly documented |
 
 ### Two Products, One Goal
@@ -168,30 +168,31 @@ Revived findings are surfaced as **"Worth Manual Review"** — flags for the aud
 
 ## Benchmarks
 
-Tested blind against 45 Code4rena contests. No other AI audit tool publishes precision/recall against real competitions.
+Tested blind against 50 Code4rena contests. No other AI audit tool publishes precision/recall against real competitions.
 
-| Version | Contests | Precision | FPs/Contest |
-|---------|----------|-----------|-------------|
-| v1 | 1-3 | 12% | 1.3 |
-| v5 | 31-35 | 70% | 0.6 |
-| v6.4 | 36-40 | 90% | 0.2 |
-| **v7** | **41-45** | **100%** | **0.0** |
+| Version | Contests | Precision | Recall | FPs/Contest |
+|---------|----------|-----------|--------|-------------|
+| v1 | 1-3 | 12% | 5.8% | 1.3 |
+| v5 | 31-35 | 70% | 9.5% | 0.6 |
+| v6.4 | 36-40 | 90% | 11.8% | 0.2 |
+| v7 | 41-45 | 100% | 11.0% | 0.0 |
+| **v8** | **46-50** | **100%** | **15.2%** | **0.0** |
 
-**Latest 5 contests (v7):**
+**Latest 5 contests (v8):**
 
-| Contest | Type | Official H+M | TPs | FPs | Precision |
-|---------|------|-------------|-----|-----|-----------|
-| Neobase | ve(3,3) / Gauges | 8 | 1 | 0 | **100%** |
-| Open Dollar | CDP + NFT Vaults | 17 | 3 | 0 | **100%** |
-| BakerFi | Leverage Vault | 12 | 4 | 0 | **100%** |
-| Loop | ETH Staking | 1 | 0 | 0 | N/A |
-| Coinbase | Smart Wallet | 3 | 0 | 0 | N/A |
+| Contest | Type | Official H+M | TPs | FPs | Precision | Recall |
+|---------|------|-------------|-----|-----|-----------|--------|
+| PoolTogether | ERC-4626 Prize Vault | 9 | 1 | 0 | **100%** | 11% |
+| GoodEntry | UniV3 Derivatives | 14 | 5 | 0 | **100%** | **36%** |
+| Arcade | Governance/Voting | 8 | 2 | 0 | **100%** | **25%** |
+| Frankencoin | CDP Stablecoin | 20 | 2 | 0 | **100%** | 10% |
+| InitCapital | Lending/Hooks | 15 | 0 | 0 | N/A | 0% |
 
 Every result is verifiable in [`shadow-audits/`](shadow-audits/).
 
 ### Self-Improving
 
-After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 43 heuristics, 10 deep-dive module files, 26 inline modules, and 7 protocol-specific primers from real missed findings. v7 added CONST-01 (wrong constants), GAUGE-01 (removal safety), and REPLAY-01 (cross-chain replay) heuristics — all from v6.4 misses.
+After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 43 original heuristics, 15 deep-dive module files, 58 extended heuristics, 26 inline modules, and 7 protocol-specific primers. v8 integrated open-source vectors from [pashov/skills](https://github.com/pashov/skills), [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen), and [forefy/.context](https://github.com/forefy/.context) (all MIT) — improving recall from 11% to 15.2% while maintaining 100% precision.
 
 ---
 
@@ -201,6 +202,10 @@ After each blind test: score → root-cause every miss → update methodology �
 - **Gauge removal locks voting power** (Neobase H-01) — contradictory guards permanently trap user governance power *(v7, GAUGE-01 heuristic)*
 - **Zero slippage on all swaps** (BakerFi H-04) — amountOutMinimum=0 enables sandwich on every deposit/withdraw *(v7)*
 - **Oracle staleness OR vs AND** (BakerFi M-06) — stale price accepted if either feed is fresh *(v7)*
+- **slot0 manipulation in TokenisableRange** (GoodEntry H-04) — flash loan manipulates UniV3 spot price, stealing depositor fees *(v8, amm-mev-deep module)*
+- **Voting power not synced on multiplier change** (Arcade M-05) — stale inflated voting power after NFT boost update *(v8, governance-voting Pashov vector)*
+- **claimYieldFeeShares zeroes entire balance** (PoolTogether H-01) — partial claim wipes all fee accounting *(v8, erc4626-vault-deep module)*
+- **Challenger reward drains reserves** (Frankencoin H-06) — self-challenge extracts unlimited rewards *(v8, economic-design module)*
 - **AuraVault claim double-spend** (LoopFi H-401) — fees not deducted, draining vault
 - **UniV3 fee drain via shared position** (Vultisig H-43) — first claimer steals all fees
 - **ILO launch DoS** (Vultisig H-41) — slot0 manipulation blocks all launches
@@ -213,9 +218,9 @@ After each blind test: score → root-cause every miss → update methodology �
 
 ## Detection Coverage
 
-**Strong on**: Reentrancy/CEI, access control gaps, oracle issues, EIP/ERC compliance, first-depositor inflation, accounting errors, assembly bugs, pause bypasses
+**Strong on**: Reentrancy/CEI, access control gaps, oracle issues (Chainlink + Pyth), EIP/ERC compliance, first-depositor inflation, accounting errors, assembly bugs, pause bypasses, slot0/spot price manipulation, ERC-4626 vault accounting, governance voting power sync, AMM/MEV vectors
 
-**Improving**: Complex math (CDP liquidation, options pricing), cross-chain edge cases, game mechanic exploits, protocol-specific integrations (Curve, UniV3 tick math), economic design flaws
+**Improving**: Complex math (CDP liquidation, options pricing), cross-chain edge cases, game mechanic exploits, custom hook/plugin architectures, protocol-specific integrations (Curve adapter edge cases)
 
 ---
 

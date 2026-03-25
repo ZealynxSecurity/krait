@@ -856,3 +856,108 @@ contests:
       recall: 25.0
       fp_count: 0
       notes: "Found slippage H-04, oracle staleness, inverted deposit check. Oracle decimals H-01 found as M. 0 FPs."
+
+  # === v8 Methodology — Open-Source Detection Integration (Contests 46-50) ===
+
+  - id: pooltogether
+    name: "PoolTogether"
+    contest: "2024-03-pooltogether"
+    repo: "https://github.com/code-423n4/2024-03-pooltogether"
+    findings_repo: "code-423n4/2024-03-pooltogether-findings"
+    type: "ERC-4626 Prize Vault"
+    estimated_loc: 648
+    status: completed
+    date: "2026-03-25"
+    methodology: v8
+    results:
+      high_total: 1
+      high_found: 1
+      medium_total: 8
+      medium_found: 0
+      precision: 100.0
+      recall: 11.1
+      fp_count: 0
+      notes: "Found H-01 (claimYieldFeeShares zeroes entire yieldFeeBalance). ERC-4626 vault module guided analysis. 0 FPs."
+
+  - id: initcapital
+    name: "InitCapital"
+    contest: "2023-12-initcapital"
+    repo: "https://github.com/code-423n4/2023-12-initcapital"
+    findings_repo: "code-423n4/2023-12-initcapital-findings"
+    type: "Hook-Based Money Market"
+    estimated_loc: 1516
+    status: completed
+    date: "2026-03-25"
+    methodology: v8
+    results:
+      high_total: 3
+      high_found: 0
+      medium_total: 12
+      medium_found: 0
+      partial: 1
+      precision: null
+      recall: 0
+      fp_count: 0
+      notes: "Weakest result. Official bugs were protocol-specific hook/position-manager issues, not generic lending patterns. Lending module vectors did not match custom architecture."
+
+  - id: goodentry
+    name: "GoodEntry"
+    contest: "2023-08-goodentry"
+    repo: "https://github.com/code-423n4/2023-08-goodentry"
+    findings_repo: "code-423n4/2023-08-goodentry-findings"
+    type: "UniV3 Derivatives / Tokenized Ranges"
+    estimated_loc: 1420
+    status: completed
+    date: "2026-03-25"
+    methodology: v8
+    results:
+      high_total: 6
+      high_found: 2
+      medium_total: 8
+      medium_found: 3
+      precision: 100.0
+      recall: 35.7
+      fp_count: 0
+      notes: "Best v8 recall. AMM-MEV module caught slot0 manipulation (H-04). Flash callback trust heuristic caught missing initiator check. V3Proxy recipient and unchecked call matched exactly."
+
+  - id: arcade
+    name: "Arcade"
+    contest: "2023-07-arcade"
+    repo: "https://github.com/code-423n4/2023-07-arcade"
+    findings_repo: "code-423n4/2023-07-arcade-findings"
+    type: "Governance / Voting Vaults / NFT Boost"
+    estimated_loc: 979
+    status: completed
+    date: "2026-03-25"
+    methodology: v8
+    results:
+      high_total: 0
+      high_found: 0
+      medium_total: 8
+      medium_found: 2
+      partial: 1
+      precision: 100.0
+      recall: 25.0
+      fp_count: 0
+      notes: "Governance module extensions caught M-05 (multiplier not synced on change) — exact Pashov vector. Treasury allowance override matched. Unsafe downcast partial."
+
+  - id: frankencoin
+    name: "Frankencoin"
+    contest: "2023-04-frankencoin"
+    repo: "https://github.com/code-423n4/2023-04-frankencoin"
+    findings_repo: "code-423n4/2023-04-frankencoin-findings"
+    type: "Oracle-Free Stablecoin / Auctions / Equity"
+    estimated_loc: 949
+    status: completed
+    date: "2026-03-25"
+    methodology: v8
+    results:
+      high_total: 6
+      high_found: 1
+      medium_total: 14
+      medium_found: 1
+      partial: 1
+      precision: 100.0
+      recall: 10.0
+      fp_count: 0
+      notes: "Found restructureCapTable bug (M-01) and challenger reward drain (H-06). Challenge mechanics needed deeper protocol-specific reasoning."
