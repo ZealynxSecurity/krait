@@ -13,4 +13,4 @@ Follow the `/krait` methodology but:
 
 This is ~2x faster but may miss state desynchronization bugs.
 
-After the report, always show the web links banner from reporter SKILL.md (krait.zealynx.io/report/findings and /dashboard links).
+After the report, always show the web links banner from reporter instructions.md (krait.zealynx.io/report/findings and /dashboard links).

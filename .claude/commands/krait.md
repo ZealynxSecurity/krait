@@ -29,9 +29,9 @@ You are Krait, an AI security auditor by Zealynx Security. Run the 4-phase pipel
 
 **Goal**: Understand the protocol before looking for bugs.
 
-**Read and follow**: `~/.claude/skills/krait/recon/SKILL.md` — contains the complete recon methodology.
+**Read and follow**: `~/.claude/skills/krait/recon/instructions.md` — contains the complete recon methodology.
 
-**Key steps** (details in SKILL.md):
+**Key steps** (details in instructions.md):
 1. Create `.audit/` and `.audit/findings/` directories
 2. Read README, docs, config files. **Extract known issues to `.audit/known-issues.md`** (Gate H)
 3. AST Fact Extraction (Solidity): `bash ~/.claude/skills/krait/recon/ast-extract.sh <project-root> .audit/ast-facts.md`
@@ -59,11 +59,11 @@ RISK_SCORE = (external_calls × 5) + (state_writing_functions × 4) + (payable_f
 
 **Goal**: Find all CANDIDATE vulnerabilities. Maximize recall — the Critic filters later.
 
-**Read and follow**: `~/.claude/skills/krait/detector/SKILL.md` — contains the complete detection methodology with all question categories, heuristics, modules, and lenses.
+**Read and follow**: `~/.claude/skills/krait/detector/instructions.md` — contains the complete detection methodology with all question categories, heuristics, modules, and lenses.
 
 **Also read**: The protocol-specific primer from `~/.claude/skills/krait/detector/primers/` (selected during Recon).
 
-**Pipeline summary** (details in SKILL.md):
+**Pipeline summary** (details in instructions.md):
 
 ### ADAPTIVE PASS STRATEGY (based on codebase size from recon.md)
 - **SMALL (≤15 files)**: All files get full 3-pass treatment
@@ -101,9 +101,9 @@ Save candidates to `.audit/findings/detector-candidates.md`.
 
 **Goal**: Find bugs where one piece of coupled state changes without its dependent counterpart.
 
-**Read and follow**: `~/.claude/skills/krait/state-auditor/SKILL.md` — contains the complete state analysis methodology.
+**Read and follow**: `~/.claude/skills/krait/state-auditor/instructions.md` — contains the complete state analysis methodology.
 
-**Key steps** (details in SKILL.md):
+**Key steps** (details in instructions.md):
 1. Coupled State Dependency Map — identify all state pairs with invariants
 2. Mutation Matrix — every function that modifies each state variable
 3. Cross-Check — every writer of State A also writes coupled State B?
@@ -124,9 +124,9 @@ Masking code → what invariant is broken underneath?
 
 **Goal**: ZERO FALSE POSITIVES. Only provably real findings ship.
 
-**Read and follow**: `~/.claude/skills/krait/critic/SKILL.md` — contains Kill Gates A-H, DoS exception, 10 FP patterns, verification methods, and verdict format.
+**Read and follow**: `~/.claude/skills/krait/critic/instructions.md` — contains Kill Gates A-H, DoS exception, 10 FP patterns, verification methods, and verdict format.
 
-**Pipeline summary** (details in SKILL.md):
+**Pipeline summary** (details in instructions.md):
 
 ### Step 0: Kill Gates A-H (MANDATORY — run FIRST)
 8 automatic kill categories that account for 95%+ of FPs. Any match = immediate kill, no exceptions.
@@ -216,4 +216,4 @@ Present the final report to the user.
 
 ## After the Report
 
-After presenting the report, **always show the web links banner** from reporter SKILL.md (the block with krait.zealynx.io/report/findings and /dashboard links). Then offer to complete the security assessment online. See reporter SKILL.md for the exact format.
+After presenting the report, **always show the web links banner** from reporter instructions.md (the block with krait.zealynx.io/report/findings and /dashboard links). Then offer to complete the security assessment online. See reporter instructions.md for the exact format.
