@@ -65,6 +65,9 @@ import { gatherProjectContext, formatContextForPrompt } from './analysis/context
 import { generatePatternsFromSolodit } from './knowledge/pattern-generator.js';
 import { SoloditClient } from './knowledge/solodit-client.js';
 import { runMultiAgentPipeline } from './agents/multi-agent.js';
+import { runFuzzPipeline } from './fuzzer/fuzz-pipeline.js';
+import { generateFuzzJsonReport, writeFuzzMarkdownReport } from './fuzzer/fuzz-reporter.js';
+import { FuzzReport } from './fuzzer/types.js';
 
 const VERSION = '0.1.0';
 
@@ -674,6 +677,254 @@ program
         console.log(chalk.gray(`  Cache: ${stats.hits} hits, ${stats.misses} misses, ${stats.size} entries stored`));
       }
       console.log('');
+
+    } catch (err) {
+      console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
+// ─── FUZZ COMMAND ───────────────────────────────────────────────────────────
+program
+  .command('fuzz')
+  .description('Run invariant-based fuzzing on a Foundry project')
+  .argument('<path>', 'Path to the Foundry project to fuzz')
+  .option('--api-key <key>', 'Anthropic API key')
+  .option('--model <model>', 'Model to use for invariant extraction and test generation')
+  .option('--deep-model <model>', 'Model for architecture pass')
+  .option('--fuzz-runs <n>', 'Foundry fuzz runs per test', '1000')
+  .option('--max-iterations <n>', 'Max fix iterations per test file', '3')
+  .option('--test-dir <path>', 'Output directory for generated tests (relative to project)', '.audit/invariant-tests')
+  .option('--output <path>', 'Output directory for reports', '.')
+  .option('--format <format>', 'Output format: json, markdown, both', 'both')
+  .option('-v, --verbose', 'Verbose output')
+  .option('--min-lines <n>', 'Skip files with fewer lines than this', '20')
+  .option('--no-cache', 'Disable response caching')
+  .option('--dry-run', 'Extract and show invariants without generating/running tests')
+  .action(async (targetPath: string, options: Record<string, unknown>) => {
+    const startTime = Date.now();
+
+    try {
+      const config = resolveConfig({
+        apiKey: options.apiKey as string | undefined,
+        model: options.model as string | undefined,
+        deepModel: options.deepModel as string | undefined,
+        verbose: options.verbose as boolean | undefined,
+        outputFormat: options.format as 'json' | 'markdown' | 'both' | undefined,
+        minLines: options.minLines ? parseInt(options.minLines as string, 10) : undefined,
+        noCache: options.cache === false,
+        dryRun: options.dryRun as boolean | undefined,
+        fuzzRuns: options.fuzzRuns ? parseInt(options.fuzzRuns as string, 10) : undefined,
+        maxIterations: options.maxIterations ? parseInt(options.maxIterations as string, 10) : undefined,
+        testOutputDir: options.testDir as string | undefined,
+      });
+
+      const projectPath = resolve(targetPath);
+      const projectName = inferProjectName(projectPath);
+      const fuzzRuns = config.fuzzRuns ?? 1000;
+      const maxIterations = config.maxIterations ?? 3;
+      const testOutputDir = config.testOutputDir ?? '.audit/invariant-tests';
+
+      console.log(chalk.bold.cyan('\n  🐍 Krait Invariant Fuzzer v' + VERSION));
+      console.log(chalk.gray(`  Project: ${projectPath}`));
+      console.log(chalk.gray(`  Fuzz runs: ${fuzzRuns} | Max iterations: ${maxIterations}\n`));
+
+      // Step 1: Discover files
+      const spinner = ora('Discovering source files...').start();
+      const files = await discoverFiles(projectPath, config.excludePatterns, config.maxFileSizeKb, config.minLines);
+      if (files.length === 0) {
+        spinner.fail('No source files found');
+        process.exit(1);
+      }
+      const totalLOC = files.reduce((sum, f) => sum + f.lines, 0);
+      spinner.succeed(`Found ${files.length} source files (${totalLOC.toLocaleString()} LOC)`);
+
+      // Step 2: Gather project context
+      spinner.start('Gathering project context...');
+      const projectContext = await gatherProjectContext(projectPath, files);
+      const contextParts: string[] = [];
+      if (projectContext.protocolName) contextParts.push(projectContext.protocolName);
+      if (projectContext.protocolType) contextParts.push(projectContext.protocolType);
+      if (projectContext.compilerVersion) contextParts.push(`Solidity ${projectContext.compilerVersion}`);
+      spinner.succeed(`Project context: ${contextParts.join(' | ') || 'minimal'}`);
+
+      // Step 3: Read all file contents
+      const fileContentsMap = new Map<string, string>();
+      for (const file of files) {
+        fileContentsMap.set(file.relativePath, readFileSync(file.path, 'utf-8'));
+      }
+
+      // Step 4: Architecture pass
+      let architectureContext: ArchitectureAnalysis | null = null;
+      if (!config.dryRun) {
+        const archSpinner = ora('Running architecture analysis...').start();
+        try {
+          const Anthropic = (await import('@anthropic-ai/sdk')).default;
+          const archClient = new Anthropic({ apiKey: config.apiKey });
+          const summaries = files.map(f => {
+            const content = fileContentsMap.get(f.relativePath)!;
+            return summarizeContract(f, content);
+          });
+
+          let archCache: ResponseCache | null = null;
+          if (!config.noCache) {
+            archCache = new ResponseCache(projectPath);
+          }
+
+          architectureContext = await runArchitecturePass(
+            archClient, files, fileContentsMap, summaries,
+            config.model, archCache, config.verbose
+          );
+          archSpinner.succeed(`Architecture: ${architectureContext.protocolSummary.slice(0, 80)}...`);
+          if (config.verbose && architectureContext.invariants.length > 0) {
+            console.log(chalk.gray(`  Seed invariants from architecture pass: ${architectureContext.invariants.length}`));
+          }
+        } catch (err) {
+          archSpinner.fail('Architecture analysis failed (continuing without)');
+          if (config.verbose) console.error(chalk.red(`    ${err}`));
+        }
+      }
+
+      // Step 5: Set up cache
+      let auditCache: ResponseCache | null = null;
+      if (!config.noCache) {
+        auditCache = new ResponseCache(projectPath);
+        if (config.verbose && auditCache.size() > 0) {
+          console.log(chalk.gray(`  Cache: ${auditCache.size()} entries from previous runs`));
+        }
+      }
+
+      // Step 6: Run fuzz pipeline
+      const Anthropic = (await import('@anthropic-ai/sdk')).default;
+      const client = new Anthropic({ apiKey: config.apiKey });
+
+      const analyzableFiles = files.filter(f => fileContentsMap.has(f.relativePath));
+
+      // Dry-run: extract invariants and display them
+      if (config.dryRun) {
+        console.log(chalk.bold('\n  Dry-Run: Extracting invariants (no test generation or forge runs)...'));
+
+        const { extractInvariants, extractCrossContractInvariants } = await import('./fuzzer/invariant-extractor.js');
+        const { InvariantCounter } = await import('./fuzzer/types.js');
+        const { scoreFileComplexity: scoreFn } = await import('./core/file-scorer.js');
+
+        const counter = new InvariantCounter();
+        const allInvariants = [];
+
+        for (const file of analyzableFiles) {
+          const content = fileContentsMap.get(file.relativePath)!;
+          try {
+            const invs = await extractInvariants(
+              client, file, content, config.model, counter, auditCache,
+              { architectureContext, projectContext, verbose: config.verbose },
+            );
+            allInvariants.push(...invs);
+            console.log(chalk.gray(`  ${file.relativePath}: ${invs.length} invariants`));
+          } catch (err) {
+            console.log(chalk.yellow(`  ${file.relativePath}: extraction failed — ${err instanceof Error ? err.message : err}`));
+          }
+        }
+
+        if (analyzableFiles.length > 1) {
+          try {
+            const crossInvs = await extractCrossContractInvariants(
+              client, analyzableFiles, fileContentsMap, allInvariants, config.model, counter, auditCache,
+              { architectureContext, projectContext, verbose: config.verbose },
+            );
+            allInvariants.push(...crossInvs);
+            console.log(chalk.gray(`  Cross-contract: ${crossInvs.length} invariants`));
+          } catch {
+            // continue
+          }
+        }
+
+        console.log(chalk.bold(`\n  Extracted ${allInvariants.length} invariants:\n`));
+        for (const inv of allInvariants) {
+          const formal = inv.formalExpression ? chalk.gray(` (${inv.formalExpression})`) : '';
+          const priority = inv.priority === 'high' ? chalk.red(inv.priority) : inv.priority === 'medium' ? chalk.yellow(inv.priority) : chalk.gray(inv.priority);
+          console.log(`  ${chalk.bold(inv.id)} [${inv.category}] [${priority}] ${inv.description}${formal}`);
+          console.log(chalk.gray(`    Contract: ${inv.contractName} | State: ${inv.stateVariables.join(', ')} | Functions: ${inv.relatedFunctions.join(', ')}`));
+        }
+
+        console.log('');
+        process.exit(0);
+      }
+
+      // Full fuzz pipeline
+      console.log(chalk.bold('\n  Running invariant fuzzing pipeline...'));
+      const pipelineSpinner = ora('  Extract → Generate → Run & Fix → Report...').start();
+
+      try {
+        const { results, stats } = await runFuzzPipeline(
+          client, analyzableFiles, fileContentsMap, config.model, projectPath, auditCache,
+          {
+            fuzzRuns,
+            maxIterations,
+            testOutputDir,
+            verbose: config.verbose,
+            projectContext,
+            architectureContext,
+          },
+        );
+
+        pipelineSpinner.succeed(
+          `  Pipeline complete: ${stats.invariantsExtracted} invariants → ${stats.invariantsHold} hold, ${stats.invariantsViolated} violated, ${stats.invariantsInconclusive} inconclusive`
+        );
+
+        // Build report
+        const duration = Date.now() - startTime;
+        const report: FuzzReport = {
+          projectName,
+          projectPath,
+          timestamp: new Date().toISOString(),
+          duration,
+          model: config.model,
+          fuzzRuns,
+          maxIterations,
+          summary: stats,
+          invariants: results.map(r => r.invariant),
+          results,
+          filesAnalyzed: analyzableFiles.map(f => f.relativePath),
+        };
+
+        // Output
+        const outputDir = resolve(options.output as string || '.');
+        const format = config.outputFormat;
+
+        if (format === 'json' || format === 'both') {
+          const jsonPath = join(outputDir, `krait-fuzz-${projectName}.json`);
+          generateFuzzJsonReport(report, jsonPath);
+          console.log(chalk.gray(`\n  JSON report: ${jsonPath}`));
+        }
+
+        if (format === 'markdown' || format === 'both') {
+          const mdPath = join(outputDir, `krait-fuzz-${projectName}.md`);
+          writeFuzzMarkdownReport(report, mdPath);
+          console.log(chalk.gray(`  Markdown report: ${mdPath}`));
+        }
+
+        // Print summary
+        console.log(chalk.bold('\n  Results:'));
+        if (stats.invariantsViolated > 0) console.log(chalk.red(`    VIOLATED:    ${stats.invariantsViolated}`));
+        console.log(chalk.green(`    HOLDS:       ${stats.invariantsHold}`));
+        if (stats.invariantsInconclusive > 0) console.log(chalk.yellow(`    INCONCLUSIVE:${stats.invariantsInconclusive}`));
+        console.log(chalk.bold(`    Total:       ${stats.invariantsExtracted} invariants`));
+        console.log(chalk.gray(`\n  Forge runs: ${stats.totalForgeRuns} | Fix iterations: ${stats.totalIterations}`));
+        console.log(chalk.gray(`  Duration: ${(duration / 1000).toFixed(1)}s`));
+
+        // Test files location
+        console.log(chalk.gray(`  Tests: ${projectPath}/${testOutputDir}/`));
+
+        if (auditCache) {
+          const cacheStats = auditCache.getStats();
+          console.log(chalk.gray(`  Cache: ${cacheStats.hits} hits, ${cacheStats.misses} misses`));
+        }
+        console.log('');
+
+      } catch (err) {
+        pipelineSpinner.fail('  Fuzz pipeline failed');
+        throw err;
+      }
 
     } catch (err) {
       console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));

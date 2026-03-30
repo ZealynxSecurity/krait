@@ -117,6 +117,10 @@ export interface KraitConfig {
   noCache: boolean;
   dryRun: boolean;
   soloditApiKey?: string;
+  // Fuzzer options
+  fuzzRuns?: number;          // Foundry fuzz runs per test (default 1000)
+  maxIterations?: number;     // Max fix iterations per test file (default 3)
+  testOutputDir?: string;     // Output dir for generated tests (default '.audit/invariant-tests')
 }
 
 export const DEFAULT_CONFIG: Omit<KraitConfig, 'apiKey'> = {
