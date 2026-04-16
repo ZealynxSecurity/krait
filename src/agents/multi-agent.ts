@@ -10,6 +10,7 @@ import { ProjectContext } from '../analysis/context-gatherer.js';
 import { PatternLoader } from '../knowledge/pattern-loader.js';
 import { AIAnalyzer } from '../analysis/ai-analyzer.js';
 import { scoreFileComplexity } from '../core/file-scorer.js';
+import { runParallel } from '../core/parallel.js';
 import { CandidateFinding, MultiAgentStats } from './types.js';
 import { detect, CandidateCounter } from './detector.js';
 import { reason } from './reasoner.js';
@@ -443,25 +444,6 @@ function quickTitleSimilarity(a: string, b: string): number {
   for (const w of wordsA) if (wordsB.has(w)) intersection++;
   const union = wordsA.size + wordsB.size - intersection;
   return union === 0 ? 0 : intersection / union;
-}
-
-/**
- * Run async tasks with a concurrency limit.
- */
-async function runParallel<T>(tasks: Array<() => Promise<T>>, limit: number): Promise<T[]> {
-  const results: T[] = new Array(tasks.length);
-  let index = 0;
-
-  async function worker() {
-    while (index < tasks.length) {
-      const i = index++;
-      results[i] = await tasks[i]();
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
-  await Promise.all(workers);
-  return results;
 }
 
 function extractRemediation(description: string): string {
