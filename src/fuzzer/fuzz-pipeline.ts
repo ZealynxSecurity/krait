@@ -10,6 +10,7 @@ import { FileInfo, ArchitectureAnalysis } from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
 import { ProjectContext } from '../analysis/context-gatherer.js';
 import { scoreFileComplexity } from '../core/file-scorer.js';
+import { runParallel } from '../core/parallel.js';
 import {
   Invariant,
   FuzzTestFile,
@@ -23,7 +24,7 @@ import {
 import { extractInvariants, extractCrossContractInvariants } from './invariant-extractor.js';
 import { generateTests } from './test-generator.js';
 import { runTestWithRetry } from './test-runner.js';
-import { checkFoundryInstalled, detectFoundryConfig } from './foundry-utils.js';
+import { checkFoundryInstalled, detectFoundryConfig, checkProjectCompiles } from './foundry-utils.js';
 
 /**
  * Run the full invariant-based fuzzing pipeline.
@@ -63,6 +64,15 @@ export async function runFuzzPipeline(
     console.error(`  [fuzz] Remappings: ${foundryConfig.remappings.length}`);
     console.error(`  [fuzz] Source path: ${foundryConfig.srcPath}`);
   }
+
+  // ─── Pre-flight: Verify project compiles ─��─
+  const buildCheck = await checkProjectCompiles(projectPath, verbose);
+  if (!buildCheck.success) {
+    throw new Error(
+      `Project does not compile. Run \`forge build\` to fix errors before fuzzing.\n${buildCheck.errors || ''}`
+    );
+  }
+  if (verbose) console.error('  [fuzz] Project compiles successfully');
 
   const invCounter = new InvariantCounter();
   const testCounter = new TestFileCounter();
@@ -297,25 +307,6 @@ export async function runFuzzPipeline(
   }
 
   return { results: allResults, stats };
-}
-
-/**
- * Run async tasks with a concurrency limit.
- */
-async function runParallel<T>(tasks: Array<() => Promise<T>>, limit: number): Promise<T[]> {
-  const results: T[] = new Array(tasks.length);
-  let index = 0;
-
-  async function worker() {
-    while (index < tasks.length) {
-      const i = index++;
-      results[i] = await tasks[i]();
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
-  await Promise.all(workers);
-  return results;
 }
 
 function emptyStats(duration: number): FuzzPipelineStats {

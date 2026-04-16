@@ -3,10 +3,13 @@
  * test file writing, and test execution.
  */
 
-import { execSync } from 'child_process';
+import { execSync, execFile } from 'child_process';
+import { promisify } from 'util';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { FoundryConfig, ForgeTestResult, TestRunResult } from './types.js';
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Check if forge is available on the system PATH.
@@ -96,6 +99,29 @@ export function detectFoundryConfig(projectPath: string): FoundryConfig {
 }
 
 /**
+ * Verify the Foundry project compiles before running fuzz tests.
+ * Fails fast with clear error if the base project has compile errors.
+ */
+export async function checkProjectCompiles(
+  projectPath: string,
+  verbose?: boolean,
+): Promise<{ success: boolean; errors?: string }> {
+  try {
+    if (verbose) console.error('  [forge] Running forge build...');
+    await execFileAsync('forge', ['build'], {
+      cwd: projectPath,
+      timeout: 120_000, // 2 minute timeout
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    return { success: true };
+  } catch (err: unknown) {
+    const execErr = err as { stdout?: string; stderr?: string };
+    const output = (execErr.stderr || execErr.stdout || 'Unknown compile error').slice(0, 3000);
+    return { success: false, errors: output };
+  }
+}
+
+/**
  * Write a test file to disk, creating directories as needed.
  */
 export function writeTestFile(filePath: string, code: string): void {
@@ -105,27 +131,28 @@ export function writeTestFile(filePath: string, code: string): void {
 
 /**
  * Run `forge test` on a specific test file and return structured results.
+ * Uses execFile with args array to prevent command injection from LLM-generated paths.
  */
-export function runForgeTest(
+export async function runForgeTest(
   projectPath: string,
   testFilePath: string,
   fuzzRuns: number,
   verbose?: boolean,
-): TestRunResult {
+): Promise<TestRunResult> {
   const start = Date.now();
   const testFileId = testFilePath; // caller maps this to the FuzzTestFile.id
+  const args = ['test', '--match-path', testFilePath, '--fuzz-runs', String(fuzzRuns), '-vvv'];
+
+  if (verbose) console.error(`    [forge] forge ${args.join(' ')}`);
 
   try {
-    const cmd = `forge test --match-path "${testFilePath}" --fuzz-runs ${fuzzRuns} -vvv 2>&1`;
-    if (verbose) console.error(`    [forge] ${cmd}`);
-
-    const output = execSync(cmd, {
+    const { stdout, stderr } = await execFileAsync('forge', args, {
       cwd: projectPath,
-      encoding: 'utf-8',
       timeout: 300_000, // 5 minute timeout
       maxBuffer: 10 * 1024 * 1024, // 10MB
     });
 
+    const output = stdout + '\n' + stderr;
     const results = parseForgeOutput(output);
     const hasCompileError = output.includes('Compiler run failed') || output.includes('Error (');
 
@@ -134,8 +161,8 @@ export function runForgeTest(
       compileSuccess: !hasCompileError,
       compileErrors: hasCompileError ? extractCompileErrors(output) : undefined,
       results,
-      rawStdout: output,
-      rawStderr: '',
+      rawStdout: stdout,
+      rawStderr: stderr,
       duration: Date.now() - start,
     };
   } catch (err: unknown) {

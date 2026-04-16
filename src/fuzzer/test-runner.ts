@@ -57,6 +57,7 @@ export async function runTestWithRetry(
   let currentCode = testFile.solidityCode;
   let totalForgeRuns = 0;
   let totalIterations = 0;
+  let lastClassification: FailureClassification | undefined;
 
   for (let iter = 0; iter < maxIterations; iter++) {
     totalIterations++;
@@ -67,7 +68,7 @@ export async function runTestWithRetry(
 
     // Run forge test
     if (verbose) console.error(`    [runner] Iteration ${iter + 1}/${maxIterations} for ${testFile.fileName}`);
-    const runResult = runForgeTest(projectPath, testFile.filePath, fuzzRuns, verbose);
+    const runResult = await runForgeTest(projectPath, testFile.filePath, fuzzRuns, verbose);
     runResult.testFileId = testFile.id;
     totalForgeRuns++;
 
@@ -159,7 +160,7 @@ export async function runTestWithRetry(
     }
 
     // Track last classification for the next iteration's action label
-    var lastClassification: FailureClassification | undefined = classification;
+    lastClassification = classification;
   }
 
   // Exhausted iterations
