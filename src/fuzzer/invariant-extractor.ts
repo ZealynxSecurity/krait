@@ -315,7 +315,7 @@ async function callExtractor(
   throw lastError || new Error('Invariant extractor: max retries exceeded');
 }
 
-function normalizeCategory(val: unknown): InvariantCategory {
+export function normalizeCategory(val: unknown): InvariantCategory {
   const s = String(val).toLowerCase();
   const valid: InvariantCategory[] = [
     'accounting', 'access-control', 'state-transition', 'economic',
@@ -325,7 +325,7 @@ function normalizeCategory(val: unknown): InvariantCategory {
   return 'custom';
 }
 
-function normalizePriority(val: unknown): 'high' | 'medium' | 'low' {
+export function normalizePriority(val: unknown): 'high' | 'medium' | 'low' {
   const s = String(val).toLowerCase();
   if (['high', 'medium', 'low'].includes(s)) return s as 'high' | 'medium' | 'low';
   return 'medium';
