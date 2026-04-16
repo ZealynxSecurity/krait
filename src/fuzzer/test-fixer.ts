@@ -176,11 +176,18 @@ function buildFixUserPrompt(
     .map(inv => `- ${inv.id}: ${inv.description}${inv.formalExpression ? ` (${inv.formalExpression})` : ''}`)
     .join('\n');
 
-  // Include relevant source contracts
+  // Include relevant source contracts (truncated to avoid context window blowout)
   const relevantSource = invariants
     .map(inv => inv.file)
     .filter((f, i, arr) => arr.indexOf(f) === i && sourceCode.has(f))
-    .map(f => `### ${f}\n\`\`\`solidity\n${sourceCode.get(f)!}\n\`\`\``)
+    .map(f => {
+      const content = sourceCode.get(f)!;
+      const lines = content.split('\n');
+      const preview = lines.length > 200
+        ? lines.slice(0, 200).join('\n') + `\n// ... (${lines.length - 200} more lines truncated)`
+        : content;
+      return `### ${f}\n\`\`\`solidity\n${preview}\n\`\`\``;
+    })
     .join('\n\n');
 
   return `## Current Test Code (has bugs)
