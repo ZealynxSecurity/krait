@@ -333,8 +333,15 @@ if [ "$AST_MODE" = "regex-fallback" ]; then
 fi
 
 # Write final output
+# MODE: line is a plain (non-blockquote) marker so downstream prompts and
+# tools can branch on data quality with a single grep. forge-ast = AST-level
+# facts; regex-fallback = grep-level facts (assembly/unchecked counts may be
+# coarse). Keep this line stable.
 {
     echo "# AST Facts (Compiler-Verified)"
+    echo ""
+    echo "MODE: $AST_MODE"
+    echo ""
     echo "> Extraction mode: $AST_MODE"
     echo "> Project root: $PROJECT_ROOT"
     echo "> Scope directory: $SCOPE_DIR"

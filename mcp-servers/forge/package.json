@@ -1,0 +1,21 @@
+{
+  "name": "@krait/forge-mcp",
+  "version": "1.0.0",
+  "description": "MCP server wrapping Foundry (forge) — used by Krait fuzz/audit skills to build and test contracts without round-tripping through shell output.",
+  "type": "module",
+  "bin": {
+    "krait-forge-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod 755 build/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
