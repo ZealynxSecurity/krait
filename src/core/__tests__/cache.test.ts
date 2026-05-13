@@ -58,6 +58,24 @@ describe('ResponseCache', () => {
       const key = cache.computeKey('sys', 'user', 'model');
       expect(key).toMatch(/^[0-9a-f]{64}$/);
     });
+
+    it('cacheTag changes the key', () => {
+      const without = cache.computeKey('sys', 'user', 'model');
+      const withTag = cache.computeKey('sys', 'user', 'model', 'arch=v1');
+      expect(without).not.toBe(withTag);
+    });
+
+    it('different cacheTag values produce different keys', () => {
+      const a = cache.computeKey('sys', 'user', 'model', 'arch=v1');
+      const b = cache.computeKey('sys', 'user', 'model', 'arch=v2');
+      expect(a).not.toBe(b);
+    });
+
+    it('omitting cacheTag is equivalent to undefined', () => {
+      const a = cache.computeKey('sys', 'user', 'model');
+      const b = cache.computeKey('sys', 'user', 'model', undefined);
+      expect(a).toBe(b);
+    });
   });
 
   describe('get/set', () => {

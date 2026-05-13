@@ -14,8 +14,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlink
 import { join, dirname } from 'path';
 import { Finding } from './types.js';
 
-/** Bump this when prompt logic changes to invalidate all cached responses. */
-export const PROMPT_VERSION = 'v1';
+/**
+ * Bump this when prompt logic changes to invalidate all cached responses.
+ * v2: computeKey now accepts an optional cacheTag so callers can express
+ * dependencies that aren't textually present in systemPrompt/userPrompt
+ * (e.g. architecture context shape, project context version). Bumping
+ * because prior keys did not factor in those tags.
+ */
+export const PROMPT_VERSION = 'v2';
 
 export interface CacheEntry {
   findings: Finding[];
@@ -50,13 +56,20 @@ export class ResponseCache {
 
   /**
    * Compute a deterministic cache key from prompt inputs.
+   *
+   * `cacheTag` is for inputs that influence the model's response but are not
+   * already present verbatim in `systemPrompt` / `userPrompt` — for example,
+   * an architecture-context fingerprint, a project-context hash, or the set
+   * of pattern files loaded. Existing callers that don't pass it keep the
+   * previous keying behaviour (modulo the PROMPT_VERSION bump).
    */
-  computeKey(systemPrompt: string, userPrompt: string, model: string): string {
+  computeKey(systemPrompt: string, userPrompt: string, model: string, cacheTag?: string): string {
     const hash = createHash('sha256');
     hash.update(PROMPT_VERSION);
     hash.update(systemPrompt);
     hash.update(userPrompt);
     hash.update(model);
+    if (cacheTag) hash.update(cacheTag);
     return hash.digest('hex');
   }
 

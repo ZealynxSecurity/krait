@@ -31,9 +31,43 @@ For each candidate, you must:
 4. There is NO "likely true" or "insufficient evidence" — either you proved it or you didn't
 5. **When in doubt, KILL it.** A missed real bug is unfortunate. A false positive destroys credibility.
 
-## Step 0: AUTOMATIC KILL GATE (MANDATORY — run FIRST on every candidate)
+## Pre-Gate: Impact Premise Gate (MANDATORY — runs BEFORE the 8 kill gates)
 
-**This gate runs FIRST. Any finding matching ANY of these 8 categories is IMMEDIATELY killed. No exploit trace is attempted. No further analysis. No exceptions. No "but in this case...". KILL IT.**
+**Run this gate FIRST on every candidate, before the kill gates A–H. The premise gate enforces that the finding's `**Impact**` field describes a concrete user or system HARM in one sentence — not a mechanism, not a path, not a reachable state.**
+
+This gate is a tightening of kill gate D ("speculative / no concrete exploit"), not a replacement. Gate D kills findings with no exploit trace. The premise gate kills findings where the trace ends at a mechanism rather than a harm — the difference is that mechanism-tests are easy to construct and silently inflate the report.
+
+### What counts as a mechanism (INSUFFICIENT — kill or send back for rewrite)
+
+A mechanism describes something the code DOES, not something a user LOSES. Examples (paraphrased from prior shadow audits — these patterns recur):
+
+- "startLiquidation succeeds while the market is still active" — proves a function call works, not that anyone is harmed.
+- "the admin setter accepts zero" — proves an input passes validation, not that the zero value causes loss.
+- "the reentrancy callback fires before the balance update" — proves a callback ordering, not that state is corrupted.
+
+### What counts as harm (REQUIRED to pass the gate)
+
+A harm names the affected party, the loss type, and (where possible) magnitude or conditions:
+
+- "the claimant receives 15% less than their pro-rata share once any other user is liquidated in the same block".
+- "the user's withdrawal reverts permanently once the cooldown parameter is set to zero".
+- "an attacker extracts 1.5x their fair share via reentrancy before the guard re-arms".
+
+### Decision rule
+
+For each candidate, read the `**Impact**` field. Pick one of:
+
+1. **Pass** — Impact names a concrete harm. Proceed to the 8 kill gates.
+2. **Rewrite** — Mechanism is described, but a harm is plausible from the candidate's scenario. Rewrite the `**Impact**` field with a harm statement using the candidate's own scenario, then proceed to the 8 kill gates. Do NOT invent harm that isn't supported by the scenario.
+3. **Kill** — Mechanism is described, scenario does not support a harm statement either. Kill under gate D ("speculative / no concrete exploit"). Record the kill reason as `Pre-gate (Impact Premise): mechanism only, no harm derivable from scenario`.
+
+Findings that pass the premise gate proceed to the 8 kill gates below unchanged. Findings killed at the premise gate do NOT proceed.
+
+---
+
+## Step 0: AUTOMATIC KILL GATE (MANDATORY — run on every candidate that passed the Impact Premise Gate)
+
+**This gate runs after the Impact Premise Gate. Any finding matching ANY of these 8 categories is IMMEDIATELY killed. No exploit trace is attempted. No further analysis. No exceptions. No "but in this case...". KILL IT.**
 
 These 8 categories account for 95%+ of all false positives across 40 shadow audits and have NEVER produced a true positive. They are unconditional kills.
 
@@ -262,17 +296,36 @@ For each candidate, assign ONE verdict:
 
 ## Output
 
-Save to `.audit/findings/critic-verdicts.md`:
+Save to `.audit/findings/critic-verdicts.md`.
+
+**Step Execution and Rules Applied** (carry forward from the candidate, update if the critic learned more):
+
+- Copy `**Step Execution**` and `**Rules Applied**` verbatim from the candidate.
+- If the critic's code trace flips a `?(uncertain)` step to `✓` or `✗(reason)`, update the field.
+- If the critic's code trace reveals that a rule previously marked `✗` actually applies (e.g., an oracle dependency was missed in detection), flip it to `✓` and re-check the verdict — the new rule may upgrade severity (R10 worst-state) or open a new attack path (R15 flash-loan, R16 oracle).
+- Never strip the fields. A verdict without them is incomplete.
+
+**Step Execution reference (cross-phase)**: detector steps 1–7 are the 7 question categories of detector/instructions.md § Step 3. State-auditor steps 1–8 are the 8 phases of state-auditor/instructions.md § Eight-Phase Methodology. When a verdict consolidates findings from both phases, list both step sets, prefixed by their origin: `**Step Execution (detector)**:` and `**Step Execution (state)**:`.
+
+**Rules Applied reference** (mandatory — exactly these 6 rules, never blank, never optional):
+
+- **R8** — Cached parameters / stored external state staleness (multi-step ops or stored external state)
+- **R10** — Worst-state severity (not current-snapshot severity)
+- **R11** — Unsolicited token transfer / donation surface
+- **R12** — Exhaustive enabler enumeration (paths to dangerous preconditions)
+- **R15** — Flash-loan precondition manipulation
+- **R16** — Oracle integrity (staleness, decimals, zero-price, failure modes)
 
 ```markdown
 # Krait Critic Verdicts
 
 ## Summary
 - Total candidates reviewed: X
+- Impact Premise Gate kills: X
 - True Positives: X
 - Likely True: X
 - Downgraded: X
-- False Positives: X
+- False Positives (kill gates A-H): X
 - Insufficient Evidence: X
 
 ## Verified Findings
@@ -283,13 +336,15 @@ Save to `.audit/findings/critic-verdicts.md`:
 **Severity**: HIGH (original: CRITICAL — downgraded because...)
 **File**: path/to/file.sol:XX
 
+**Step Execution**: ✓1,2,3,5 | ✗4(no externals),7(single-tx) | ✓6(was uncertain, critic confirmed)
+**Rules Applied**: [R8:✓, R10:✓, R11:✗(no external tokens), R12:✓, R15:✗(no flash-loan-accessible state), R16:✗(no oracle dependency)]
 **Verification Method**: Code trace / PoC trace / Hybrid
 
 **Proof**:
 [Concrete exploitation trace with values OR
 complete code trace showing no mitigation exists]
 
-**Impact**: [Precise impact statement]
+**Impact**: [Precise HARM statement — names affected party, loss type, magnitude/conditions. Passed Impact Premise Gate.]
 **Root Cause**: [One-line root cause]
 
 ---
@@ -299,6 +354,10 @@ complete code trace showing no mitigation exists]
 ### CANDIDATE-XXX: Title
 **Verdict**: FALSE POSITIVE
 **Reason**: FP-3 — OpenZeppelin ERC4626 provides virtual offset protection (line XX of parent contract)
+
+### CANDIDATE-YYY: Title
+**Verdict**: FALSE POSITIVE
+**Reason**: Pre-gate (Impact Premise) — mechanism only ("setter accepts zero"), no harm derivable from scenario
 ```
 
 ## Rules

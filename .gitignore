@@ -10,5 +10,5 @@ krait-report-*
 .krait-cache/
 .claude/projects/
 *.jsonl
-CLAUDE.md
 shadow-audits/contests/
+improvements-backlog.md

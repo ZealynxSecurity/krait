@@ -85,24 +85,30 @@ cp -r .claude/commands/* ~/.claude/commands/
 cp -r .claude/skills/* ~/.claude/skills/
 ```
 
-### Optional: Pattern Search MCP Server
+### Optional: MCP Servers
 
-Krait includes an MCP server that lets you search 47 vulnerability patterns locally. No API key needed.
+Krait ships two optional MCP servers. The skills work fine without them — they enrich specific flows.
 
 ```bash
-cd krait/mcp-servers/solodit
-npm install && npm run build
+# Pattern search (Solodit-derived vulnerability patterns, used during detection)
+cd krait/mcp-servers/solodit && npm install && npm run build
+
+# Foundry gateway (forge build / test / fmt-check, used by /krait-fuzz and PoC verification)
+cd krait/mcp-servers/forge && npm install && npm run build
 ```
 
-The `.mcp.json` in the repo root auto-configures it for Claude Code. The skills work fine without the MCP server — it's an optional pattern search tool for development.
+The `.mcp.json` in the repo root auto-configures both for Claude Code. No API keys needed.
 
 ### Commands
 
 | Command | What it does |
 |---------|-------------|
-| `/krait` | Full 4-phase audit: Recon → Detection → State Analysis → Verification → Report |
+| `/krait` | Full 4-phase audit: Recon → Detection → State Analysis → Verification → Report (auto-runs preflight first) |
 | `/krait-quick` | Same pipeline, skips state analysis — ~2x faster |
+| `/krait-proven` | Same pipeline, caps findings without a mechanically-proven PoC or production trace at Low severity. For benchmark-grade reports. |
 | `/krait-review` | Second opinion on killed findings — re-examines aggressive gate decisions |
+| `/krait-fuzz` | Invariant extraction → Foundry test generation → run/fix loop |
+| `/krait-init` | Standalone readiness check (tools, project shape, MCP wiring). `/krait` runs this automatically; this command is for CI setup and debugging. |
 
 All output to `.audit/` in your project directory.
 
@@ -145,11 +151,13 @@ Every function in high-risk files gets examined from **16 angles** (4 lenses x 4
 
 ### Kill Gates (Verification)
 
-Eight automatic gates try to **disprove every finding** before it reaches you:
+A finding passes verification only if it survives, in order:
 
-- **A**: Generic best practice ("use SafeERC20") · **B**: Theoretical/unrealistic
-- **C**: Intentional design · **D**: Speculative (no WHO/WHAT/HOW MUCH)
-- **E**: Admin trust · **F**: Dust (<$100) · **G**: Out of context · **H**: Known issue
+1. **Impact premise pre-gate** — the finding's impact line must state a concrete user-or-system **harm** in one sentence, not a mechanism or a reachable state. "User's withdrawal reverts permanently after parameter is set to zero" passes; "parameter can be set to zero" doesn't.
+2. **Eight automatic kill gates**:
+   - **A**: Generic best practice ("use SafeERC20") · **B**: Theoretical/unrealistic
+   - **C**: Intentional design · **D**: Speculative (no WHO/WHAT/HOW MUCH)
+   - **E**: Admin trust · **F**: Dust (<$100) · **G**: Out of context · **H**: Known issue
 
 Result: FPs dropped from 4.2/contest → 0.0/contest in v7 (**100% reduction**). The last 10 contests (v6.4+v7) had only 1 total FP across 10 contests.
 

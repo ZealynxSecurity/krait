@@ -42,6 +42,7 @@ import {
   generateJsonReport,
   writeMarkdownReport,
   generateMarkdownReport,
+  consolidateByRootCause,
 } from './core/reporter.js';
 import { Finding, Report, Domain, ArchitectureAnalysis } from './core/types.js';
 import { ResponseCache } from './core/cache.js';
@@ -95,6 +96,7 @@ program
   .option('--dry-run', 'Show analysis plan without making API calls')
   .option('--multi-agent', 'Use multi-agent pipeline: Detector → Reasoner → Critic → Ranker (default)')
   .option('--no-multi-agent', 'Use legacy single-pass analysis')
+  .option('--proven-only', 'Cap unproven findings (no executed PoC) at Low severity')
   .option('--solodit-key <key>', 'Solodit API key for enrichment (or set SOLODIT_API_KEY)')
   .action(async (targetPath: string, options: Record<string, unknown>) => {
     const startTime = Date.now();
@@ -112,6 +114,7 @@ program
         noCache: options.cache === false,  // Commander's --no-cache sets cache=false
         dryRun: options.dryRun as boolean | undefined,
         soloditApiKey: options.soloditKey as string | undefined,
+        provenOnly: options.provenOnly as boolean | undefined,
       });
 
       const projectPath = resolve(targetPath);
@@ -625,24 +628,62 @@ program
         console.log(chalk.gray(`\n  Filtered: ${rawCount - filteredFindings.length} low-confidence/info findings removed`));
       }
 
+      // A6: proven-only mode — cap unproven findings at Low.
+      let provenOnlyNote: string | undefined;
+      if (config.provenOnly) {
+        const provenTags = new Set(['POC-PASS', 'MEDUSA-PASS', 'PROD-ONCHAIN', 'PROD-SOURCE', 'PROD-FORK']);
+        const cappableSeverities = new Set(['critical', 'high', 'medium']);
+        const downgradedFrom: Record<string, number> = {};
+        let downgradedCount = 0;
+        for (const f of filteredFindings) {
+          const proven = f.evidenceTag && provenTags.has(f.evidenceTag);
+          if (proven) continue;
+          if (!cappableSeverities.has(f.severity)) continue;
+          const originalSeverity = f.severity;
+          downgradedFrom[originalSeverity] = (downgradedFrom[originalSeverity] ?? 0) + 1;
+          downgradedCount++;
+          if (!f.originalSeverity) f.originalSeverity = originalSeverity;
+          f.severity = 'low';
+        }
+        const severities = Object.keys(downgradedFrom)
+          .sort((a, b) => downgradedFrom[b] - downgradedFrom[a])
+          .join(',');
+        provenOnlyNote = `Proven-only mode: ${downgradedCount} findings capped at Low from {${severities || 'none'}} due to unproven evidence ([CODE-TRACE] only).`;
+        if (config.verbose) {
+          console.log(chalk.gray(`  ${provenOnlyNote}`));
+        }
+      }
+
       // Reassign sequential IDs after all filtering
       for (let i = 0; i < filteredFindings.length; i++) {
         filteredFindings[i].id = `KRAIT-${String(i + 1).padStart(3, '0')}`;
       }
 
+      // A7: root-cause consolidation. Merge findings with same severity/category and
+      // similar titles into a single finding with a locations table.
+      const consolidatedFindings = consolidateByRootCause(filteredFindings);
+      if (config.verbose && consolidatedFindings.length < filteredFindings.length) {
+        console.log(chalk.gray(`  Consolidated: ${filteredFindings.length} → ${consolidatedFindings.length} findings (root-cause merge)`));
+      }
+      // Re-sequence IDs after consolidation so the summary matches the report body.
+      for (let i = 0; i < consolidatedFindings.length; i++) {
+        consolidatedFindings[i].id = `KRAIT-${String(i + 1).padStart(3, '0')}`;
+      }
+
       // Step 7: Build report
       const duration = Date.now() - startTime;
-      const summary = buildSummary(filteredFindings, files.length, totalLOC);
+      const summary = buildSummary(consolidatedFindings, files.length, totalLOC);
       const report: Report = {
         projectName,
         projectPath,
         timestamp: new Date().toISOString(),
         duration,
         summary,
-        findings: filteredFindings,
+        findings: consolidatedFindings,
         filesAnalyzed: files,
         patternsUsed: domainPatterns.length,
         model: config.model,
+        provenOnlyNote,
       };
 
       // Step 7: Output
