@@ -85,24 +85,29 @@ cp -r .claude/commands/* ~/.claude/commands/
 cp -r .claude/skills/* ~/.claude/skills/
 ```
 
-### Optional: Pattern Search MCP Server
+### Optional: MCP Servers
 
-Krait includes an MCP server that lets you search 47 vulnerability patterns locally. No API key needed.
+Krait ships two optional MCP servers. The skills work fine without them — they enrich specific flows.
 
 ```bash
-cd krait/mcp-servers/solodit
-npm install && npm run build
+# Pattern search (Solodit-derived vulnerability patterns, used during detection)
+cd krait/mcp-servers/solodit && npm install && npm run build
+
+# Foundry gateway (forge build / test / fmt-check, used by /krait-fuzz and PoC verification)
+cd krait/mcp-servers/forge && npm install && npm run build
 ```
 
-The `.mcp.json` in the repo root auto-configures it for Claude Code. The skills work fine without the MCP server — it's an optional pattern search tool for development.
+The `.mcp.json` in the repo root auto-configures both for Claude Code. No API keys needed.
 
 ### Commands
 
 | Command | What it does |
 |---------|-------------|
-| `/krait` | Full 4-phase audit: Recon → Detection → State Analysis → Verification → Report |
+| `/krait` | Full 4-phase audit: Recon → Detection → State Analysis → Verification → Report (auto-runs preflight first) |
 | `/krait-quick` | Same pipeline, skips state analysis — ~2x faster |
 | `/krait-review` | Second opinion on killed findings — re-examines aggressive gate decisions |
+| `/krait-fuzz` | Invariant extraction → Foundry test generation → run/fix loop |
+| `/krait-init` | Standalone readiness check (tools, project shape, MCP wiring). `/krait` runs this automatically; this command is for CI setup and debugging. |
 
 All output to `.audit/` in your project directory.
 

@@ -9,8 +9,9 @@ Krait is a structured audit methodology for Solidity smart contracts, encoded as
 
 ## How It Works
 
-When invoked via `/krait`, the pipeline runs 4 phases sequentially:
+When invoked via `/krait`, a preflight readiness check runs first, then the 4-phase pipeline runs sequentially:
 
+- **Preflight** (`preflight/instructions.md`): Hard checks (forge / bash / jq / `.sol` files) before any work. Same skill is invoked in *report* mode by `/krait-init` and in *gate* mode by `/krait`.
 1. **Phase 0 — Recon** (`recon/instructions.md`): Architecture mapping, deterministic file risk scoring, module selection
 2. **Phase 1 — Detection** (`detector/instructions.md`): 3-pass analysis with 4 parallel lenses × 4 mindsets, 101 heuristics, activated detection modules
 3. **Phase 2 — State Analysis** (`state-auditor/instructions.md`): Coupled state pair analysis, mutation matrix, masking code detection
@@ -21,12 +22,14 @@ When invoked via `/krait`, the pipeline runs 4 phases sequentially:
 ## Reference Files
 
 ### Phase Instructions
+- `preflight/instructions.md` — Shared readiness check (gate vs report mode)
 - `recon/instructions.md` — Full recon methodology
 - `detector/instructions.md` — Detection methodology with all question categories and heuristics
 - `state-auditor/instructions.md` — State inconsistency analysis
 - `critic/instructions.md` — Kill gates and verification
 - `reviewer/instructions.md` — Second opinion methodology
 - `reporter/instructions.md` — Report generation
+- `fuzzer/SKILL.md` — Invariant fuzz pipeline (used by `/krait-fuzz`)
 
 ### Detection Modules (loaded selectively based on protocol type)
 - `detector/modules/*.md` — 15 deep-dive detection modules (ERC-4626 vaults, lending/liquidation, AMM/MEV, governance, oracles, etc.)
@@ -42,9 +45,11 @@ When invoked via `/krait`, the pipeline runs 4 phases sequentially:
 
 | Command | Description |
 |---------|-------------|
-| `/krait` | Full 4-phase audit |
+| `/krait` | Full 4-phase audit (auto-runs preflight first) |
 | `/krait-quick` | Skip state analysis for speed |
 | `/krait-review` | Second opinion on killed findings |
+| `/krait-fuzz` | Generate and run Foundry invariant fuzz tests |
+| `/krait-init` | Standalone readiness report (preflight in report mode) |
 
 ## Benchmarks
 

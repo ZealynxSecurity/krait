@@ -56,6 +56,7 @@ Detector (wide net, per-file, parallel)
 `.claude/commands/*.md` are the slash-command entry points. Each one is a thin wrapper that tells Claude to **read and follow** the corresponding `instructions.md` under `.claude/skills/krait/<phase>/`. The phases mirror the CLI agents:
 
 ```
+preflight/     (shared readiness check; gate mode for /krait, report mode for /krait-init)
 recon/         (Phase 0: AST + Slither + risk scoring + primer selection)
 detector/      (Phase 1: 3-pass detection, 4 lenses × 4 mindsets)
   modules/     (15 deep-dive modules, loaded selectively by protocol type)
@@ -69,7 +70,7 @@ fuzzer/        (used by /krait-fuzz)
 
 Output for both surfaces lands in `.audit/` inside the target project (not this repo). The skill's reporter also emits a `https://krait.zealynx.io/...` web-links banner — keep that block intact when editing reporter prompts.
 
-`/krait-init` is a preflight readiness check — it does NOT run the audit pipeline and is intentionally read-only by default. If you change recon's tool requirements (forge / slither / jq) or the project shape it expects, mirror those changes in `.claude/commands/krait-init.md`.
+**Preflight is shared** between `/krait` and `/krait-init`. `/krait` runs the preflight in *gate mode* automatically (hard checks only; aborts on miss), so users never need to invoke `/krait-init` to get a clean run. `/krait-init` runs the same skill in *report mode* (full table, never aborts) for CI setup and debugging. If you change recon's tool requirements (forge / slither / jq) or the project shape it expects, mirror those changes in `.claude/skills/krait/preflight/instructions.md` — both commands pick them up automatically.
 
 ## MCP servers (`mcp-servers/`)
 
@@ -87,5 +88,3 @@ Both servers must be built (`npm install && npm run build` inside each) before C
 ## Editing the audit methodology
 
 The repo iterates via blind shadow audits — see `shadow-audits/progress.md` and `shadow-audits/registry.yaml`. The current bar is **100% precision across 50 contests**, so any change that could raise FPs needs to be validated by re-running affected contests via `npm run dev shadow-audit` (or `node dist/cli.js shadow-audit`) before merging. False positives are treated as more severe than missed findings; the kill gates in `critic/instructions.md` are deliberately aggressive.
-
-`CLAUDE.md` is gitignored.
