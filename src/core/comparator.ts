@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, readdirSync, existsSync } from 'fs';
 import { resolve, join } from 'path';
 import Anthropic from '@anthropic-ai/sdk';
 import { Finding, Severity } from './types.js';
@@ -84,7 +84,6 @@ export function parseOfficialFindings(reportPath: string): OfficialFinding[] {
 export function parseFromDataDir(dataDir: string): OfficialFinding[] {
   // This is a fallback if report.md doesn't exist.
   // We look for risk=2 (medium) and risk=3 (high) findings.
-  const { readdirSync } = require('fs');
   const files = readdirSync(dataDir).filter((f: string) => f.endsWith('.json'));
   const findings: OfficialFinding[] = [];
   const seen = new Set<string>();

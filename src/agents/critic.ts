@@ -9,6 +9,7 @@ import { ArchitectureAnalysis } from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
 import { CandidateFinding, ExploitProof, CriticVerdict } from './types.js';
 import { formatArchitectureForSystemPrompt } from '../analysis/architecture-pass.js';
+import { parseRulesApplied, parseImpactPremise } from './detector.js';
 
 const VERDICT_TOOL: Anthropic.Tool = {
   name: 'report_verdicts',
@@ -40,8 +41,17 @@ const VERDICT_TOOL: Anthropic.Tool = {
             },
             finalReasoning: { type: 'string', description: 'Summary judgment explaining the verdict' },
             confidence: { type: 'number', description: 'Confidence in verdict 0-100' },
+            rulesApplied: {
+              type: 'object',
+              description: 'Audited rules-applied table. Mirror the upstream rule codes (R8/R10/R11/R12/R15/R16) with ✓ / ✗(reason) / ?(reason). Append "(flag-for-depth-review)" to the value when R6/R8/R10/R15/R16 are marked ✗ with no reason yet the rule appears applicable.',
+              additionalProperties: { type: 'string' },
+            },
+            impactPremise: {
+              type: 'string',
+              description: 'Validated one-sentence concrete user/system HARM. Empty string when rejected (mechanism-only, no concrete user/system impact).',
+            },
           },
-          required: ['candidateId', 'verdict', 'finalReasoning', 'confidence'],
+          required: ['candidateId', 'verdict', 'finalReasoning', 'confidence', 'impactPremise'],
         },
       },
     },
@@ -181,7 +191,25 @@ async function criticBatch(
 
   const systemPrompt = `You are a SKEPTICAL CODE REVIEWER performing adversarial validation. Your job is to determine whether each finding is REAL or FALSE. You must commit to a verdict.
 ${archContext}
-## Validation Process (for EACH finding):
+## STEP 0 — Impact Premise Gate (HARD GATE, run FIRST for every finding)
+
+Before any validation, read the finding's impact / impactDescription / impactPremise. Identify in ONE sentence what concrete user-or-system HARM the finding claims — not the mechanism, not a reachable state, not a path.
+
+**Mechanism tests (INSUFFICIENT — set verdict='invalid' and \`impactPremise\` to empty string):**
+- "startLiquidation succeeds while market is active" — proves a function call, not user loss
+- "parameter can be set to zero" — proves a setter works, not that the zero value causes harm
+- "reentrancy callback is triggered" — proves a callback fires, not that state is corrupted
+
+**Harm tests (REQUIRED — emit the harm sentence in \`impactPremise\`):**
+- "claimant receives 15% less than their pro-rata share after attack sequence"
+- "user's withdrawal reverts permanently after parameter is set to zero"
+- "attacker extracts 1.5x their fair share via reentrancy before guard triggers"
+
+If you cannot extract a concrete harm sentence from the finding's evidence, you MUST set verdict='invalid' and add a counterargument referencing the missing harm statement. \`impactPremise\` MUST then be the empty string \`""\`.
+
+If the harm sentence is present and credible, restate it as \`impactPremise\`. Then proceed to the validation process below.
+
+## Validation Process (for EACH finding, after the impact premise gate passes):
 
 1. **Read the cited code** at the exact line numbers. Does the code actually do what the finding claims?
 2. **Search for mitigations**: Scan the ENTIRE file for require/assert/revert checks, modifiers (onlyOwner, nonReentrant, whenNotPaused), and guard patterns that prevent the issue.
@@ -189,6 +217,7 @@ ${archContext}
 4. **Check compiler protections**: Solidity ≥0.8.0 has overflow protection (except unchecked{} and explicit casts like uint128()).
 5. **Consider protocol design**: Does the architecture above make this scenario impossible? Check invariants and trust assumptions.
 6. **Evaluate prerequisites**: Are the attack conditions realistic? Can the attacker actually reach this state?
+7. **Audit the upstream \`rulesApplied\` claims** (see Rules Audit section below).
 
 ## Verdict Rules (you MUST pick one):
 
@@ -215,7 +244,18 @@ Do NOT use 'uncertain' as a default. If you don't find a specific mitigation, it
 ## Be specific:
 - Cite exact line numbers for every mitigation you find
 - For mitigating factors, quote the actual code (e.g., "require(amount > 0) on line 45")
-- If you claim the math is correct, show the calculation with values`;
+- If you claim the math is correct, show the calculation with values
+
+## Rules Audit (\`rulesApplied\` output field)
+
+The detector and reasoner emitted a \`rulesApplied\` map covering R8, R10, R11, R12, R15, R16. Mirror that table in your own \`rulesApplied\` output, AUDITING each rule:
+- **R6** (Bidirectional Role) is NOT in the detector/reasoner table but applies whenever a semi-trusted role is involved. Add \`R6\` to your map if applicable.
+- **R8** (Cached parameters / stored external state staleness): if upstream marked ✗ without a reason but multi-step or cached external state is present, append \`"(flag-for-depth-review)"\` to your status value.
+- **R10** (Worst-state severity): if upstream marked ✗ but severity uses the current snapshot only, flag for depth review.
+- **R15** (Flash-loan precondition manipulation): if upstream marked ✗ but a balance/oracle/threshold precondition is flash-loan-accessible, flag for depth review.
+- **R16** (Oracle integrity): if upstream marked ✗ but an oracle dependency exists, flag for depth review.
+
+A finding with flagged R6/R8/R10/R15/R16 still gets your real verdict (valid / invalid / uncertain) — flagging is additive. If a flagged rule materially weakens the finding (e.g., worst-state severity should bump it up but wasn't applied), prefer verdict='uncertain' with an explicit counterargument.`;
 
   const userPrompt = `## Contract: ${file}
 \`\`\`solidity
@@ -272,6 +312,10 @@ For EACH finding: search for mitigations, verify the math, check for guards. Com
                 mitigatingFactors: Array.isArray(raw.mitigatingFactors) ? raw.mitigatingFactors.map(String) : [],
                 finalReasoning: String(raw.finalReasoning || ''),
                 criticConfidence: Number(raw.confidence) || 50,
+                rulesApplied: parseRulesApplied(raw.rulesApplied),
+                impactPremise: typeof raw.impactPremise === 'string'
+                  ? raw.impactPremise.trim()
+                  : parseImpactPremise(raw.impactPremise),
               };
               seenIds.add(verdict.candidateId);
               verdicts.push(verdict);

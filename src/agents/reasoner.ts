@@ -8,6 +8,15 @@ import { ArchitectureAnalysis } from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
 import { CandidateFinding, ExploitProof } from './types.js';
 import { formatArchitectureForSystemPrompt } from '../analysis/architecture-pass.js';
+import {
+  parseStepExecution,
+  parseRulesApplied,
+  parseDepthEvidence,
+  parseImpactPremise,
+  parseMissingPrecondition,
+  parsePostconditions,
+  parseAssumptionDep,
+} from './detector.js';
 
 const PROOF_TOOL: Anthropic.Tool = {
   name: 'report_proofs',
@@ -36,6 +45,54 @@ const PROOF_TOOL: Anthropic.Tool = {
             },
             codeTrace: { type: 'string', description: 'Function call trace showing the exploit path' },
             confidence: { type: 'number', description: 'Confidence in exploit viability 0-100' },
+            stepExecution: {
+              type: 'string',
+              description: 'Step execution markers e.g., "✓1,2,3,5 | ✗4(N/A) | ?6,7(uncertain)" — deepens the detector\'s step markers.',
+            },
+            rulesApplied: {
+              type: 'object',
+              description: 'Map of rule code (R8/R10/R11/R12/R15/R16) to ✓ / ✗(reason) / ?(reason). Never blank.',
+              additionalProperties: { type: 'string' },
+            },
+            depthEvidence: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Depth evidence tags such as [BOUNDARY:X=val], [VARIATION:A→B], [TRACE:path→outcome] — concrete value substitutions, parameter variations, or terminal-state traces.',
+            },
+            impactPremise: {
+              type: 'string',
+              description: 'One-sentence concrete user/system HARM — not a mechanism, not a reachable state.',
+            },
+            missingPrecondition: {
+              type: 'object',
+              description: 'For PARTIAL/REFUTED-with-caveat findings: what blocks exploitation today.',
+              properties: {
+                statement: { type: 'string' },
+                type: { type: 'string', enum: ['STATE', 'ACCESS', 'TIMING', 'EXTERNAL', 'BALANCE'] },
+                reason: { type: 'string' },
+              },
+            },
+            postconditionsCreated: {
+              type: 'object',
+              description: 'For CONFIRMED/PARTIAL findings: the conditions the bug creates that downstream attacks can chain.',
+              properties: {
+                conditions: { type: 'array', items: { type: 'string' } },
+                types: {
+                  type: 'array',
+                  items: { type: 'string', enum: ['STATE', 'ACCESS', 'TIMING', 'EXTERNAL', 'BALANCE'] },
+                },
+                whoBenefits: { type: 'string' },
+              },
+            },
+            assumptionDep: {
+              type: 'object',
+              description: 'Trust-assumption tag. TRUSTED-ACTOR (fully-trusted actor must act maliciously) or WITHIN-BOUNDS (impact within stated bounds for a semi-trusted actor).',
+              properties: {
+                kind: { type: 'string', enum: ['TRUSTED-ACTOR', 'WITHIN-BOUNDS'] },
+                actor: { type: 'string' },
+                assumption: { type: 'string' },
+              },
+            },
           },
           required: ['candidateId', 'isExploitable', 'attackScenario', 'confidence'],
         },
@@ -218,6 +275,43 @@ Provide: the specific input/state that triggers incorrect behavior, what the cod
 - "Values would need to be astronomically large" — if there's no explicit bounds check, large values CAN accumulate over time. Mark exploitable.
 - "Overflow is prevented by Solidity 0.8+" — this only applies to arithmetic (+, -, *), NOT to explicit type casts like uint128(x). Casts silently truncate. Mark exploitable if no bounds check exists.
 - "Fee is small so impact is minimal" — even small incorrect fees compound over many transactions. Mark exploitable if the math is wrong.
+
+## Structured Proof Fields (REQUIRED — your job is to DEEPEN what the detector started)
+
+### \`stepExecution\` — which validation steps you actually ran
+Markers like \`"✓1,2,3,5 | ✗4(N/A) | ?6,7(uncertain)"\` referencing the validation steps above. \`✓\` = completed, \`✗(reason)\` = skipped with reason, \`?\` = uncertain.
+
+### \`rulesApplied\` — supplementary rules audit (deepen the detector's pass)
+For EACH rule below, set its status. NEVER leave a rule blank.
+- **R8** Cached parameters / stored external state staleness — does multi-step or cached state interact here?
+- **R10** Worst-state severity — calibrate severity against worst realistic operational state.
+- **R11** Unsolicited token transfer — external tokens transferred directly (not via approve/transferFrom)?
+- **R12** Exhaustive enabler enumeration — has every actor category that can reach the dangerous state been considered?
+- **R15** Flash-loan precondition manipulation — is any balance/oracle/threshold precondition flash-loan-accessible?
+- **R16** Oracle integrity — staleness, decimals, zero/negative price, feed-failure handling?
+
+Use \`"✓"\` (rule applied / honored) or \`"✗(reason)"\` (rule does NOT apply, e.g., \`"✗(no oracle dependency)"\`). \`"?"\` only when genuinely undeterminable — the critic will flag it for depth review.
+
+### \`depthEvidence\` — concrete-value evidence tags (DEEPEN the detector's tags)
+You must add at least one tag whenever your validation substituted, varied, or traced something:
+- \`[BOUNDARY:X=val]\` — substituted a concrete boundary (e.g., \`[BOUNDARY:windowSize=0 → weight=MAX_INT]\`)
+- \`[VARIATION:A→B]\` — tested a parameter change (e.g., \`[VARIATION:decimals 18→6 → price inflated 1e12x]\`)
+- \`[TRACE:path→outcome]\` — traced execution to a terminal state (e.g., \`[TRACE:withdraw(MAX)→revert L120 "insufficient"]\`)
+
+If the detector emitted tags, build on them — don't just repeat them. Add NEW tags showing the validation you performed.
+
+### \`impactPremise\` — one-sentence concrete harm
+A user/system HARM in one sentence (NOT a mechanism, NOT a reachable state). Example: "claimant receives 15% less than their pro-rata share after attack sequence." Mechanism-only ("function can be called") will be rejected by the critic.
+
+### \`missingPrecondition\` (PARTIAL / REFUTED-with-caveat findings only)
+If you couldn't construct a working exploit because something blocks it, name the blocker. \`type\` is one of STATE / ACCESS / TIMING / EXTERNAL / BALANCE. Optional.
+
+### \`postconditionsCreated\` (CONFIRMED / PARTIAL findings only)
+Optional. If the bug, when triggered, creates a condition that downstream attacks could chain off of, name it. \`whoBenefits\` identifies who can use those conditions.
+
+### \`assumptionDep\` — trust-assumption tag (optional)
+- \`{kind: "TRUSTED-ACTOR", actor, assumption}\` — exploit only fires if a fully-trusted actor (governance multisig, DAO, timelock) acts maliciously.
+- \`{kind: "WITHIN-BOUNDS", actor, assumption}\` — impact falls within stated operational bounds for a semi-trusted actor (admin, operator, keeper, oracle).
 ${archContext}`;
 
   const userPrompt = `## File: ${file}
@@ -277,6 +371,13 @@ For EACH candidate above, provide an exploitation proof. If you cannot construct
                 proofSteps: Array.isArray(raw.proofSteps) ? raw.proofSteps.map(String) : [],
                 codeTrace: String(raw.codeTrace || ''),
                 reasonerConfidence: Number(raw.confidence) || 0,
+                stepExecution: parseStepExecution(raw.stepExecution),
+                rulesApplied: parseRulesApplied(raw.rulesApplied),
+                depthEvidence: parseDepthEvidence(raw.depthEvidence),
+                impactPremise: parseImpactPremise(raw.impactPremise),
+                missingPrecondition: parseMissingPrecondition(raw.missingPrecondition),
+                postconditionsCreated: parsePostconditions(raw.postconditionsCreated),
+                assumptionDep: parseAssumptionDep(raw.assumptionDep),
               };
               seenIds.add(proof.candidateId);
               proofs.push(proof);

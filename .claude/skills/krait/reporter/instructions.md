@@ -33,9 +33,30 @@ Multiple candidates may describe the same underlying bug from different angles (
 - Same root cause but different manifestations → single finding with multiple impact paths
 - Related but distinct bugs → keep separate, note relationship
 
-### Step 3: Severity Ranking
+### Step 3a: Trust-Assumption Downgrade (runs BEFORE severity ranking)
 
-Final severity assignment using this rubric:
+Some findings only fire when a trusted actor violates the protocol's stated trust assumptions, or when the impact stays within the operational bounds explicitly granted to a semi-trusted actor. Krait's existing kill gate E (`critic/instructions.md` § GATE E — Admin Trust Boundary) kills these outright when the finding REQUIRES a trusted actor to act maliciously with no other harm path. This step is the softer middle option for findings that survived gate E because they have an additional non-admin path, but whose worst-case impact still depends on a trust violation. It is applied INSTEAD OF gate E re-evaluation, not in addition to it — gate E already ran in critic.
+
+For each verified finding, scan the candidate's body and the critic verdict for an `[ASSUMPTION-DEP: ...]` tag. There are exactly two recognized variants:
+
+**`[ASSUMPTION-DEP: TRUSTED-ACTOR]`** — the exploit only fires when a documented trusted actor (governance multisig, DAO, timelock owner) violates a stated trust assumption.
+
+- Downgrade severity by exactly one tier (CRITICAL → HIGH → MEDIUM → LOW → INFORMATIONAL). Floor at INFORMATIONAL.
+- Add this note after the `**Severity**` line in the finding:
+  > *Severity adjusted from {original} — attack requires {actor} to violate stated trust assumption: {assumption}.*
+- Substitute `{actor}` with the actual role (e.g., "governance multisig", "fee admin") and `{assumption}` with the documented assumption from `.audit/recon.md` (e.g., "admin will not set fee > 50%").
+
+**`[ASSUMPTION-DEP: WITHIN-BOUNDS]`** — the impact stays within the protocol's stated operational bounds for a semi-trusted actor.
+
+- Do NOT change severity.
+- Add this note in the finding's Description:
+  > *Note: the impact described falls within the protocol's stated operational bounds for the {actor} role. Reported because the bound is undocumented or the boundary value is at the edge of safety.*
+
+If a finding has neither tag, skip this step for that finding. Do not invent tags. Do not downgrade findings that the critic verified at full severity without a tag.
+
+### Step 3b: Severity Ranking
+
+Final severity assignment (after any trust-assumption downgrade) using this rubric:
 
 | Severity | Criteria | Examples |
 |----------|----------|---------|
@@ -43,6 +64,63 @@ Final severity assignment using this rubric:
 | **HIGH** | Conditional fund loss, privilege escalation, or broken core invariant. Requires specific conditions but attacker can create them. | Oracle manipulation for bad debt, self-liquidation profit, reentrancy fund drain |
 | **MEDIUM** | Value leakage, griefing with cost to attacker, degraded functionality. Limited impact or requires unlikely conditions. | Rounding exploitation over many txs, reward gaming, event inconsistency affecting integrations |
 | **LOW** | Informational, gas optimization, cosmetic inconsistency. No direct value impact. | Unnecessary storage reads, missing events, style inconsistency |
+
+### Step 3c: Proven-Only Mode Demotion (runs only when proven-only mode is set)
+
+This step is gated by an external flag — it runs ONLY when the invocation set proven-only mode (currently the `/krait-proven` command; future flags may also set it). If no proven-only flag is set, skip this step entirely.
+
+When the flag is set, scan each finding's evidence tags. A finding is "unproven" if its BEST evidence is `[CODE-TRACE]` and it has NONE of: `[POC-PASS]`, `[MEDUSA-PASS]`, `[PROD-ONCHAIN]`, `[PROD-SOURCE]`, `[PROD-FORK]`.
+
+For each unproven finding:
+
+- Cap severity at LOW. If the current severity is CRITICAL/HIGH/MEDIUM, demote to LOW. If already LOW or INFORMATIONAL, leave unchanged.
+- Record the pre-demotion severity (you need it for the report header).
+- Add this note after the `**Severity**` line:
+  > *Severity capped at LOW under proven-only mode — best evidence is `[CODE-TRACE]` only, no mechanically-verified PoC or production trace.*
+
+Count the demotions and the distribution of pre-demotion severities (e.g., 2 from CRITICAL, 4 from HIGH, 1 from MEDIUM). Surface this in the report header as:
+
+> *Proven-only mode enabled: {N} findings capped at LOW from {pre-demotion severity breakdown} due to unproven evidence (`[CODE-TRACE]` only).*
+
+If the count is zero, still surface the header note with `0 findings capped` so the reader knows the mode was active.
+
+### Step 3d: Root-Cause Consolidation (runs BEFORE writing the report)
+
+Multiple verified findings often share a single root cause and a single fix. Krait reports each separately by default, which inflates the report and obscures the systemic pattern. This step consolidates same-cause findings into one report finding with a locations table.
+
+**Merge two findings into ONE report finding when ALL of the following hold:**
+
+1. **Same fix pattern** — the same TYPE of code change resolves both (e.g., both need "add zero-value validation to the admin setter", both need "emit an event when this state changes", both need "add `block.timestamp - updatedAt < heartbeat` check").
+2. **Same severity tier** — both sit in the same tier AFTER the Step 3a downgrade and AFTER the Step 3c proven-only demotion. Cross-tier merges are PROHIBITED.
+3. **Same vulnerability class** — both are instances of the same bug pattern (missing event, missing input validation, missing staleness check, etc.).
+
+**Do NOT merge when:**
+
+- The fixes target different functions or different files in a way that each location needs its own diff. A "missing zero check" on `setFee()` and on `setRate()` can merge — same diff pattern, different functions; both belong in one consolidated finding with the locations table. A "missing zero check on `setFee()`" and a "wrong arithmetic in `_calcShares()`" cannot merge — different fix types.
+- The two findings sit in different severity tiers, even if same class.
+- The group would exceed 6 locations. Split into multiple consolidated findings of at most 6 locations each, ordered by file path.
+
+**Consolidated finding format:**
+
+- Title is class-level (e.g., "Missing event emission on admin setters"), not location-specific.
+- Use a locations table instead of a single `**File**` line:
+  ```
+  | Contract | Function | Line | Issue |
+  |----------|----------|------|-------|
+  | VaultManager.sol | setFee | 142 | no event |
+  | VaultManager.sol | setRate | 168 | no event |
+  | OracleAdapter.sol | setHeartbeat | 84 | no event |
+  ```
+- The `**Description**`, `**Impact**`, `**Recommendation**`, and `**Vulnerable Code** + **Suggested Fix**` blocks describe the shared root cause and shared fix once. If individual locations have meaningfully different impact, list them as bullets under `**Impact**`.
+- Severity uses the highest severity across the merged group (after Steps 3a and 3c).
+
+**Common patterns to consolidate explicitly** (from prior shadow audits):
+
+- Missing event emission on admin setters — collapses 5–10 separate findings into one.
+- Missing zero-value validation on admin setters — same pattern, different setters.
+- Missing staleness check on rate / oracle / price providers — when multiple feeds share the same omission.
+
+Hypotheses that don't match any peer remain standalone findings; they are not forced into a consolidation.
 
 ### Step 4: Write Report
 
@@ -55,6 +133,8 @@ Generate `.audit/krait-report.md`:
 **Date**: [Date]
 **Auditor**: Krait by Zealynx Security
 **Scope**: [Files audited]
+
+[If proven-only mode was set, include this line: *Proven-only mode enabled: {N} findings capped at LOW from {breakdown} due to unproven evidence ([CODE-TRACE] only).*]
 
 ---
 
@@ -77,13 +157,20 @@ Generate `.audit/krait-report.md`:
 ### [KRAIT-001] [Title] — [SEVERITY]
 
 **File**: `path/to/file.sol:XX`
+[For consolidated findings (Step 3d), replace the **File** line with the locations table:
+| Contract | Function | Line | Issue |
+|----------|----------|------|-------|
+]
 **Category**: [e.g., reentrancy, state-desync, access-control]
+
+[If severity was adjusted in Step 3a, include: *Severity adjusted from {original} — attack requires {actor} to violate stated trust assumption: {assumption}.*]
+[If severity was capped in Step 3c, include: *Severity capped at LOW under proven-only mode — best evidence is `[CODE-TRACE]` only.*]
 
 **Description**:
 [Clear explanation of the vulnerability. What's wrong and why it matters.]
 
 **Impact**:
-[Specific impact: who is affected, how much value at risk, under what conditions.]
+[Specific HARM: who is affected, how much value at risk, under what conditions. Passed the Impact Premise Gate during verification.]
 
 **Proof of Concept**:
 ```

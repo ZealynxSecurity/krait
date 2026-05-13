@@ -11,3 +11,4 @@ krait-report-*
 .claude/projects/
 *.jsonl
 shadow-audits/contests/
+improvements-backlog.md

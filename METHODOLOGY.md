@@ -2,7 +2,9 @@
 
 This document describes exactly how Krait finds vulnerabilities. Every technique here was derived from real missed findings in blind shadow audits against Code4rena contests, then validated by measuring precision/recall improvements.
 
-Current version: **v8.0** (methodology) / **v8** (shadow audit scoring, 50 contests)
+Current version: **v8.1** (methodology) / **v8** (shadow audit scoring, 50 contests)
+
+> **v8.1 changes**: Added an Impact Premise pre-gate to Phase 3 — before the eight kill gates fire, every finding must state concrete user-or-system harm in one sentence, not a mechanism. Expanded Phase 4 with three new report steps: trust-assumption downgrade (soft middle option between kill-gate E and full-severity reporting), root-cause consolidation (same fix pattern + severity + class merges with a locations table), and an optional proven-only demotion path invoked via `/krait-proven` or the `--proven-only` CLI flag (caps findings without an executed PoC / fork / production trace at Low). Extended the finding output schema with `Step Execution`, `Rules Applied` (R8 / R10 / R11 / R12 / R15 / R16), `Depth Evidence` tags (`[BOUNDARY]` / `[VARIATION]` / `[TRACE]`), `Impact Premise`, precondition/postcondition fields, `Assumption Dep`, `Original Severity`, `Evidence Tag`, and `Consolidated From / Locations`. All schema additions are additive — pre-v8.1 JSON reports remain valid. The eight kill gates, ten FP patterns, and risk-scoring formula are unchanged from v8 — the 100%-precision foundation is preserved.
 
 > **v8 changes**: Integrated open-source detection knowledge from [pashov/skills](https://github.com/pashov/skills) (MIT), [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen) (MIT), and [forefy/.context](https://github.com/forefy/.context) (MIT). Added 5 new detection modules (ERC-4626 vault, lending/liquidation, AMM/MEV, EIP-7702, ERC-4337), 58 extended heuristics, protocol-type statistical enrichment across all 7 primers, and Devil's Advocate verification methodology. Module trigger system now uses tier hierarchy (Tier 0 always-load, Tier 1 protocol-type, Tier 2 feature-detected). See [ATTRIBUTION.md](.claude/skills/krait/ATTRIBUTION.md) for full source details.
 
@@ -214,6 +216,24 @@ This phase catches bugs that per-function analysis misses — where the vulnerab
 
 Every candidate finding must survive **all 8 gates** before reaching the report. These gates have eliminated 95% of false positives across 50 blind shadow audits — 0.0 FPs/contest in v7 and v8.
 
+### Impact Premise Pre-Gate
+
+Before the eight gates fire, the critic runs a single pre-gate: the finding's impact statement must describe a concrete user-or-system **harm** in one sentence, not a mechanism, not a reachable state, not a path.
+
+**Mechanism (insufficient — finding marked `invalid` with the missing-harm counterargument):**
+
+- "startLiquidation succeeds while market is active" — proves a function call, not user loss
+- "parameter can be set to zero" — proves a setter works, not that the zero value causes harm
+- "reentrancy callback is triggered" — proves a callback fires, not that state is corrupted
+
+**Harm (required — recorded as the finding's `impactPremise` field):**
+
+- "claimant receives 15% less than their pro-rata share after attack sequence"
+- "user's withdrawal reverts permanently after parameter is set to zero"
+- "attacker extracts 1.5x their fair share via reentrancy before guard triggers"
+
+The pre-gate forces every reported finding to answer "what does the user actually lose?" before any other gate evaluates it. Findings that pass it carry the harm sentence forward to the report. The reviewer phase (`/krait-review`) applies the same gate when reviving killed candidates.
+
 ### Automatic Kill Gates
 
 | Gate | Kills | Example |
@@ -266,8 +286,27 @@ After kill gates, remaining candidates are checked against 10 empirically-derive
 
 1. Load only **VERIFIED + LIKELY TRUE** findings
 2. **Deduplicate** — same file + lines + root cause → merge
-3. **Rank** — CRITICAL > HIGH > MEDIUM
-4. Generate `.audit/krait-report.md` (markdown) + `.audit/krait-findings.json` (JSON)
+3. **Trust-assumption downgrade** — findings tagged `[ASSUMPTION-DEP: TRUSTED-ACTOR]` drop one severity tier (floor: Informational), with an explicit note: "Severity adjusted from {original} — attack requires {actor} to violate stated trust assumption: {assumption}." Findings tagged `[ASSUMPTION-DEP: WITHIN-BOUNDS]` keep their severity but carry a context note. This is the soft middle option between kill gate E (kill outright) and full-severity reporting.
+4. **Rank** — CRITICAL > HIGH > MEDIUM
+5. **Root-cause consolidation** — findings sharing the same fix pattern, severity tier, and vulnerability class merge into one finding with a locations table. Three "missing event emission" findings on three different setters → one finding with three rows. Cap: 6 locations per consolidated finding; larger groups split.
+6. **Optional proven-only demotion** (`/krait-proven` or the `--proven-only` CLI flag) — any finding whose best evidence tag is `[CODE-TRACE]` (no `[POC-PASS]`, `[MEDUSA-PASS]`, `[PROD-ONCHAIN]`, `[PROD-SOURCE]`, or `[PROD-FORK]`) caps at LOW. The report header records how many findings were demoted and from which severities.
+7. Generate `.audit/krait-report.md` (markdown) + `.audit/krait-findings.json` (JSON)
+
+### Finding Output Schema
+
+Every finding records the standard title / severity / file / description / impact / remediation, plus:
+
+| Field | Purpose |
+|-------|---------|
+| **Step Execution** | Which detector / state-auditor steps actually ran on this finding — e.g., `✓1,2,3,5 \| ✗4(N/A) \| ?6,7(uncertain)`. Step gaps marked `✗` with no reason flag the finding for reviewer attention. |
+| **Rules Applied** | Audit of six structured rules: R8 cached parameters / stored external state staleness; R10 worst-state severity; R11 unsolicited token transfer; R12 exhaustive enabler enumeration; R15 flash-loan precondition manipulation; R16 oracle integrity. Each marked `✓` or `✗(reason)`. The critic flags `✗(no reason)` for depth review. |
+| **Depth Evidence** | Concrete-value tags from the analyst's work — `[BOUNDARY:X=val]` (substituted a value), `[VARIATION:A→B]` (varied a parameter), `[TRACE:path→outcome]` (traced execution to a terminal state). Findings with zero depth-evidence tags are reviewer-flagged. |
+| **Impact Premise** | The one-sentence harm statement validated by the pre-gate in Phase 3. Empty if the pre-gate rejected the finding. |
+| **Missing Precondition / Postconditions Created** | Schema fields for partial / refuted-with-caveat findings. Populated where applicable; reserved for future cross-finding chain analysis. |
+| **Assumption Dep** | `TRUSTED-ACTOR` or `WITHIN-BOUNDS`. Drives the trust-assumption step above. |
+| **Original Severity** | The pre-downgrade severity, preserved when a trust-assumption or proven-only adjustment has fired. |
+| **Evidence Tag** | Strongest evidence available — `POC-PASS`, `MEDUSA-PASS`, `PROD-ONCHAIN`, `PROD-SOURCE`, `PROD-FORK`, `CODE-TRACE`. Drives proven-only demotion. |
+| **Consolidated From / Locations** | When root-cause consolidation merges N findings into one, the merged finding records the original IDs and a per-source locations table (file / function / line). |
 
 ### Severity Rubric
 

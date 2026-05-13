@@ -668,7 +668,37 @@ After individual function interrogation:
 
 ### Step 6: Record Candidates
 
-For EVERY suspected vulnerability, create a candidate entry:
+For EVERY suspected vulnerability, create a candidate entry using the schema below.
+
+**Step Execution reference for this phase** (the 7 question categories from Step 3 of this file):
+
+1 = PURPOSE (Cat 1) · 2 = ORDERING (Cat 2) · 3 = CONSISTENCY (Cat 3) · 4 = ASSUMPTIONS (Cat 4) · 5 = BOUNDARIES & EDGE CASES (Cat 5) · 6 = RETURN VALUES & ERROR PATHS (Cat 6) · 7 = EXTERNAL CALLS & CROSS-TX (Cat 7)
+
+Mark each step `✓` (executed and informative), `✗(reason)` (deliberately skipped — N/A, no externals, no role, etc.), or `?(uncertain)`. Steps marked `✗(no reason)` or `?` get flagged for reviewer attention.
+
+**Rules Applied reference** (mandatory — exactly these 6 rules, never blank, never optional):
+
+- **R8** — Cached parameters / stored external state staleness (multi-step ops or stored external state)
+- **R10** — Worst-state severity (not current-snapshot severity)
+- **R11** — Unsolicited token transfer / donation surface
+- **R12** — Exhaustive enabler enumeration (paths to dangerous preconditions)
+- **R15** — Flash-loan precondition manipulation
+- **R16** — Oracle integrity (staleness, decimals, zero-price, failure modes)
+
+Mark each `✓` (rule applied and informative), or `✗(reason)` when the rule does not apply (e.g., `R16:✗(no oracle dependency)`). Never leave a rule blank.
+
+**Depth Evidence reference** (use at least one tag per candidate — a finding with zero tags is still allowed but is flagged for the reviewer as "abstract reasoning, no concrete substitution"):
+
+| Tag | What It Proves |
+|-----|----------------|
+| `[BOUNDARY:X=val]` | Substituted a concrete boundary value into the expression (e.g., `[BOUNDARY:totalSupply=0 → shares=type(uint).max]`) |
+| `[VARIATION:param A→B]` | Tested behavior change when a parameter varies (e.g., `[VARIATION:decimals 18→6 → price inflated 1e12x]`) |
+| `[TRACE:path→outcome]` | Traced execution to a terminal state — revert, return, state change (e.g., `[TRACE:withdraw(maxUint)→revert at L120]`) |
+
+**Precondition / Postcondition fields** (preparation for future chain analysis — emitted but not consumed by the Critic in this phase; do not let these affect severity or verdict):
+
+- Emit the **Precondition Analysis** block only when the finding is a partial bug (mechanism present but a guard prevents the full attack) or a refuted-with-caveat (the attack only fires under an extra condition you couldn't establish from the code alone).
+- Emit the **Postcondition Analysis** block when the finding is exploitable as stated, or when it is partial but still creates new state that another finding could consume.
 
 ```markdown
 ### [CANDIDATE-XXX] Title
@@ -683,6 +713,10 @@ For EVERY suspected vulnerability, create a candidate entry:
 - **MEDIUM**: Conditional fund loss (requires specific timing/state), temporary DoS, broken invariant without direct fund loss, governance manipulation.
 - Do NOT downgrade to MEDIUM just because the exploit requires multiple steps or specific ordering. Multi-step exploits that lead to fund loss are still HIGH.
 - **Severity under-rating was the #1 calibration error in shadow audits.** When in doubt between H and M, rate HIGH — the Critic will downgrade if warranted.
+
+**Step Execution**: ✓1,2,3,5 | ✗4(no externals),7(single-tx) | ?6(uncertain)
+**Rules Applied**: [R8:✓, R10:✓, R11:✗(no external tokens), R12:✓, R15:✗(no flash-loan-accessible state), R16:✗(no oracle dependency)]
+**Depth Evidence**: [BOUNDARY:totalSupply=0 → shares=type(uint).max], [TRACE:firstDeposit(1)→shares=1e18 at L84]
 
 **Discovery Method**: [Which question/heuristic exposed this]
 
@@ -700,6 +734,16 @@ For EVERY suspected vulnerability, create a candidate entry:
 ```
 
 **Why This Is a Bug**: [Not "might be" — state your case]
+
+### Precondition Analysis (only if partial bug or refuted-with-caveat)
+**Missing Precondition**: <one-line statement of what blocks the full attack>
+**Precondition Type**: STATE | ACCESS | TIMING | EXTERNAL | BALANCE
+**Why This Blocks**: <one-line reason>
+
+### Postcondition Analysis (only if exploitable as stated, or partial but still creates new state)
+**Postconditions Created**: <list of state/access/balance changes the attack produces>
+**Postcondition Types**: [STATE | ACCESS | TIMING | EXTERNAL | BALANCE]
+**Who Benefits**: <which actor can use these as a precondition for another attack>
 
 **Status**: UNVERIFIED — needs Critic validation
 ```

@@ -4,6 +4,43 @@ export type Language = 'solidity' | 'rust' | 'typescript' | 'javascript';
 
 export type Domain = 'solidity' | 'rust-solana' | 'web2-typescript' | 'ai-red-team';
 
+export type PreconditionType = 'STATE' | 'ACCESS' | 'TIMING' | 'EXTERNAL' | 'BALANCE';
+
+export type EvidenceTag =
+  | 'POC-PASS'
+  | 'POC-FAIL'
+  | 'CODE-TRACE'
+  | 'MEDUSA-PASS'
+  | 'PROD-ONCHAIN'
+  | 'PROD-SOURCE'
+  | 'PROD-FORK';
+
+export interface MissingPrecondition {
+  statement: string;
+  type: PreconditionType;
+  reason: string;
+}
+
+export interface PostconditionsCreated {
+  conditions: string[];
+  types: PreconditionType[];
+  whoBenefits: string;
+}
+
+export interface AssumptionDep {
+  kind: 'TRUSTED-ACTOR' | 'WITHIN-BOUNDS';
+  actor?: string;
+  assumption?: string;
+}
+
+export interface FindingLocation {
+  file: string;
+  line: number;
+  endLine?: number;
+  function?: string;
+  note?: string;
+}
+
 export interface Finding {
   id: string;
   title: string;
@@ -19,6 +56,24 @@ export interface Finding {
   patternId?: string;
   codeSnippet?: string;
   soloditRefs?: string[];
+  // A1
+  stepExecution?: string;
+  rulesApplied?: Record<string, string>;
+  // A2
+  depthEvidence?: string[];
+  // A3
+  impactPremise?: string;
+  // A4
+  missingPrecondition?: MissingPrecondition;
+  postconditionsCreated?: PostconditionsCreated;
+  // A5
+  assumptionDep?: AssumptionDep;
+  originalSeverity?: Severity;
+  // A6 (verification)
+  evidenceTag?: EvidenceTag;
+  // A7
+  consolidatedFrom?: string[];
+  locations?: FindingLocation[];
 }
 
 export interface Report {
@@ -31,6 +86,8 @@ export interface Report {
   filesAnalyzed: FileInfo[];
   patternsUsed: number;
   model: string;
+  // A6: rendered when --proven-only downgrades unproven findings.
+  provenOnlyNote?: string;
 }
 
 export interface ReportSummary {
@@ -121,6 +178,8 @@ export interface KraitConfig {
   fuzzRuns?: number;          // Foundry fuzz runs per test (default 1000)
   maxIterations?: number;     // Max fix iterations per test file (default 3)
   testOutputDir?: string;     // Output dir for generated tests (default '.audit/invariant-tests')
+  // A6: cap unproven findings at Low severity
+  provenOnly?: boolean;
 }
 
 export const DEFAULT_CONFIG: Omit<KraitConfig, 'apiKey'> = {

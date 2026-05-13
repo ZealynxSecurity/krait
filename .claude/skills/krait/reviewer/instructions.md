@@ -130,6 +130,12 @@ For each killed finding in priority order:
 
 3. **Apply the gate-specific re-examination approach** (see above).
 
+3a. **Impact Premise Gate (mandatory before reviving)**: Before surfacing any finding as "Worth Manual Review", re-check that the candidate's `**Impact**` field names a concrete user or system HARM in one sentence — not a mechanism. The same gate the Critic applied (see `critic/instructions.md` § Pre-Gate: Impact Premise Gate) applies here.
+
+   - If the candidate's impact is a mechanism (function call works, parameter accepts a value, callback fires) and the scenario does not support a harm statement, do NOT revive. The reviewer is not a path around the gate.
+   - If the candidate's impact is a mechanism but the scenario supports a harm statement, rewrite the impact as a harm before reviving. Then surface the revived finding with the rewritten harm — flag in the output that the impact was rewritten during review.
+   - If the candidate's impact already names a harm, proceed normally.
+
 4. **Assign a review verdict**:
 
    - **REVIVE — Worth Manual Review**: The gate dismissal was premature. The mechanism is plausible and deserves human auditor attention. Include WHY the gate was wrong and what the auditor should look for.
@@ -205,6 +211,8 @@ If no systemic patterns found, skip this section entirely. Don't write "No syste
 
 Each revived finding tells a complete story. The auditor should understand the issue without having to look up the original candidate or know what "Gate C" means.
 
+**Schema notes for revived/new findings**: Every revived or new finding must carry the same `**Step Execution**` and `**Rules Applied**` fields the detector and state-auditor use (see those files for the cross-phase reference). For revived findings, copy the candidate's fields and update any step you re-examined; for new findings discovered during review, populate the fields from scratch using the detector's 7 categories or the state-auditor's 8 phases depending on where the bug surfaced. The `**Impact**` field must name a concrete user or system HARM (Impact Premise Gate, Step 3a). If you rewrote the impact during review, add a one-line note in the body.
+
 **For findings discovered NEW during review** (found by reading the code with fresh eyes, not from the killed list):
 
 ```markdown
@@ -213,6 +221,9 @@ Each revived finding tells a complete story. The auditor should understand the i
 **File**: `path/to/file.sol:XX-YY`
 **Suggested severity**: [MEDIUM/HIGH]
 
+**Step Execution**: ✓1,2,3 | ✗4(no externals),5(single tx) | ?6,7(deferred to manual review)
+**Rules Applied**: [R8:✓, R10:✓, R11:✗(no external tokens), R12:✓, R15:✗(no flash-loan-accessible state), R16:✗(no oracle dependency)]
+
 **What's wrong**:
 [Clear explanation of the vulnerability in 2-4 sentences. What the code does, what it should do, and what breaks. Include the actual code behavior, not abstractions.]
 
@@ -220,7 +231,7 @@ Each revived finding tells a complete story. The auditor should understand the i
 [One sentence — e.g., "The original audit focused on X but this function was only analyzed in the context of Y"]
 
 **Impact**:
-[Concrete impact — who loses what, under what conditions, approximately how much]
+[Concrete HARM — who loses what, under what conditions, approximately how much. Must pass the Impact Premise Gate.]
 
 **Verify**:
 - [ ] [Specific check 1 — e.g., "Confirm _syncFunding() is not called anywhere in the addMargin() call chain"]
@@ -236,6 +247,9 @@ Each revived finding tells a complete story. The auditor should understand the i
 **File**: `path/to/file.sol:XX-YY`
 **Suggested severity**: [MEDIUM/HIGH]
 
+**Step Execution**: ✓1,2,3,5 | ✗4(no externals),7(single-tx) | ✓6(reviewer confirmed previously uncertain step)
+**Rules Applied**: [R8:✓, R10:✓, R11:✗(no external tokens), R12:✓, R15:✗(no flash-loan-accessible state), R16:✗(no oracle dependency)]
+
 **What the finding claims**:
 [2-3 sentence plain-English summary of the original finding. What's the alleged vulnerability?]
 
@@ -246,7 +260,7 @@ Each revived finding tells a complete story. The auditor should understand the i
 [Specific counterargument — e.g., "The reference implementation doesn't have X constraint that this protocol adds, which changes the security properties." or "The owner action is irreversible and there's no timelock — in Code4rena this typically qualifies as Medium."]
 
 **Impact if real**:
-[Concrete impact — who loses what, under what conditions]
+[Concrete HARM — who loses what, under what conditions. Must pass the Impact Premise Gate. If the original candidate's impact described a mechanism and you rewrote it during review, add: "Impact rewritten during review from mechanism to harm."]
 
 **Verify**:
 - [ ] [Specific check 1]

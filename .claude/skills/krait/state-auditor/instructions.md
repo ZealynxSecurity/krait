@@ -179,7 +179,37 @@ Generate NEW candidates based on cross-feed insights.
 
 ## Output
 
-Save to `.audit/findings/state-candidates.md`:
+Save to `.audit/findings/state-candidates.md`.
+
+**Step Execution reference for this phase** (the 8 phases of this file's methodology):
+
+1 = Dependency Mapping (Phase 1) · 2 = Mutation Matrix (Phase 2) · 3 = Cross-Check Verification (Phase 3) · 4 = Operation Ordering Analysis (Phase 4) · 5 = Parallel Path Comparison (Phase 5) · 6 = Multi-Step User Journey Simulation (Phase 6) · 7 = Masking Code Detection (Phase 7) · 8 = Cross-Feed from Detector (Phase 8)
+
+Mark each step `✓` (executed and informative), `✗(reason)` (deliberately skipped — N/A, single mutation path, no masking code, no detector overlap), or `?(uncertain)`. Steps marked `✗(no reason)` or `?` get flagged for reviewer attention.
+
+**Rules Applied reference** (mandatory — exactly these 6 rules, never blank, never optional):
+
+- **R8** — Cached parameters / stored external state staleness (multi-step ops or stored external state)
+- **R10** — Worst-state severity (not current-snapshot severity)
+- **R11** — Unsolicited token transfer / donation surface
+- **R12** — Exhaustive enabler enumeration (paths to dangerous preconditions)
+- **R15** — Flash-loan precondition manipulation
+- **R16** — Oracle integrity (staleness, decimals, zero-price, failure modes)
+
+Mark each `✓` (rule applied and informative), or `✗(reason)` when the rule does not apply (e.g., `R16:✗(no oracle dependency)`). Never leave a rule blank.
+
+**Depth Evidence reference** (use at least one tag per candidate — a finding with zero tags is still allowed but is flagged for the reviewer as "abstract reasoning, no concrete substitution"):
+
+| Tag | What It Proves |
+|-----|----------------|
+| `[BOUNDARY:X=val]` | Substituted a concrete boundary value into the expression (e.g., `[BOUNDARY:totalShares=0 → desync survives indefinitely]`) |
+| `[VARIATION:param A→B]` | Tested behavior change when a parameter varies (e.g., `[VARIATION:partialAmt=1→full → coupled state diverges by 100%]`) |
+| `[TRACE:path→outcome]` | Traced execution to a terminal state — revert, return, state change (e.g., `[TRACE:liquidate→shares-=x, totalShares unchanged]`) |
+
+**Precondition / Postcondition fields** (preparation for future chain analysis — emitted but not consumed by the Critic in this phase; do not let these affect severity or verdict):
+
+- Emit the **Precondition Analysis** block only when the finding is a partial bug (the desync exists but a guard prevents the value-loss outcome) or a refuted-with-caveat (the desync only matters under an extra condition you couldn't establish from the code alone).
+- Emit the **Postcondition Analysis** block when the desync is exploitable as stated, or when it is partial but still leaves coupled state in a form another finding could consume.
 
 ```markdown
 # Krait State Audit Candidates
@@ -200,6 +230,10 @@ Save to `.audit/findings/state-candidates.md`:
 **File**: path/to/file.sol
 **Lines**: XX-YY
 
+**Step Execution**: ✓1,2,3,5 | ✗4(no external calls in path),7(no masking code present) | ?8(detector overlap unclear)
+**Rules Applied**: [R8:✓, R10:✓, R11:✗(no external tokens), R12:✓, R15:✗(no flash-loan-accessible state), R16:✗(no oracle dependency)]
+**Depth Evidence**: [TRACE:liquidate(user)→shares[user]-=x, totalShares unchanged at L142], [BOUNDARY:partialAmt=shares[user] → invariant broken by full amount]
+
 **Invariant**: [What should always hold]
 **Breaking Scenario**:
 1. Call function X with parameters Y
@@ -210,6 +244,17 @@ Save to `.audit/findings/state-candidates.md`:
 
 **Masking Code** (if any): [defensive pattern hiding this]
 **Cross-Feed**: [Related Detector candidate, if any]
+
+### Precondition Analysis (only if partial bug or refuted-with-caveat)
+**Missing Precondition**: <one-line statement of what blocks value loss despite the desync>
+**Precondition Type**: STATE | ACCESS | TIMING | EXTERNAL | BALANCE
+**Why This Blocks**: <one-line reason>
+
+### Postcondition Analysis (only if exploitable as stated, or partial but still leaves consumable state)
+**Postconditions Created**: <list of state/access/balance changes the desync produces>
+**Postcondition Types**: [STATE | ACCESS | TIMING | EXTERNAL | BALANCE]
+**Who Benefits**: <which actor can use these as a precondition for another attack>
+
 **Status**: UNVERIFIED
 ```
 

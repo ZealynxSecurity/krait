@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Krait is a Solidity security auditor with **two delivery surfaces that share patterns and methodology but otherwise have separate runtimes**:
 
-1. **Claude Code skill** under `.claude/` — invoked via `/krait`, `/krait-quick`, `/krait-fuzz`, `/krait-review`, plus the read-only preflight `/krait-init`. Pure prompt + methodology files; runs inside the user's Claude session, no API key. Source of truth for the audit *methodology*.
+1. **Claude Code skill** under `.claude/` — invoked via `/krait`, `/krait-quick`, `/krait-proven`, `/krait-fuzz`, `/krait-review`, plus the read-only preflight `/krait-init`. Pure prompt + methodology files; runs inside the user's Claude session, no API key. Source of truth for the audit *methodology*.
 2. **Standalone CLI** under `src/` (TypeScript, Node ≥20) — calls the Anthropic SDK directly. Used for batch/shadow audits and CI; needs `ANTHROPIC_API_KEY`.
 
 When fixing bugs or adding heuristics, the methodology usually lives in BOTH places: the Claude Code instructions under `.claude/skills/krait/**/instructions.md` and the equivalent prompt builders/heuristics in `src/`. Check both before declaring a change complete. `METHODOLOGY.md` documents the canonical pipeline.

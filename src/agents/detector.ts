@@ -4,7 +4,14 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { FileInfo, ArchitectureAnalysis } from '../core/types.js';
+import {
+  FileInfo,
+  ArchitectureAnalysis,
+  MissingPrecondition,
+  PostconditionsCreated,
+  AssumptionDep,
+  PreconditionType,
+} from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
 import { CandidateFinding } from './types.js';
 import { formatArchitectureForSystemPrompt, formatArchitectureForFilePrompt } from '../analysis/architecture-pass.js';
@@ -42,6 +49,54 @@ const CANDIDATE_TOOL: Anthropic.Tool = {
             },
             confidence: { type: 'number', description: 'Confidence 0-100' },
             remediation: { type: 'string', description: 'How to fix the vulnerability' },
+            stepExecution: {
+              type: 'string',
+              description: 'Step execution markers, e.g., "✓1,2,3,5 | ✗4(N/A) | ?6,7(uncertain)"',
+            },
+            rulesApplied: {
+              type: 'object',
+              description: 'Map of rule code (R8/R10/R11/R12/R15/R16) to status — ✓, ✗(reason), or ?(reason). Use ✗(reason) when the rule does not apply. Never leave blank.',
+              additionalProperties: { type: 'string' },
+            },
+            depthEvidence: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Depth evidence tags such as [BOUNDARY:X=val], [VARIATION:A→B], [TRACE:path→outcome]',
+            },
+            impactPremise: {
+              type: 'string',
+              description: 'One-sentence concrete user/system HARM (not a mechanism, not a reachable state).',
+            },
+            missingPrecondition: {
+              type: 'object',
+              description: 'When the finding is PARTIAL or REFUTED-with-caveat, what blocks exploitation today.',
+              properties: {
+                statement: { type: 'string' },
+                type: { type: 'string', enum: ['STATE', 'ACCESS', 'TIMING', 'EXTERNAL', 'BALANCE'] },
+                reason: { type: 'string' },
+              },
+            },
+            postconditionsCreated: {
+              type: 'object',
+              description: 'When the finding is CONFIRMED or PARTIAL, the conditions it creates that downstream attacks can use.',
+              properties: {
+                conditions: { type: 'array', items: { type: 'string' } },
+                types: {
+                  type: 'array',
+                  items: { type: 'string', enum: ['STATE', 'ACCESS', 'TIMING', 'EXTERNAL', 'BALANCE'] },
+                },
+                whoBenefits: { type: 'string' },
+              },
+            },
+            assumptionDep: {
+              type: 'object',
+              description: 'Trust-assumption tag. TRUSTED-ACTOR: exploit only fires if a fully-trusted actor (governance multisig, DAO, timelock) acts maliciously. WITHIN-BOUNDS: impact falls within stated operational bounds for a semi-trusted actor (admin, operator, keeper, oracle).',
+              properties: {
+                kind: { type: 'string', enum: ['TRUSTED-ACTOR', 'WITHIN-BOUNDS'] },
+                actor: { type: 'string' },
+                assumption: { type: 'string' },
+              },
+            },
           },
           required: ['title', 'severity', 'line', 'category', 'description', 'confidence'],
         },
@@ -107,7 +162,92 @@ export async function detect(
     relatedContracts: Array.isArray(r.relatedContracts) ? r.relatedContracts.map(String) : [],
     detectorConfidence: Number(r.confidence) || 50,
     remediation: String(r.remediation || ''),
+    stepExecution: parseStepExecution(r.stepExecution),
+    rulesApplied: parseRulesApplied(r.rulesApplied),
+    depthEvidence: parseDepthEvidence(r.depthEvidence),
+    impactPremise: parseImpactPremise(r.impactPremise),
+    missingPrecondition: parseMissingPrecondition(r.missingPrecondition),
+    postconditionsCreated: parsePostconditions(r.postconditionsCreated),
+    assumptionDep: parseAssumptionDep(r.assumptionDep),
   }));
+}
+
+const PRECONDITION_TYPES: readonly PreconditionType[] = ['STATE', 'ACCESS', 'TIMING', 'EXTERNAL', 'BALANCE'];
+
+export function parseStepExecution(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+export function parseRulesApplied(v: unknown): Record<string, string> | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof value !== 'string') continue;
+    const trimmedKey = key.trim();
+    const trimmedValue = value.trim();
+    if (trimmedKey.length === 0 || trimmedValue.length === 0) continue;
+    out[trimmedKey] = trimmedValue;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+export function parseDepthEvidence(v: unknown): string[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const tags = v.filter((t): t is string => typeof t === 'string' && t.trim().length > 0).map(t => t.trim());
+  return tags.length > 0 ? tags : undefined;
+}
+
+export function parseImpactPremise(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isPreconditionType(v: unknown): v is PreconditionType {
+  return typeof v === 'string' && (PRECONDITION_TYPES as readonly string[]).includes(v);
+}
+
+export function parseMissingPrecondition(v: unknown): MissingPrecondition | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const obj = v as Record<string, unknown>;
+  if (typeof obj.statement !== 'string' || obj.statement.trim().length === 0) return undefined;
+  if (!isPreconditionType(obj.type)) return undefined;
+  return {
+    statement: obj.statement.trim(),
+    type: obj.type,
+    reason: typeof obj.reason === 'string' ? obj.reason.trim() : '',
+  };
+}
+
+export function parsePostconditions(v: unknown): PostconditionsCreated | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const obj = v as Record<string, unknown>;
+  const conditions = Array.isArray(obj.conditions)
+    ? obj.conditions.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).map(c => c.trim())
+    : [];
+  const types = Array.isArray(obj.types)
+    ? obj.types.filter(isPreconditionType)
+    : [];
+  if (conditions.length === 0) return undefined;
+  return {
+    conditions,
+    types,
+    whoBenefits: typeof obj.whoBenefits === 'string' ? obj.whoBenefits.trim() : '',
+  };
+}
+
+export function parseAssumptionDep(v: unknown): AssumptionDep | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const obj = v as Record<string, unknown>;
+  const kind = obj.kind;
+  if (kind !== 'TRUSTED-ACTOR' && kind !== 'WITHIN-BOUNDS') return undefined;
+  return {
+    kind,
+    actor: typeof obj.actor === 'string' && obj.actor.trim().length > 0 ? obj.actor.trim() : undefined,
+    assumption: typeof obj.assumption === 'string' && obj.assumption.trim().length > 0 ? obj.assumption.trim() : undefined,
+  };
 }
 
 function buildDetectorSystemPrompt(
@@ -175,6 +315,44 @@ Read the code like an attacker:
 - Missing features (no pause, no timelock, no circuit breaker)
 - Generic reentrancy where no concrete value extraction is possible
 - "Potential" issues that are purely cosmetic (naming, documentation, style)
+
+## Structured Finding Fields (REQUIRED on every finding)
+
+### \`stepExecution\` — which detection steps you actually ran
+Use markers like \`"✓1,2,3,5 | ✗4(N/A) | ?6,7(uncertain)"\` referencing the analysis steps in "How to Analyze" above. \`✓\` = completed, \`✗(reason)\` = skipped with reason, \`?\` = attempted but uncertain.
+
+### \`rulesApplied\` — supplementary rules audit
+For EACH rule below, set its status. NEVER leave a rule blank.
+- **R8** (Cached parameters / stored external state staleness): does the finding involve a cached parameter or stored external state that can go stale across multi-step operations?
+- **R10** (Worst-state severity): is severity calibrated against the worst realistic operational state (max accumulated values, longest pending durations, worst price), not just the current snapshot?
+- **R11** (Unsolicited token transfer): does the finding involve external tokens whose direct transfer (not via approve/transferFrom) is unexpected?
+- **R12** (Exhaustive enabler enumeration): for any dangerous state the finding identifies, have you considered every actor category (external attacker, semi-trusted role, natural operation, external event, user sequence) that could reach it?
+- **R15** (Flash-loan precondition manipulation): if the finding has a balance/oracle/threshold precondition, is that precondition flash-loan-accessible?
+- **R16** (Oracle integrity): if the finding depends on an oracle, are staleness, decimals, zero/negative price, and feed-failure handled?
+
+Use \`"✓"\` (rule applied / honored), or \`"✗(reason)"\` (rule does NOT apply — e.g., \`"✗(no oracle dependency)"\`). Use \`"?"\` only when you genuinely cannot determine — the critic will then flag this for depth review.
+
+### \`depthEvidence\` — concrete-value evidence tags
+Use tag literals when you substitute a value, vary a parameter, or trace a path:
+- \`[BOUNDARY:X=val]\` — you substituted a concrete boundary (e.g., \`[BOUNDARY:windowSize=0 → weight=MAX_INT]\`)
+- \`[VARIATION:A→B]\` — you tested a parameter change (e.g., \`[VARIATION:decimals 18→6 → price inflated 1e12x]\`)
+- \`[TRACE:path→outcome]\` — you traced execution to a terminal state (e.g., \`[TRACE:withdraw(MAX)→revert L120 "insufficient"]\`)
+
+Every finding where you substituted, varied, or traced something MUST include at least one tag. Findings that are only structural observations (e.g., "missing event") need not include depth-evidence tags.
+
+### \`impactPremise\` — one-sentence concrete harm
+State the HARM in one sentence — not the mechanism, not a reachable state. Example: "claimant receives 15% less than their pro-rata share after attack sequence." Mechanism-only ("function can be called", "state can be reached") is NOT a harm statement and will be rejected by the critic.
+
+### \`missingPrecondition\` (PARTIAL / REFUTED-with-caveat findings only)
+If you couldn't construct a working exploit because something blocks it, name that something. \`type\` is one of STATE / ACCESS / TIMING / EXTERNAL / BALANCE. Optional — only emit when applicable.
+
+### \`postconditionsCreated\` (CONFIRMED / PARTIAL findings only)
+Optional. If the bug, when triggered, creates a state/access/timing/external/balance condition that downstream attacks could chain off of, name it. \`whoBenefits\` is who can use those conditions.
+
+### \`assumptionDep\` — trust-assumption tag (optional)
+Emit only when one of these applies:
+- \`{kind: "TRUSTED-ACTOR", actor, assumption}\` — the exploit ONLY fires if a fully-trusted actor (governance multisig, DAO, timelock) acts maliciously. (Distinct from semi-trusted-only exploits which the critic kill-gates outright.)
+- \`{kind: "WITHIN-BOUNDS", actor, assumption}\` — the impact falls within the protocol's stated operational bounds for a semi-trusted actor (admin, operator, keeper, oracle).
 
 ${archContext}
 
