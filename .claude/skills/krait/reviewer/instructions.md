@@ -130,6 +130,13 @@ For each killed finding in priority order:
 
 3. **Apply the gate-specific re-examination approach** (see above).
 
+3a. **Use the methodology audit trail to prioritize and target re-examination**:
+- **`Step Execution`** with `✗(no reason)` or `?` on a lens/phase → that's an under-analyzed area; re-examine that lens here.
+- **`Rules Applied`** with `✗(no reason)` on a rule that SHOULD apply (e.g. R16 marked ✗ but the function reads an oracle, or R15 marked ✗ but a flash-loan-accessible balance is used) → likely a rule-application failure; revive.
+- **`Depth Evidence`** is empty or has 0 concrete tags → the agent never substituted real values; re-do that step yourself with concrete numbers before deciding.
+- **`Missing Precondition`** is named in the killing critic verdict → check whether ANY other finding's `Postconditions Created` field would create that precondition. If yes, the chain is live and the kill is wrong.
+- **`Postconditions Created`** is non-empty on a CONFIRMED finding upstream → check whether any KILLED finding's `Missing Precondition` matches; if so, the killed finding becomes exploitable via the chain.
+
 4. **Assign a review verdict**:
 
    - **REVIVE — Worth Manual Review**: The gate dismissal was premature. The mechanism is plausible and deserves human auditor attention. Include WHY the gate was wrong and what the auditor should look for.
@@ -222,6 +229,9 @@ Each revived finding tells a complete story. The auditor should understand the i
 **Impact**:
 [Concrete impact — who loses what, under what conditions, approximately how much]
 
+**Depth Evidence** (if you reasoned with concrete values): [BOUNDARY:...], [VARIATION:...], [TRACE:...]
+**Postconditions Created** (optional, helps chain analysis): [What state/access/timing/external/balance changes does success leave behind]
+
 **Verify**:
 - [ ] [Specific check 1 — e.g., "Confirm _syncFunding() is not called anywhere in the addMargin() call chain"]
 - [ ] [Specific check 2 — e.g., "Calculate max staleness: block.timestamp - lastFundingTime after 24h of no trades"]
@@ -244,6 +254,9 @@ Each revived finding tells a complete story. The auditor should understand the i
 
 **Why that dismissal may be wrong**:
 [Specific counterargument — e.g., "The reference implementation doesn't have X constraint that this protocol adds, which changes the security properties." or "The owner action is irreversible and there's no timelock — in Code4rena this typically qualifies as Medium."]
+
+**Audit-trail signal that justified revival**:
+[Plain English — e.g., "The critic verdict listed Missing Precondition = 'amountIn must be > MAX_RESERVE', but Detector candidate-007 has Postconditions Created = 'reserve can be inflated past MAX_RESERVE via fee accumulation'. The two compose into a working exploit." OR "The killing critic verdict had no Depth Evidence tags, so the dismissal was abstract reasoning rather than concrete-value verification."]
 
 **Impact if real**:
 [Concrete impact — who loses what, under what conditions]

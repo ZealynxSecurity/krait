@@ -1,17 +1,19 @@
 # Krait
 
-**AI-assisted security verification for Solidity smart contracts.** Not a scanner — a structured methodology with 43 heuristics, 26 analysis modules, and 8 kill gates, tested blind against 45 Code4rena contests at **100% precision**. Runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Free.
+**AI-assisted security verification for Solidity smart contracts.** Not a scanner — a structured methodology with 101 heuristics, 26 analysis modules, and 8 kill gates, tested blind against 50 Code4rena contests at **100% precision**. Runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Free.
 
 ### At a Glance
 
 | | |
 |---|---|
+| **Current version** | v8.1 (Tier A methodology audit trail; v8 numbers remain the 50-contest baseline) |
 | **Detection angles** | 16 per function (4 lenses × 4 mindsets) |
 | **Heuristics** | 43 original + 58 extended (from open-source community) |
 | **Analysis modules** | 15 deep-dive module files + 26 inline modules (A-X) |
+| **Audit-trail rules** | R8 / R10 / R11 / R12 / R15 / R16 — exercised per finding (v8.1) |
 | **Domain primers** | 7 (DEX, Lending, Staking, GameFi, Bridges, Proxies, Wallets) |
 | **Kill gates** | 8 automatic + 10 FP patterns |
-| **Shadow audits** | 50 contests, 100% precision, 0 FPs/contest (v8) |
+| **Shadow audits** | 50 contests, 100% precision, 0 FPs/contest (v8 baseline); 3-contest v8.1 pilot 100% precision / 54.1% recall |
 | **Full methodology** | [`METHODOLOGY.md`](METHODOLOGY.md) — every technique, publicly documented |
 
 ### Two Products, One Goal
@@ -182,6 +184,7 @@ Tested blind against 50 Code4rena contests. No other AI audit tool publishes pre
 | v6.4 | 36-40 | 90% | 11.8% | 0.2 |
 | v7 | 41-45 | 100% | 11.0% | 0.0 |
 | **v8** | **46-50** | **100%** | **15.2%** | **0.0** |
+| **v8.1 (pilot)** | **3 re-runs** | **100%** | **54.1%** | **0.0** |
 
 **Latest 5 contests (v8):**
 
@@ -193,11 +196,22 @@ Tested blind against 50 Code4rena contests. No other AI audit tool publishes pre
 | Frankencoin | CDP Stablecoin | 20 | 2 | 0 | **100%** | 10% |
 | InitCapital | Lending/Hooks | 15 | 0 | 0 | N/A | 0% |
 
-Every result is verifiable in [`shadow-audits/`](shadow-audits/).
+**v8.1 Tier A pilot — same 3 contests re-run with the methodology audit-trail fields enabled:**
+
+| Contest | v8 Precision / Recall / FPs | v8.1 Precision / Recall / FPs | Δ Recall |
+|---------|---|---|---|
+| PoolTogether | 100% / 11.1% / 0 | **100% / 44.4% (4/9) / 0** | **+33.3 pp** |
+| Arcade | 100% / 25.0% / 0 | **100% / 75.0% (6/8) / 0** | **+50.0 pp** |
+| Frankencoin | 100% / 10.0% / 0 | **100% / 42.9% (9/21) / 0** | **+32.9 pp** |
+| **Average** | **100% / 15.4% / 0** | **100% / 54.1% / 0** | **+38.7 pp** |
+
+Three contests is signal, not statistical proof — a full 50-contest regression is required before changing the published v8 headline numbers. Every result is verifiable in [`shadow-audits/`](shadow-audits/).
 
 ### Self-Improving
 
 After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 43 original heuristics, 15 deep-dive module files, 58 extended heuristics, 26 inline modules, and 7 protocol-specific primers. v8 integrated open-source vectors from [pashov/skills](https://github.com/pashov/skills), [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen), and [forefy/.context](https://github.com/forefy/.context) (all MIT) — improving recall from 11% to 15.2% while maintaining 100% precision.
+
+**v8.1 (Tier A — methodology audit trail)** adds six structured fields to every detector / state-auditor / critic finding: `stepExecution` (which lenses/phases/gates ran), `rulesApplied` (R8 cached params, R10 worst-state severity, R11 unsolicited token transfer, R12 enabler enumeration, R15 flash-loan precondition, R16 oracle integrity), `depthEvidence` (`[BOUNDARY:…]` / `[VARIATION:…]` / `[TRACE:…]` concrete-value tags), `missingPrecondition` / `preconditionType`, `postconditionsCreated` / `postconditionTypes` / `whoBenefits`. Rules and tags are derived from [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen)'s methodology framework, integrated under MIT. Three pilot contests show recall +33–50 pp with precision held at 100% and zero new false positives; the full 50-contest regression has not been run yet.
 
 ---
 

@@ -11,6 +11,8 @@ Krait is a Solidity security auditor with **two delivery surfaces that share pat
 
 When fixing bugs or adding heuristics, the methodology usually lives in BOTH places: the Claude Code instructions under `.claude/skills/krait/**/instructions.md` and the equivalent prompt builders/heuristics in `src/`. Check both before declaring a change complete. `METHODOLOGY.md` documents the canonical pipeline.
 
+**v8.1 — Tier A methodology audit trail.** Every detector / state-auditor / critic finding emits six structured fields alongside the standard schema: `stepExecution` (which lenses/phases/gates ran), `rulesApplied` (R8 cached params, R10 worst-state severity, R11 unsolicited token transfer, R12 enabler enumeration, R15 flash-loan precondition, R16 oracle integrity), `depthEvidence` (`[BOUNDARY:…]` / `[VARIATION:…]` / `[TRACE:…]` tags), `missingPrecondition` + `preconditionType`, `postconditionsCreated` + `postconditionTypes` + `whoBenefits`. The rule and tag definitions are ported (under MIT) from PlamenTSV/plamen. All six are **optional** — pre-existing caches and findings still validate. CLI types live in `src/agents/types.ts` and `src/core/types.ts`; merge logic between the three pipeline stages is in `src/agents/ranker.ts` (`mergeMethodologyFields`). Schema is also embedded in the four skill files (`detector/state-auditor/critic/reviewer/instructions.md`). When adding new findings or modifying agent prompts, keep the audit-trail emission patterns consistent — they're the foundation for future chain analysis (D2 in `improvements-backlog.md`).
+
 ## Common commands
 
 ```

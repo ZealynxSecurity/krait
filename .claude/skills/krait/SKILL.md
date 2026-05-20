@@ -1,6 +1,6 @@
 ---
 name: krait
-description: AI-first security auditor for Solidity smart contracts. 4-phase pipeline (recon → detection → state analysis → verification) with 101 heuristics, 15 detection modules, and 8 kill gates. Tested at 100% precision across 50 blind shadow audits.
+description: AI-first security auditor for Solidity smart contracts. 4-phase pipeline (recon → detection → state analysis → verification) with 101 heuristics, 15 detection modules, 8 kill gates, and a 6-field methodology audit trail per finding (v8.1). Tested at 100% precision across 50 blind shadow audits.
 ---
 
 # Krait — AI Security Auditor
@@ -54,5 +54,7 @@ When invoked via `/krait`, a preflight readiness check runs first, then the 4-ph
 ## Benchmarks
 
 100% precision across 50 blind shadow audits against Code4rena contests. 0 false positives per contest (v7+v8). See `shadow-audits/progress.md` for full results.
+
+v8.1 Tier A methodology audit trail (3-contest pilot): 100% precision / 54.1% avg recall / 0 FPs across PoolTogether, Arcade, Frankencoin. Schema-driven; awaits full 50-contest regression.
 
 Built by [Zealynx Security](https://zealynx.io).

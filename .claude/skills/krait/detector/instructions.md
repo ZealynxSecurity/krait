@@ -701,8 +701,38 @@ For EVERY suspected vulnerability, create a candidate entry:
 
 **Why This Is a Bug**: [Not "might be" — state your case]
 
+**Step Execution**: Lens: A=✓ B=✓ C=✗(N/A: no external calls) D=?
+**Rules Applied**: [R8:✗(single-step), R10:✓(assessed at full unbond state), R11:✗(no external tokens), R12:✓(enumerated 3 paths to state S), R15:✗(no flash-loan-accessible state), R16:✗(no oracle dependency)]
+**Depth Evidence**: [BOUNDARY:amount=0 → revert at L42], [VARIATION:decimals 18→6 → price inflated 1e12x], [TRACE:withdraw(MAX)→revert L120 "insufficient"]
+**Missing Precondition** (if currently blocked): [What stops the attack today]
+**Precondition Type**: STATE / ACCESS / TIMING / EXTERNAL / BALANCE
+**Postconditions Created** (if attack succeeds): [What state/access/timing/external/balance changes does success leave behind]
+**Postcondition Types**: [STATE, ACCESS, ...]
+**Who Benefits**: [Attacker / any caller / specific role]
+
 **Status**: UNVERIFIED — needs Critic validation
 ```
+
+#### Methodology audit trail (the new fields)
+
+These last six fields are the **methodology audit trail**. They are OPTIONAL but strongly encouraged — they show your work to downstream agents and feed future chain analysis.
+
+- **Step Execution**: which Pass-2 lenses you ran on THIS candidate (A=access/auth, B=value-flow, C=external/composability, D=design/spec). Format: ✓=ran, ✗=skipped with reason, ?=ran but uncertain.
+- **Rules Applied**: cross-cutting rules independent of the kill gates. Pick from R8/R10/R11/R12/R15/R16:
+  - **R8** — Cached parameter / stored external state — multi-step ops only
+  - **R10** — Worst-state severity — assess impact at the worst realistic state, not the current snapshot (always required)
+  - **R11** — Unsolicited token transfer — when external tokens are involved
+  - **R12** — Exhaustive enabler enumeration — when the finding identifies a dangerous precondition state
+  - **R15** — Flash-loan precondition manipulation — when balance/oracle/threshold preconditions are flash-loan-accessible
+  - **R16** — Oracle integrity — when oracle-dependent logic is involved
+
+  Mark `✗(reason)` for rules that don't apply. Don't fake `✓` — the Critic will check.
+- **Depth Evidence**: concrete-value tags. These prove you reasoned with real numbers instead of abstractly:
+  - `[BOUNDARY:X=val]` — you substituted a boundary value into the expression
+  - `[VARIATION:A→B]` — you traced behavior change when a parameter varies
+  - `[TRACE:path→outcome]` — you traced execution to a terminal state (revert, return, state change)
+- **Missing Precondition / Precondition Type**: if the attack is currently blocked, name the blocker. Lets future chain analysis look for an enabler. Optional.
+- **Postconditions Created / Postcondition Types / Who Benefits**: if the attack succeeds, what conditions does it leave behind that another attack could chain off? Optional but valuable.
 
 Save ALL candidates to `.audit/findings/detector-candidates.md`.
 
