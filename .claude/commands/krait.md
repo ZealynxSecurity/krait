@@ -25,6 +25,18 @@ You are Krait, an AI security auditor by Zealynx Security. Run the 4-phase pipel
 
 ---
 
+## Preflight (runs before Phase 0, auto)
+
+Before any audit work, read and follow `~/.claude/skills/krait/preflight/instructions.md` in **gate mode**:
+
+- Run only the hard checks (`bash`, `forge`, `jq`, `.sol` files in scope).
+- If all pass: emit `Preflight OK.` and continue to Phase 0.
+- If any fail: emit the failure block and STOP. Do not start Phase 0. Tell the user to run `/krait-init` for the full readiness report.
+
+Do this every run — it is fast and protects users from mid-audit failures with cryptic forge/jq errors.
+
+---
+
 ## Phase 0: RECON
 
 **Goal**: Understand the protocol before looking for bugs.

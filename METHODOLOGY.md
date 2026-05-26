@@ -2,7 +2,17 @@
 
 This document describes exactly how Krait finds vulnerabilities. Every technique here was derived from real missed findings in blind shadow audits against Code4rena contests, then validated by measuring precision/recall improvements.
 
-Current version: **v8.0** (methodology) / **v7** (shadow audit scoring)
+Current version: **v8.1** (methodology audit trail) / **v8** (shadow audit scoring baseline, 50 contests)
+
+> **v8.1 changes (Tier A — methodology audit trail)**: Added six structured fields to every detector / state-auditor / critic finding so the model shows its work to downstream agents and so future chain analysis (D2) can match preconditions to postconditions:
+>
+> - `stepExecution` — which lenses/phases/gates the agent actually ran on this finding (e.g. `Lens: A=✓ B=✓ C=✗(N/A) D=?`)
+> - `rulesApplied` — exercise log for six cross-cutting rules ported from PlamenTSV/plamen: **R8** (cached parameter / stored external state), **R10** (worst-state severity), **R11** (unsolicited token transfer), **R12** (exhaustive enabler enumeration), **R15** (flash-loan precondition manipulation), **R16** (oracle integrity)
+> - `depthEvidence` — concrete-value tags: `[BOUNDARY:X=val]`, `[VARIATION:A→B]`, `[TRACE:path→outcome]`
+> - `missingPrecondition` / `preconditionType` — names the blocker when an attack is currently stopped (STATE / ACCESS / TIMING / EXTERNAL / BALANCE)
+> - `postconditionsCreated` / `postconditionTypes` / `whoBenefits` — what conditions a successful exploit leaves behind that another finding could chain off
+>
+> All fields are optional and additive; pre-existing findings still validate. Three-contest pilot (PoolTogether / Arcade / Frankencoin, all v8 baselines re-run) showed average recall +38.7 pp with precision held at 100% and zero new FPs. Full 50-contest regression has not been run yet — the published v8 headline numbers remain the canonical baseline until then.
 
 > **v8 changes**: Integrated open-source detection knowledge from [pashov/skills](https://github.com/pashov/skills) (MIT), [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen) (MIT), and [forefy/.context](https://github.com/forefy/.context) (MIT). Added 5 new detection modules (ERC-4626 vault, lending/liquidation, AMM/MEV, EIP-7702, ERC-4337), 58 extended heuristics, protocol-type statistical enrichment across all 7 primers, and Devil's Advocate verification methodology. Module trigger system now uses tier hierarchy (Tier 0 always-load, Tier 1 protocol-type, Tier 2 feature-detected). See [ATTRIBUTION.md](.claude/skills/krait/ATTRIBUTION.md) for full source details.
 
@@ -108,9 +118,9 @@ Every function is questioned through 7 categories (28+ questions):
 6. **RETURN VALUES** — What persists on revert? Can a failed call leave dirty state?
 7. **EXTERNAL CALLS** — What can happen between the call and the next line? Cross-tx windows?
 
-### Pass 1: 40 Heuristic Triggers
+### Pass 1: 101 Heuristic Triggers (43 original + 58 extended)
 
-Each heuristic was extracted from a real missed finding in shadow audits:
+Each heuristic was extracted from a real missed finding in shadow audits, or integrated from open-source community sources (see [ATTRIBUTION.md](.claude/skills/krait/ATTRIBUTION.md)):
 
 **Business Logic**: flash loan interactions, first-depositor inflation, round-trip exploits, fee-free arbitrage, circular collateral, liquidation profitability edge
 
@@ -212,7 +222,7 @@ This phase catches bugs that per-function analysis misses — where the vulnerab
 
 ## Phase 3: Verification — 8 Kill Gates
 
-Every candidate finding must survive **all 8 gates** before reaching the report. These gates have eliminated 95% of false positives and have **never killed a true positive** across 40 contests.
+Every candidate finding must survive **all 8 gates** before reaching the report. These gates have eliminated 95% of false positives across 50 blind shadow audits — 0.0 FPs/contest in v7 and v8.
 
 ### Automatic Kill Gates
 
@@ -314,34 +324,48 @@ If new findings emerge, the loop runs max 2 additional cycles. This catches bugs
 
 ## Shadow Audit Results
 
-Tested blind against 40 Code4rena contests. The full results are in [`shadow-audits/`](shadow-audits/).
+Tested blind against 50 Code4rena contests. The full results are in [`shadow-audits/`](shadow-audits/).
 
 ### Progression
 
-| Version | Contests | Avg Precision | FPs/Contest | Key Change |
-|---------|----------|--------------|-------------|------------|
-| v1 | 1-3 | 12% | 1.3 | Baseline |
-| v2 | 5-10 | 66% | 2.3 | Multi-pass + lenses |
-| v3 | 11-20 | 34% | 3.3 | Over-engineered, regression |
-| v4 | 21-30 | 37% | 4.2 | Module expansion |
-| v5 | 31-35 | 70% | 0.6 | Kill gates introduced |
-| **v6.4** | **36-40** | **90%** | **0.2** | Primers + architecture cleanup |
+| Version | Contests | Avg Precision | Avg Recall | FPs/Contest | Key Change |
+|---------|----------|--------------|------------|-------------|------------|
+| v1 | 1-3 | 12% | 5.8% | 1.3 | Baseline |
+| v2 | 5-10 | 66% | 30.2% | 2.3 | Multi-pass + lenses |
+| v3 | 11-20 | 34% | 14.1% | 3.3 | Over-engineered, regression |
+| v4 | 21-30 | 37% | 14.0% | 4.2 | Module expansion |
+| v5 | 31-35 | 70% | 9.5% | 0.6 | Kill gates introduced |
+| v6.4 | 36-40 | 90% | 11.8% | 0.2 | Primers + architecture cleanup |
+| v7 | 41-45 | **100%** | 11.0% | **0.0** | Module system + recon flags + new heuristics |
+| **v8** | **46-50** | **100%** | **15.2%** | **0.0** | Open-source integration (pashov/plamen/forefy) + 5 new modules |
+| **v8.1 (pilot)** | **3 re-runs** | **100%** | **54.1%** | **0.0** | Tier A methodology audit trail (6 new finding-schema fields) |
 
-### Latest 5 Contests (v6.4)
+### Latest 5 Contests (v8)
 
-| Contest | Type | LOC | TPs | FPs | Precision |
-|---------|------|-----|-----|-----|-----------|
-| LoopFi | Lending/Looping | 10,383 | 2 | 0 | **100%** |
-| DittoETH | Stablecoin/OrderBook | 16,215 | 1 | 1 | 50% |
-| Phi | Social/NFT | 3,964 | 1 | 0 | **100%** |
-| Vultisig | ILO/Token | 2,705 | 2 | 0 | **100%** |
-| Predy | DeFi Derivatives | 7,631 | 1 | 0 | **100%** |
+| Contest | Type | Official H+M | TPs | FPs | Precision | Recall | Key Module |
+|---------|------|--------------|-----|-----|-----------|--------|------------|
+| PoolTogether | ERC-4626 Prize Vault | 9 | 1 | 0 | **100%** | 11.1% | erc4626-vault-deep |
+| InitCapital | Lending/Hooks | 15 | 0 | 0 | N/A | 0% | lending-liquidation-deep |
+| GoodEntry | UniV3/AMM | 14 | 5 | 0 | **100%** | **35.7%** | amm-mev-deep |
+| Arcade | Governance | 8 | 2 | 0 | **100%** | **25.0%** | governance-voting |
+| Frankencoin | Mixed CDP | 20 | 2 | 0 | **100%** | 10.0% | lending-liq + economic |
 
-4 consecutive 100% precision contests. 0.2 FPs/contest. No other AI audit tool publishes these numbers.
+10 TPs, 0 FPs across the v8 batch. 4/5 contests at 100% precision (InitCapital found no TPs but also no FPs — clean sheet). No other AI audit tool publishes precision/recall against real competitions.
+
+### v8.1 Pilot — Same 3 Contests Re-Run with Tier A Audit Trail
+
+| Contest | v8 P / R / FP | v8.1 P / R / FP | Δ Recall | Notes |
+|---------|---|---|---|---|
+| PoolTogether | 100% / 11.1% / 0 | **100% / 44.4% (4/9) / 0** | **+33.3 pp** | yieldFeeBalance ↔ TWAB uint96 cap interactions surfaced via R8+R10 |
+| Arcade | 100% / 25.0% / 0 | **100% / 75.0% (6/8) / 0** | **+50.0 pp** | setter↔consumer asymmetries surfaced via R8 + R12 enabler enumeration |
+| Frankencoin | 100% / 10.0% / 0 | **100% / 42.9% (9/21) / 0** | **+32.9 pp** | auction-state enablers + balance-based bypass paths via R12 + R15 |
+| **Average** | **100% / 15.4% / 0** | **100% / 54.1% / 0** | **+38.7 pp** | Schema fields present on 100% of final findings; R10 fired on every finding |
+
+Caveats: (1) v8 baselines are ~2 months old — some delta is "today's run vs old run" rather than purely the schema change; (2) n=3 contests is signal, not statistical proof; (3) audit agents knew this was a Tier A pilot, which may bias adoption of the new fields upward vs a stock `/krait` invocation. Full 50-contest regression is required before promoting v8.1 to the headline metric.
 
 ### Self-Improving Loop
 
-After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced the 40 heuristics, 26 modules, 7 primers, and 10 FP patterns from real missed findings — not from theory.
+After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 43 original heuristics + 58 extended heuristics, 15 deep-dive module files + 26 inline modules, 7 primers, and 10 FP patterns from real missed findings — not from theory.
 
 ---
 
@@ -349,14 +373,16 @@ After each blind test: score → root-cause every miss → update methodology �
 
 | Metric | Count |
 |--------|-------|
-| Detection heuristics | 40 |
-| Targeted analysis modules | 26 (A-X) |
+| Detection heuristics | 101 (43 original + 58 extended) |
+| Deep-dive module files | 15 |
+| Inline analysis modules | 26 (A-X) |
 | Analysis angles per function | 16 (4 lenses × 4 mindsets) |
 | Domain-specific primers | 7 |
 | Kill gates | 8 |
 | False positive patterns | 10 |
 | Feynman question categories | 7 (28+ questions) |
 | Mechanical sweep checks | 7 |
-| Shadow audits completed | 40 |
-| Precision (latest) | 90% |
-| FPs per contest (latest) | 0.2 |
+| Shadow audits completed | 50 |
+| Precision (v7 + v8, last 10 contests) | 100% |
+| FPs per contest (v7 + v8) | 0.0 |
+| Recall (v8) | 15.2% |

@@ -71,6 +71,7 @@ export function rank(
       remediation: candidate.remediation || '',
       category: candidate.category,
       codeSnippet: candidate.codeSnippet,
+      ...mergeMethodologyFields(candidate, proof, verdict),
     };
 
     scored.push({
@@ -177,6 +178,70 @@ function deduplicateRanked(findings: RankedFinding[]): RankedFinding[] {
   }
 
   return result;
+}
+
+/**
+ * Merge A1/A2/A4 metadata from candidate (detector), proof (reasoner), and verdict (critic)
+ * into the final Finding. Critic is authoritative for rules/preconditions; reasoner is
+ * authoritative for postconditions (the proof actually demonstrates them).
+ * All fields stay optional — findings with no metadata still validate.
+ */
+export function mergeMethodologyFields(
+  candidate: CandidateFinding,
+  proof: ExploitProof,
+  verdict: CriticVerdict,
+): Partial<Finding> {
+  const out: Partial<Finding> = {};
+
+  // Step Execution: concatenate detector + critic views (different phases, both useful)
+  const stepParts: string[] = [];
+  if (candidate.stepExecution) stepParts.push(`Detector: ${candidate.stepExecution}`);
+  if (verdict.verdict === 'valid' || verdict.verdict === 'uncertain') {
+    // Critic's stepExecution lives elsewhere (per the skill, in the verified-findings template);
+    // the TS pipeline doesn't have a slot for it on CriticVerdict today. Plumbed only if available.
+    const criticStep = (verdict as unknown as { stepExecution?: string }).stepExecution;
+    if (typeof criticStep === 'string' && criticStep.trim()) stepParts.push(`Critic: ${criticStep.trim()}`);
+  }
+  if (stepParts.length > 0) out.stepExecution = stepParts.join(' | ');
+
+  // Rules Applied: prefer critic's (later, authoritative), fall back to detector
+  if (verdict.rulesApplied && verdict.rulesApplied.length > 0) {
+    out.rulesApplied = verdict.rulesApplied.map(r => ({ ...r }));
+  } else if (candidate.rulesApplied && candidate.rulesApplied.length > 0) {
+    out.rulesApplied = candidate.rulesApplied.map(r => ({ ...r }));
+  }
+
+  // Depth Evidence: union of all sources (deduplicated)
+  const evidence = new Set<string>();
+  for (const e of candidate.depthEvidence || []) evidence.add(e);
+  for (const e of proof.depthEvidence || []) evidence.add(e);
+  if (evidence.size > 0) out.depthEvidence = [...evidence];
+
+  // Precondition: critic's blocker when verdict isn't 'valid'; else detector's
+  if (verdict.verdict !== 'valid' && verdict.missingPrecondition) {
+    out.missingPrecondition = verdict.missingPrecondition;
+    if (verdict.preconditionType) out.preconditionType = verdict.preconditionType;
+  } else if (candidate.missingPrecondition) {
+    out.missingPrecondition = candidate.missingPrecondition;
+    if (candidate.preconditionType) out.preconditionType = candidate.preconditionType;
+  }
+
+  // Postconditions: reasoner is authoritative (proof actually creates them); fall back to detector
+  if (proof.postconditionsCreated) {
+    out.postconditionsCreated = proof.postconditionsCreated;
+    if (proof.postconditionTypes && proof.postconditionTypes.length > 0) {
+      out.postconditionTypes = [...proof.postconditionTypes];
+    }
+    if (proof.whoBenefits) out.whoBenefits = proof.whoBenefits;
+  } else if (candidate.postconditionsCreated) {
+    out.postconditionsCreated = candidate.postconditionsCreated;
+    if (candidate.postconditionTypes && candidate.postconditionTypes.length > 0) {
+      out.postconditionTypes = [...candidate.postconditionTypes];
+    }
+    if (candidate.whoBenefits) out.whoBenefits = candidate.whoBenefits;
+  }
+
+  return out;
 }
 
 function jaccardSimilarity(a: string, b: string): number {

@@ -210,8 +210,20 @@ Save to `.audit/findings/state-candidates.md`:
 
 **Masking Code** (if any): [defensive pattern hiding this]
 **Cross-Feed**: [Related Detector candidate, if any]
+
+**Step Execution**: Phases: 1=✓ 2=✓ 3=✓ 4=✓ 5=✓ 6=✗(N/A: not multi-step) 7=? 8=✓
+**Rules Applied**: [R8:✓(traced cached state across 3 ops), R10:✓(severity at full-drain state), R11:✗(no external tokens), R12:✓(enumerated 4 paths reaching desync), R15:✗, R16:✗]
+**Depth Evidence**: [BOUNDARY:lastFundingTime=0 → staleness=block.timestamp], [VARIATION:partial withdraw amount 1→reserve → sync gap grows linearly], [TRACE:liquidate(partial)→state A updated, state B unchanged]
+**Missing Precondition** (if desync is currently masked): [What masks it today]
+**Precondition Type**: STATE / ACCESS / TIMING / EXTERNAL / BALANCE
+**Postconditions Created** (after desync): [E.g. "rewards now computed against stale supply for 24h"]
+**Postcondition Types**: [STATE, TIMING, ...]
+**Who Benefits**: [Attacker / next caller / any user]
+
 **Status**: UNVERIFIED
 ```
+
+The last six fields are the **methodology audit trail** — see detector skill `instructions.md` Step 6 for full definitions of Step Execution, Rules Applied (R8/R10/R11/R12/R15/R16), Depth Evidence tags, and precondition/postcondition fields. State-auditor "Step Execution" lists Phases 1–8 from this skill (Phase 1 = Dependency Map, Phase 2 = Mutation Matrix, etc.). All six are optional but strongly encouraged.
 
 ## Rules
 

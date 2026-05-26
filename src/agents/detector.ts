@@ -6,11 +6,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { FileInfo, ArchitectureAnalysis } from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
-import { CandidateFinding } from './types.js';
+import { CandidateFinding, ConditionType, RuleApplication, RuleCode } from './types.js';
 import { formatArchitectureForSystemPrompt, formatArchitectureForFilePrompt } from '../analysis/architecture-pass.js';
 import { getHeuristicsForFile, formatHeuristicsForPrompt } from '../knowledge/audit-heuristics.js';
 import { ProjectContext, formatContextForPrompt } from '../analysis/context-gatherer.js';
 import { getProtocolChecklist } from '../analysis/domain-checklists.js';
+
+const CONDITION_TYPE_ENUM = ['STATE', 'ACCESS', 'TIMING', 'EXTERNAL', 'BALANCE'];
+const RULE_CODE_ENUM = ['R8', 'R10', 'R11', 'R12', 'R15', 'R16'];
 
 const CANDIDATE_TOOL: Anthropic.Tool = {
   name: 'report_candidates',
@@ -42,6 +45,53 @@ const CANDIDATE_TOOL: Anthropic.Tool = {
             },
             confidence: { type: 'number', description: 'Confidence 0-100' },
             remediation: { type: 'string', description: 'How to fix the vulnerability' },
+            // A1 — methodology audit trail
+            stepExecution: {
+              type: 'string',
+              description: 'Compact summary of which detector steps you actually ran on this candidate. Format: "Lens: A=✓ B=✓ C=✗(N/A) D=?" where ✓=ran, ✗=skipped with reason in parens, ?=ran but uncertain. Optional.',
+            },
+            rulesApplied: {
+              type: 'array',
+              description: 'Which cross-cutting rules you exercised. Always include R10 (worst-state severity). Mark others ✗ with reason if N/A. Optional but recommended.',
+              items: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string', enum: RULE_CODE_ENUM, description: 'R8=cached/stored external state, R10=worst-state severity, R11=unsolicited token transfer, R12=enabler enumeration, R15=flash-loan precondition, R16=oracle integrity' },
+                  applied: { type: 'boolean', description: 'true=rule exercised and contributed evidence, false=N/A or skipped' },
+                  reason: { type: 'string', description: 'Short note: why N/A or what the rule surfaced' },
+                },
+                required: ['code', 'applied'],
+              },
+            },
+            // A2 — depth evidence tags
+            depthEvidence: {
+              type: 'array',
+              description: 'Concrete-value evidence tags you produced while investigating. Format: ["[BOUNDARY:amount=0]", "[VARIATION:decimals 18→6]", "[TRACE:withdraw(MAX)→revert L120]"]. Optional but strongly incentivized — these prove you reasoned with real values.',
+              items: { type: 'string' },
+            },
+            // A4 — precondition/postcondition
+            missingPrecondition: {
+              type: 'string',
+              description: 'If the attack is currently BLOCKED by a check or state, describe what would have to be different. Optional.',
+            },
+            preconditionType: {
+              type: 'string',
+              enum: CONDITION_TYPE_ENUM,
+              description: 'Category of the missing precondition. Optional.',
+            },
+            postconditionsCreated: {
+              type: 'string',
+              description: 'If this finding executes successfully, what state/access/timing/external/balance conditions does it leave behind that another attack could chain off? Optional.',
+            },
+            postconditionTypes: {
+              type: 'array',
+              description: 'Categories of postconditions created. Optional.',
+              items: { type: 'string', enum: CONDITION_TYPE_ENUM },
+            },
+            whoBenefits: {
+              type: 'string',
+              description: 'Who can use the postconditions created (attacker, any caller, a specific role). Optional.',
+            },
           },
           required: ['title', 'severity', 'line', 'category', 'description', 'confidence'],
         },
@@ -107,7 +157,67 @@ export async function detect(
     relatedContracts: Array.isArray(r.relatedContracts) ? r.relatedContracts.map(String) : [],
     detectorConfidence: Number(r.confidence) || 50,
     remediation: String(r.remediation || ''),
+    ...extractMethodologyFields(r),
   }));
+}
+
+/**
+ * Pull A1/A2/A4 metadata out of a raw tool-call entry. All fields are optional —
+ * older detectors / cached results without them stay valid.
+ */
+export function extractMethodologyFields(r: Record<string, unknown>): Partial<CandidateFinding> {
+  const out: Partial<CandidateFinding> = {};
+  if (typeof r.stepExecution === 'string' && r.stepExecution.trim()) {
+    out.stepExecution = r.stepExecution.trim();
+  }
+  if (Array.isArray(r.rulesApplied)) {
+    const rules: RuleApplication[] = [];
+    for (const x of r.rulesApplied) {
+      if (typeof x !== 'object' || x === null) continue;
+      const obj = x as Record<string, unknown>;
+      const code = String(obj.code || '');
+      if (!isRuleCode(code)) continue;
+      rules.push({
+        code,
+        applied: Boolean(obj.applied),
+        reason: typeof obj.reason === 'string' && obj.reason.trim() ? obj.reason.trim() : undefined,
+      });
+    }
+    if (rules.length > 0) out.rulesApplied = rules;
+  }
+  if (Array.isArray(r.depthEvidence)) {
+    const tags = r.depthEvidence.map(String).filter(s => s.trim().length > 0);
+    if (tags.length > 0) out.depthEvidence = tags;
+  }
+  if (typeof r.missingPrecondition === 'string' && r.missingPrecondition.trim()) {
+    out.missingPrecondition = r.missingPrecondition.trim();
+  }
+  if (typeof r.preconditionType === 'string' && isConditionType(r.preconditionType)) {
+    out.preconditionType = r.preconditionType;
+  }
+  if (typeof r.postconditionsCreated === 'string' && r.postconditionsCreated.trim()) {
+    out.postconditionsCreated = r.postconditionsCreated.trim();
+  }
+  if (Array.isArray(r.postconditionTypes)) {
+    const types: ConditionType[] = [];
+    for (const t of r.postconditionTypes) {
+      const s = String(t);
+      if (isConditionType(s)) types.push(s);
+    }
+    if (types.length > 0) out.postconditionTypes = types;
+  }
+  if (typeof r.whoBenefits === 'string' && r.whoBenefits.trim()) {
+    out.whoBenefits = r.whoBenefits.trim();
+  }
+  return out;
+}
+
+function isRuleCode(s: string): s is RuleCode {
+  return RULE_CODE_ENUM.includes(s);
+}
+
+function isConditionType(s: string): s is ConditionType {
+  return CONDITION_TYPE_ENUM.includes(s);
 }
 
 function buildDetectorSystemPrompt(
@@ -175,6 +285,27 @@ Read the code like an attacker:
 - Missing features (no pause, no timelock, no circuit breaker)
 - Generic reentrancy where no concrete value extraction is possible
 - "Potential" issues that are purely cosmetic (naming, documentation, style)
+
+## Methodology Audit Trail (optional but recommended fields)
+
+For each candidate, ALSO emit:
+
+- **stepExecution**: a compact string showing which lenses you applied to THIS candidate, e.g. \`"Lens: A=✓ B=✓ C=✗(N/A) D=?"\` — ✓=ran, ✗=skipped (give a reason), ?=ran but uncertain. This is your work-shown for downstream agents.
+- **rulesApplied**: array of objects exercising the cross-cutting rules. Always include R10 (worst-state severity). For others, mark \`applied:false\` with a one-line reason if N/A:
+  - **R8** — cached parameter / stored external state (multi-step ops only)
+  - **R10** — worst-state severity (always — assess impact at the worst realistic state, not the current snapshot)
+  - **R11** — unsolicited token transfer (when external tokens are involved)
+  - **R12** — exhaustive enabler enumeration (when the finding identifies a dangerous precondition state)
+  - **R15** — flash-loan precondition manipulation (when balance/oracle/threshold preconditions are flash-loan-accessible)
+  - **R16** — oracle integrity (when oracle-dependent logic is involved)
+- **depthEvidence**: array of concrete-value evidence tags. Use these aggressively — they prove you reasoned with real numbers instead of in the abstract:
+  - \`"[BOUNDARY:amount=0]"\` — you substituted a boundary value into the expression
+  - \`"[VARIATION:decimals 18→6]"\` — you traced behavior change when a parameter varies
+  - \`"[TRACE:withdraw(MAX)→revert L120]"\` — you traced execution to a terminal state
+- **missingPrecondition** / **preconditionType**: if the attack is currently BLOCKED by some check or state, describe it and classify the type (STATE / ACCESS / TIMING / EXTERNAL / BALANCE). Optional.
+- **postconditionsCreated** / **postconditionTypes** / **whoBenefits**: if the finding executes successfully, what state/access/timing/external/balance conditions does it leave behind that another attack could chain off? Optional but valuable for chain analysis.
+
+These fields do NOT replace the description — they augment it. Older candidates without them remain valid.
 
 ${archContext}
 

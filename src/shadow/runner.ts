@@ -5,10 +5,10 @@
  * Pipeline: Clone repo → Run Krait audit → Clone findings → Compare → Score
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { resolve, join, basename } from 'path';
-import { ContestEntry } from './registry.js';
+import { ContestEntry, validateContestEntry } from './registry.js';
 import { resolveConfig } from '../core/config.js';
 import { discoverFiles, detectDomain } from '../core/file-discovery.js';
 import { PatternLoader } from '../knowledge/pattern-loader.js';
@@ -68,6 +68,10 @@ export async function runShadowAudit(
   const startTime = Date.now();
   const workDir = resolve(options.workDir);
 
+  // Validate URLs before doing anything else — we shell out to git below, so
+  // a malformed registry entry is a security issue, not just a runtime error.
+  validateContestEntry(contest);
+
   if (!existsSync(workDir)) {
     mkdirSync(workDir, { recursive: true });
   }
@@ -80,7 +84,7 @@ export async function runShadowAudit(
     if (!options.skipClone) {
       if (!existsSync(sourceDir)) {
         log(`  Cloning source: ${contest.sourceRepo}`);
-        execSync(`git clone --depth 1 ${contest.sourceRepo} ${sourceDir}`, {
+        execFileSync('git', ['clone', '--depth', '1', '--', contest.sourceRepo, sourceDir], {
           stdio: options.verbose ? 'inherit' : 'pipe',
           timeout: 120000,
         });
@@ -91,7 +95,7 @@ export async function runShadowAudit(
       // Step 2: Clone findings repo (if needed)
       if (!existsSync(findingsDir)) {
         log(`  Cloning findings: ${contest.findingsRepo}`);
-        execSync(`git clone --depth 1 ${contest.findingsRepo} ${findingsDir}`, {
+        execFileSync('git', ['clone', '--depth', '1', '--', contest.findingsRepo, findingsDir], {
           stdio: options.verbose ? 'inherit' : 'pipe',
           timeout: 120000,
         });

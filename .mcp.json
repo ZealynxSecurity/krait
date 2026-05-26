@@ -4,6 +4,11 @@
       "type": "stdio",
       "command": "node",
       "args": ["mcp-servers/solodit/build/index.js"]
+    },
+    "krait-forge": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["mcp-servers/forge/build/index.js"]
     }
   }
 }

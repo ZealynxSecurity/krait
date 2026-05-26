@@ -292,6 +292,13 @@ complete code trace showing no mitigation exists]
 **Impact**: [Precise impact statement]
 **Root Cause**: [One-line root cause]
 
+**Step Execution**: Gates: A=✓ B=✓ C=✓ D=✓ E=✓ F=✓ G=✓ H=✓
+**Rules Applied**: [R8:✓(verified cached fee param against current state), R10:✓(severity assessed at worst-state pool=empty), R11:✗(no external tokens), R12:✓(detector enumerated 4 enablers; all confirmed reachable), R15:✗(no flash-loan-accessible state), R16:✗(no oracle)]
+**Depth Evidence**: [BOUNDARY:reserve=0 → divisor underflow], [TRACE:swap(1 wei)→profit 1.2e18 after attack sequence]
+**Postconditions Created** (carry from detector/reasoner): [What this exploit leaves behind]
+**Postcondition Types**: [STATE, BALANCE, ...]
+**Who Benefits**: [Attacker]
+
 ---
 
 ## Eliminated (False Positives)
@@ -299,7 +306,14 @@ complete code trace showing no mitigation exists]
 ### CANDIDATE-XXX: Title
 **Verdict**: FALSE POSITIVE
 **Reason**: FP-3 — OpenZeppelin ERC4626 provides virtual offset protection (line XX of parent contract)
+
+**Step Execution**: Gates: A=✓ B=✓ C=✓ D=✓ E=✓ F=✓ G=✓ H=✓
+**Rules Applied**: [R10:✓, R11:✗(no external tokens), R16:✗(no oracle)]
+**Missing Precondition** (the blocker that makes this invalid): Virtual offset of 10^6 prevents share-price manipulation at first deposit
+**Precondition Type**: STATE
 ```
+
+The new **Step Execution / Rules Applied / Depth Evidence / Precondition / Postcondition** fields are the **methodology audit trail** — see detector skill `instructions.md` Step 6 for full definitions. Critic's `Step Execution` lists the 8 kill gates (A=Generic Best Practice, B=Theoretical/Unrealistic, C=Intentional Design, D=Speculative, E=Admin Trust, F=Dust, G=Out of Context, H=Publicly Known Issues). For invalid verdicts, the `Missing Precondition` field captures the specific blocker so future chain analysis can search for an enabler that creates it. All six are optional but strongly encouraged.
 
 ## Rules
 

@@ -123,8 +123,39 @@ export const CONTEST_REGISTRY: ContestEntry[] = [
   },
 ];
 
+/**
+ * Allowed shape for a contest source/findings repo URL.
+ * Strict on purpose: we shell out to `git clone` with these strings, so we
+ * reject anything that isn't a plain GitHub HTTPS URL with a single org/repo
+ * path. No protocol smuggling, no shell metacharacters, no SSH form.
+ */
+const REPO_URL_RE = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(?:\.git)?$/;
+
+export class RegistryValidationError extends Error {
+  constructor(contestId: string, field: string, value: string) {
+    super(`Contest ${contestId}: invalid ${field}=${JSON.stringify(value)} — must match ${REPO_URL_RE}`);
+    this.name = 'RegistryValidationError';
+  }
+}
+
+/**
+ * Validate that an entry's URLs are safe to pass to git. Throws on failure.
+ * Called by getContestById/listContests so any consumer that resolves entries
+ * by id gets validated input.
+ */
+export function validateContestEntry(entry: ContestEntry): void {
+  if (!REPO_URL_RE.test(entry.sourceRepo)) {
+    throw new RegistryValidationError(entry.id, 'sourceRepo', entry.sourceRepo);
+  }
+  if (!REPO_URL_RE.test(entry.findingsRepo)) {
+    throw new RegistryValidationError(entry.id, 'findingsRepo', entry.findingsRepo);
+  }
+}
+
 export function getContestById(id: string): ContestEntry | undefined {
-  return CONTEST_REGISTRY.find(c => c.id === id);
+  const entry = CONTEST_REGISTRY.find(c => c.id === id);
+  if (entry) validateContestEntry(entry);
+  return entry;
 }
 
 export function getContestsByDifficulty(difficulty: ContestEntry['difficulty']): ContestEntry[] {
@@ -132,5 +163,6 @@ export function getContestsByDifficulty(difficulty: ContestEntry['difficulty']):
 }
 
 export function listContests(): ContestEntry[] {
+  for (const c of CONTEST_REGISTRY) validateContestEntry(c);
   return [...CONTEST_REGISTRY];
 }

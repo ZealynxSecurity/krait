@@ -6,8 +6,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { ArchitectureAnalysis } from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
-import { CandidateFinding, ExploitProof } from './types.js';
+import { CandidateFinding, ConditionType, ExploitProof } from './types.js';
 import { formatArchitectureForSystemPrompt } from '../analysis/architecture-pass.js';
+
+const REASONER_CONDITION_ENUM = ['STATE', 'ACCESS', 'TIMING', 'EXTERNAL', 'BALANCE'];
 
 const PROOF_TOOL: Anthropic.Tool = {
   name: 'report_proofs',
@@ -36,6 +38,26 @@ const PROOF_TOOL: Anthropic.Tool = {
             },
             codeTrace: { type: 'string', description: 'Function call trace showing the exploit path' },
             confidence: { type: 'number', description: 'Confidence in exploit viability 0-100' },
+            // A2 — depth evidence surfaced while building the proof
+            depthEvidence: {
+              type: 'array',
+              description: 'Concrete-value tags you produced while building the proof. Format: ["[BOUNDARY:reserve=MAX_UINT128]", "[VARIATION:fee 0→10000]", "[TRACE:liquidate(victim)→profit 1.2e18]"]. Optional but strongly incentivized.',
+              items: { type: 'string' },
+            },
+            // A4 — postconditions a successful exploit leaves behind
+            postconditionsCreated: {
+              type: 'string',
+              description: 'If the exploit succeeds, what state/access/timing/external/balance conditions does it leave behind that another attack could chain off? Optional.',
+            },
+            postconditionTypes: {
+              type: 'array',
+              description: 'Categories of postconditions created by a successful exploit. Optional.',
+              items: { type: 'string', enum: REASONER_CONDITION_ENUM },
+            },
+            whoBenefits: {
+              type: 'string',
+              description: 'Who can use the postconditions created (attacker, any caller, a specific role). Optional.',
+            },
           },
           required: ['candidateId', 'isExploitable', 'attackScenario', 'confidence'],
         },
@@ -218,6 +240,17 @@ Provide: the specific input/state that triggers incorrect behavior, what the cod
 - "Values would need to be astronomically large" — if there's no explicit bounds check, large values CAN accumulate over time. Mark exploitable.
 - "Overflow is prevented by Solidity 0.8+" — this only applies to arithmetic (+, -, *), NOT to explicit type casts like uint128(x). Casts silently truncate. Mark exploitable if no bounds check exists.
 - "Fee is small so impact is minimal" — even small incorrect fees compound over many transactions. Mark exploitable if the math is wrong.
+
+## Methodology Fields (optional but recommended)
+
+When you build a proof, ALSO emit:
+
+- **depthEvidence**: array of concrete-value tags showing what real numbers you tried while building the proof. Format: \`["[BOUNDARY:amount=0]", "[VARIATION:decimals 18→6]", "[TRACE:withdraw(MAX)→revert L120]"]\`. These prove the exploit is grounded in real values, not abstract reasoning.
+- **postconditionsCreated**: if the exploit succeeds, what state/access/timing/external/balance conditions does it leave behind? (e.g. "victim's collateral now < liquidation threshold", "attacker holds approval over depositor's vault shares", "oracle reports stale price for 10+ blocks").
+- **postconditionTypes**: classify each postcondition as STATE / ACCESS / TIMING / EXTERNAL / BALANCE.
+- **whoBenefits**: who can use the postconditions created (attacker, any caller, a specific role).
+
+These feed downstream chain analysis. Omit if the exploit creates no useful postconditions (e.g. it just reverts).
 ${archContext}`;
 
   const userPrompt = `## File: ${file}
@@ -277,6 +310,7 @@ For EACH candidate above, provide an exploitation proof. If you cannot construct
                 proofSteps: Array.isArray(raw.proofSteps) ? raw.proofSteps.map(String) : [],
                 codeTrace: String(raw.codeTrace || ''),
                 reasonerConfidence: Number(raw.confidence) || 0,
+                ...extractProofMethodologyFields(raw),
               };
               seenIds.add(proof.candidateId);
               proofs.push(proof);
@@ -320,4 +354,31 @@ For EACH candidate above, provide an exploitation proof. If you cannot construct
   }
 
   throw lastError || new Error('Reasoner: max retries exceeded');
+}
+
+/**
+ * Pull A2 (depth evidence) and A4 (postconditions) fields from a raw proof entry.
+ * All optional; cached proofs without these stay valid.
+ */
+function extractProofMethodologyFields(raw: Record<string, unknown>): Partial<ExploitProof> {
+  const out: Partial<ExploitProof> = {};
+  if (Array.isArray(raw.depthEvidence)) {
+    const tags = raw.depthEvidence.map(String).filter(s => s.trim().length > 0);
+    if (tags.length > 0) out.depthEvidence = tags;
+  }
+  if (typeof raw.postconditionsCreated === 'string' && raw.postconditionsCreated.trim()) {
+    out.postconditionsCreated = raw.postconditionsCreated.trim();
+  }
+  if (Array.isArray(raw.postconditionTypes)) {
+    const types: ConditionType[] = [];
+    for (const t of raw.postconditionTypes) {
+      const s = String(t);
+      if (REASONER_CONDITION_ENUM.includes(s)) types.push(s as ConditionType);
+    }
+    if (types.length > 0) out.postconditionTypes = types;
+  }
+  if (typeof raw.whoBenefits === 'string' && raw.whoBenefits.trim()) {
+    out.whoBenefits = raw.whoBenefits.trim();
+  }
+  return out;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rank } from '../ranker.js';
+import { rank, mergeMethodologyFields } from '../ranker.js';
 import { CandidateFinding, ExploitProof, CriticVerdict } from '../types.js';
 
 function makeCandidate(overrides: Partial<CandidateFinding> = {}): CandidateFinding {
@@ -179,5 +179,109 @@ describe('Ranker', () => {
 
     const result = rank(candidates, proofs, verdicts, 0);
     expect(result[0].finding.description).toContain('Call withdraw() before deposit settles');
+  });
+});
+
+describe('mergeMethodologyFields', () => {
+  it('returns empty when no metadata anywhere', () => {
+    expect(mergeMethodologyFields(makeCandidate(), makeProof(), makeVerdict())).toEqual({});
+  });
+
+  it('passes candidate stepExecution into Detector: prefix', () => {
+    const result = mergeMethodologyFields(
+      makeCandidate({ stepExecution: 'Lens: A=✓ B=✓' }),
+      makeProof(),
+      makeVerdict(),
+    );
+    expect(result.stepExecution).toBe('Detector: Lens: A=✓ B=✓');
+  });
+
+  it('prefers critic rulesApplied over detector rulesApplied', () => {
+    const result = mergeMethodologyFields(
+      makeCandidate({ rulesApplied: [{ code: 'R10', applied: true, reason: 'detector view' }] }),
+      makeProof(),
+      makeVerdict({ rulesApplied: [{ code: 'R10', applied: true, reason: 'critic view' }] }),
+    );
+    expect(result.rulesApplied).toEqual([{ code: 'R10', applied: true, reason: 'critic view' }]);
+  });
+
+  it('falls back to detector rulesApplied when critic has none', () => {
+    const result = mergeMethodologyFields(
+      makeCandidate({ rulesApplied: [{ code: 'R10', applied: true }] }),
+      makeProof(),
+      makeVerdict(),
+    );
+    expect(result.rulesApplied).toEqual([{ code: 'R10', applied: true }]);
+  });
+
+  it('unions depthEvidence from candidate and proof (deduped)', () => {
+    const result = mergeMethodologyFields(
+      makeCandidate({ depthEvidence: ['[BOUNDARY:amount=0]', '[TRACE:foo→revert]'] }),
+      makeProof({ depthEvidence: ['[TRACE:foo→revert]', '[VARIATION:fee 0→100]'] }),
+      makeVerdict(),
+    );
+    expect(result.depthEvidence?.sort()).toEqual(
+      ['[BOUNDARY:amount=0]', '[TRACE:foo→revert]', '[VARIATION:fee 0→100]'].sort(),
+    );
+  });
+
+  it('uses critic precondition when verdict is invalid/uncertain', () => {
+    const result = mergeMethodologyFields(
+      makeCandidate({ missingPrecondition: 'detector view', preconditionType: 'STATE' }),
+      makeProof(),
+      makeVerdict({
+        verdict: 'invalid',
+        missingPrecondition: 'critic blocker',
+        preconditionType: 'ACCESS',
+      }),
+    );
+    expect(result.missingPrecondition).toBe('critic blocker');
+    expect(result.preconditionType).toBe('ACCESS');
+  });
+
+  it('uses detector precondition when verdict is valid', () => {
+    const result = mergeMethodologyFields(
+      makeCandidate({ missingPrecondition: 'detector view', preconditionType: 'STATE' }),
+      makeProof(),
+      makeVerdict({ verdict: 'valid' }),
+    );
+    expect(result.missingPrecondition).toBe('detector view');
+    expect(result.preconditionType).toBe('STATE');
+  });
+
+  it('prefers reasoner postconditions over detector postconditions', () => {
+    const result = mergeMethodologyFields(
+      makeCandidate({
+        postconditionsCreated: 'detector view',
+        postconditionTypes: ['STATE'],
+        whoBenefits: 'detector-attacker',
+      }),
+      makeProof({
+        postconditionsCreated: 'reasoner view',
+        postconditionTypes: ['BALANCE', 'TIMING'],
+        whoBenefits: 'reasoner-attacker',
+      }),
+      makeVerdict(),
+    );
+    expect(result.postconditionsCreated).toBe('reasoner view');
+    expect(result.postconditionTypes).toEqual(['BALANCE', 'TIMING']);
+    expect(result.whoBenefits).toBe('reasoner-attacker');
+  });
+
+  it('plumbs full metadata into rank() output Finding', () => {
+    const candidate = makeCandidate({
+      stepExecution: 'Lens: A=✓',
+      rulesApplied: [{ code: 'R10', applied: true }],
+      depthEvidence: ['[BOUNDARY:amount=0]'],
+    });
+    const proof = makeProof({ postconditionsCreated: 'attacker holds approval' });
+    const verdict = makeVerdict();
+
+    const result = rank([candidate], [proof], [verdict], 0);
+    expect(result.length).toBe(1);
+    expect(result[0].finding.stepExecution).toBe('Detector: Lens: A=✓');
+    expect(result[0].finding.rulesApplied).toEqual([{ code: 'R10', applied: true }]);
+    expect(result[0].finding.depthEvidence).toEqual(['[BOUNDARY:amount=0]']);
+    expect(result[0].finding.postconditionsCreated).toBe('attacker holds approval');
   });
 });

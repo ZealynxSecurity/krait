@@ -7,8 +7,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { ArchitectureAnalysis } from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
-import { CandidateFinding, ExploitProof, CriticVerdict } from './types.js';
+import { CandidateFinding, ConditionType, CriticVerdict, ExploitProof, RuleApplication, RuleCode } from './types.js';
 import { formatArchitectureForSystemPrompt } from '../analysis/architecture-pass.js';
+
+const CRITIC_CONDITION_ENUM = ['STATE', 'ACCESS', 'TIMING', 'EXTERNAL', 'BALANCE'];
+const CRITIC_RULE_ENUM = ['R8', 'R10', 'R11', 'R12', 'R15', 'R16'];
 
 const VERDICT_TOOL: Anthropic.Tool = {
   name: 'report_verdicts',
@@ -40,6 +43,30 @@ const VERDICT_TOOL: Anthropic.Tool = {
             },
             finalReasoning: { type: 'string', description: 'Summary judgment explaining the verdict' },
             confidence: { type: 'number', description: 'Confidence in verdict 0-100' },
+            // A1 — record which cross-cutting rules the critic exercised on this finding
+            rulesApplied: {
+              type: 'array',
+              description: 'Which Plamen-derived rules you exercised. Always include R10. Mark others ✗ with reason if N/A. Codes: R8=cached/stored external state, R10=worst-state severity, R11=unsolicited token transfer, R12=enabler enumeration, R15=flash-loan precondition, R16=oracle integrity.',
+              items: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string', enum: CRITIC_RULE_ENUM },
+                  applied: { type: 'boolean' },
+                  reason: { type: 'string' },
+                },
+                required: ['code', 'applied'],
+              },
+            },
+            // A4 — if the critic finds the candidate is BLOCKED, name the blocker so chain analysis can search for an enabler
+            missingPrecondition: {
+              type: 'string',
+              description: 'If verdict is "invalid" or "uncertain" because a check/state blocks the attack, describe that blocker here. Enables future chain analysis. Optional.',
+            },
+            preconditionType: {
+              type: 'string',
+              enum: CRITIC_CONDITION_ENUM,
+              description: 'Category of the blocking precondition. Optional.',
+            },
           },
           required: ['candidateId', 'verdict', 'finalReasoning', 'confidence'],
         },
@@ -215,7 +242,22 @@ Do NOT use 'uncertain' as a default. If you don't find a specific mitigation, it
 ## Be specific:
 - Cite exact line numbers for every mitigation you find
 - For mitigating factors, quote the actual code (e.g., "require(amount > 0) on line 45")
-- If you claim the math is correct, show the calculation with values`;
+- If you claim the math is correct, show the calculation with values
+
+## Methodology Audit Trail (optional but recommended)
+
+For each verdict, ALSO emit:
+
+- **rulesApplied**: array exercising the cross-cutting rules. Always include R10 (worst-state severity — did the detector assess the worst plausible state, not just the current snapshot?). Mark others ✗ with a one-line reason if N/A.
+  - **R8** — cached parameter / stored external state (multi-step ops only)
+  - **R10** — worst-state severity (always — did the severity assessment use the worst realistic state?)
+  - **R11** — unsolicited token transfer (when external tokens are involved)
+  - **R12** — exhaustive enabler enumeration (when the finding identifies a dangerous precondition state)
+  - **R15** — flash-loan precondition manipulation (when balance/oracle/threshold preconditions are flash-loan-accessible)
+  - **R16** — oracle integrity (when oracle-dependent logic is involved)
+- **missingPrecondition** / **preconditionType**: if your verdict is 'invalid' or 'uncertain' BECAUSE some specific check or state currently blocks the attack, name that blocker and classify it (STATE / ACCESS / TIMING / EXTERNAL / BALANCE). This lets downstream chain analysis look for an enabler that would create the missing precondition. Optional.
+
+These fields do NOT replace finalReasoning — they augment it.`;
 
   const userPrompt = `## Contract: ${file}
 \`\`\`solidity
@@ -272,6 +314,7 @@ For EACH finding: search for mitigations, verify the math, check for guards. Com
                 mitigatingFactors: Array.isArray(raw.mitigatingFactors) ? raw.mitigatingFactors.map(String) : [],
                 finalReasoning: String(raw.finalReasoning || ''),
                 criticConfidence: Number(raw.confidence) || 50,
+                ...extractVerdictMethodologyFields(raw),
               };
               seenIds.add(verdict.candidateId);
               verdicts.push(verdict);
@@ -320,4 +363,34 @@ function normalizeVerdict(val: unknown): CriticVerdict['verdict'] {
   const v = String(val).toLowerCase();
   if (v === 'valid' || v === 'invalid' || v === 'uncertain') return v;
   return 'uncertain';
+}
+
+/**
+ * Pull A1 (rules applied) and A4 (blocking precondition) fields from a raw verdict.
+ * All optional; older verdicts without them stay valid.
+ */
+function extractVerdictMethodologyFields(raw: Record<string, unknown>): Partial<CriticVerdict> {
+  const out: Partial<CriticVerdict> = {};
+  if (Array.isArray(raw.rulesApplied)) {
+    const rules: RuleApplication[] = [];
+    for (const x of raw.rulesApplied) {
+      if (typeof x !== 'object' || x === null) continue;
+      const obj = x as Record<string, unknown>;
+      const code = String(obj.code || '');
+      if (!CRITIC_RULE_ENUM.includes(code)) continue;
+      rules.push({
+        code: code as RuleCode,
+        applied: Boolean(obj.applied),
+        reason: typeof obj.reason === 'string' && obj.reason.trim() ? obj.reason.trim() : undefined,
+      });
+    }
+    if (rules.length > 0) out.rulesApplied = rules;
+  }
+  if (typeof raw.missingPrecondition === 'string' && raw.missingPrecondition.trim()) {
+    out.missingPrecondition = raw.missingPrecondition.trim();
+  }
+  if (typeof raw.preconditionType === 'string' && CRITIC_CONDITION_ENUM.includes(raw.preconditionType)) {
+    out.preconditionType = raw.preconditionType as ConditionType;
+  }
+  return out;
 }

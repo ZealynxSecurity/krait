@@ -19,6 +19,16 @@ export interface Finding {
   patternId?: string;
   codeSnippet?: string;
   soloditRefs?: string[];
+  // A1/A2/A4 metadata, propagated from pipeline agents.
+  // All optional — pre-existing findings without these still validate.
+  stepExecution?: string;
+  rulesApplied?: Array<{ code: string; applied: boolean; reason?: string }>;
+  depthEvidence?: string[];
+  missingPrecondition?: string;
+  preconditionType?: 'STATE' | 'ACCESS' | 'TIMING' | 'EXTERNAL' | 'BALANCE';
+  postconditionsCreated?: string;
+  postconditionTypes?: Array<'STATE' | 'ACCESS' | 'TIMING' | 'EXTERNAL' | 'BALANCE'>;
+  whoBenefits?: string;
 }
 
 export interface Report {
