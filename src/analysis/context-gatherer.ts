@@ -14,7 +14,7 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { resolve, join, basename, dirname, extname, relative } from 'path';
+import { resolve, join, basename, dirname, extname } from 'path';
 import { glob } from 'glob';
 import { FileInfo } from '../core/types.js';
 
@@ -325,7 +325,7 @@ function extractDescription(readme: string): string {
   return afterTitle.slice(0, 500);
 }
 
-function inferProtocolType(readme: string, contractNames?: string[]): string {
+function inferProtocolType(readme: string, _contractNames?: string[]): string {
   const lower = readme.toLowerCase();
   const types: Array<[string, string[], number]> = [
     ['DEX / AMM', ['decentralized exchange', 'dex', 'amm', 'automated market', 'swap', 'liquidity pool'], 0],

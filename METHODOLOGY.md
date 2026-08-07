@@ -2,7 +2,18 @@
 
 This document describes exactly how Krait finds vulnerabilities. Every technique here was derived from real missed findings in blind shadow audits against Code4rena contests, then validated by measuring precision/recall improvements.
 
-Current version: **v8.1** (methodology audit trail) / **v8** (shadow audit scoring baseline, 50 contests)
+Current version: **v8.2** (kill-gate parity, Impact Premise, second-pass recall stages).
+**Measured baseline: v8** (50 contests, 100% precision, 15.2% recall). v8.1 and v8.2 are
+unmeasured — see [Unvalidated since the v8 baseline](#-unvalidated-since-the-v8-baseline).
+
+> **v8.2 changes**
+>
+> - **Kill-gate parity (P0)**: the 8 kill gates, the DoS exception and the 10 FP patterns now exist in the TypeScript CLI critic (`src/agents/critic.ts`), not just the skill. Previously the CLI ran a generic skeptical-reviewer prompt with none of them, while the shadow-audit harness — which runs the CLI — was the source of the published precision numbers. Gate attribution is enforced in code (`enforceGateContract`), not just requested in the prompt, and a parity test suite fails the build when the two surfaces drift.
+> - **Impact Premise gate (A3)**: every candidate must carry a one-sentence harm statement — WHO loses WHAT — before any trace is attempted. Mechanism statements ("the function is callable", "state is corrupted") are killed under Gate D as `MECHANISM-ONLY`. The reviewer treats that kill class as its highest-yield revival target, because it is a description failure rather than a disproof.
+> - **Rescan pass (B4)** and **Per-contract pass (B3)**: two exclusion-list-driven recall phases between detection and state analysis. Rescan counters attention saturation (broad second pass told what pass 1 found); per-contract counters attention dilution (one agent per inheritance cluster). Both feed the same kill gates.
+> - **Trust-assumption downgrade (A5)**: a finding that survives gate E but still depends on a semi-trusted role is reported one tier lower with an explicit note, instead of being discarded.
+> - **Root-cause consolidation (A7)**: findings sharing a severity tier, class and fix collapse into one finding with a locations table.
+> - **Detector prompt: 767 → 613 lines**, with the heuristic catalogue extracted to `detector/heuristics-core.md`. v7 measured that shrinking this file improves instruction adherence; it had since grown back past the threshold.
 
 > **v8.1 changes (Tier A — methodology audit trail)**: Added six structured fields to every detector / state-auditor / critic finding so the model shows its work to downstream agents and so future chain analysis (D2) can match preconditions to postconditions:
 >
@@ -12,7 +23,7 @@ Current version: **v8.1** (methodology audit trail) / **v8** (shadow audit scori
 > - `missingPrecondition` / `preconditionType` — names the blocker when an attack is currently stopped (STATE / ACCESS / TIMING / EXTERNAL / BALANCE)
 > - `postconditionsCreated` / `postconditionTypes` / `whoBenefits` — what conditions a successful exploit leaves behind that another finding could chain off
 >
-> All fields are optional and additive; pre-existing findings still validate. Three-contest pilot (PoolTogether / Arcade / Frankencoin, all v8 baselines re-run) showed average recall +38.7 pp with precision held at 100% and zero new FPs. Full 50-contest regression has not been run yet — the published v8 headline numbers remain the canonical baseline until then.
+> All fields are optional and additive; pre-existing findings still validate. A three-contest pilot suggested a large recall gain, but n=3 with stale baselines is not a benchmark — the numbers and their caveats are quarantined under [Unvalidated since the v8 baseline](#-unvalidated-since-the-v8-baseline).
 
 > **v8 changes**: Integrated open-source detection knowledge from [pashov/skills](https://github.com/pashov/skills) (MIT), [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen) (MIT), and [forefy/.context](https://github.com/forefy/.context) (MIT). Added 5 new detection modules (ERC-4626 vault, lending/liquidation, AMM/MEV, EIP-7702, ERC-4337), 58 extended heuristics, protocol-type statistical enrichment across all 7 primers, and Devil's Advocate verification methodology. Module trigger system now uses tier hierarchy (Tier 0 always-load, Tier 1 protocol-type, Tier 2 feature-detected). See [ATTRIBUTION.md](.claude/skills/krait/ATTRIBUTION.md) for full source details.
 
@@ -24,11 +35,11 @@ Current version: **v8.1** (methodology audit trail) / **v8** (shadow audit scori
 Phase 0: RECON           Phase 1: DETECTION           Phase 2: STATE           Phase 3: VERIFY
 ───────────────          ─────────────────           ─────────────          ──────────────
 AST extraction           Pass 1: Tiered scan          Dependency map          8 kill gates
-Risk scoring             ├─ Feynman interrogation     Mutation matrix         10 FP patterns
-File tiering             ├─ 40 heuristic triggers     Cross-check verify      Deep code trace
-Attack surface           └─ Function-state matrix     Operation ordering      PoC construction
-Primer selection                                      Parallel paths          Severity assignment
-                         Pass 2: 4 parallel lenses    User journey sim
+Risk scoring             ├─ Feynman interrogation     Mutation matrix         Impact Premise
+File tiering             ├─ 101 heuristic triggers    Cross-check verify      10 FP patterns
+Attack surface           └─ Function-state matrix     Operation ordering      Deep code trace
+Primer selection                                      Parallel paths          PoC construction
+                         Pass 2: 4 parallel lenses    User journey sim        Severity assignment
       │                  ├─ A: Access/State/Gov       Masking detection           │
       │                  ├─ B: Value/Economic                                     │
       │                  ├─ C: External/Cross-contract    ◄── cross-feed ──►      │
@@ -36,10 +47,25 @@ Primer selection                                      Parallel paths          Se
       │                                                                           ▼
       │                  Pass 3: Mechanical sweep                          Phase 4: REPORT
       │                  26 targeted modules (A-X)                         ──────────────
-      ▼                  7 domain primers                                  Dedup + rank
-  .audit/recon.md        .audit/findings/                                  JSON + Markdown
-                         detector-candidates.md                            .audit/krait-report.md
+      │                  7 domain primers                                  Root-cause consolidation
+      │                        │                                           Trust downgrade
+      │                        ▼                                           Dedup + rank
+      │                  Phase 1b: RESCAN                                  JSON + Markdown
+      │                  broad 2nd pass, exclusion list                    .audit/krait-report.md
+      │                  (self-skips if pass 1 found
+      ▼                   nothing above Info)                                     ▲
+  .audit/recon.md               │                                                 │
+                                ▼                                          Phase 3b: REVIEW
+                          Phase 1c: PER-CONTRACT                           2nd opinion on kills
+                          1 agent per inheritance cluster                  (MECHANISM-ONLY first)
+                          max 8 clusters, ≤5 findings each
+                                │
+                                ▼
+                          .audit/findings/*.md
 ```
+
+Phases 1b and 1c are **recall** stages: they add candidates, never bypass gates. Everything
+they surface goes through the same Phase 3 verification as a Phase 1 candidate.
 
 ---
 
@@ -239,6 +265,31 @@ Every candidate finding must survive **all 8 gates** before reaching the report.
 
 **DoS Exception**: DoS that bricks a core lifecycle function + low cost to trigger + persistent = Medium minimum, survives gates A/B/D/F.
 
+**Both surfaces run these gates.** The skill encodes them in `critic/instructions.md`; the
+CLI encodes them in `src/agents/critic.ts` (`KILL_GATES`). Attribution is enforced
+mechanically — a verdict carrying a gate letter is forced to `invalid` regardless of what
+the model returned — and `src/agents/__tests__/parity.test.ts` fails the build if a gate,
+the DoS carve-out, or an FP pattern exists on one surface but not the other.
+
+### Impact Premise — harm, not mechanism (v8.2)
+
+Gate D kills "speculative" findings, but speculative is a judgement call. The Impact
+Premise makes it mechanical: before any trace, the candidate must carry a one-sentence
+harm statement naming **WHO loses WHAT**.
+
+| Statement | Verdict |
+|---|---|
+| "`startLiquidation` succeeds while the market is active" | Mechanism → killed as `MECHANISM-ONLY` |
+| "the parameter can be set to zero" | Mechanism → killed |
+| "state is corrupted" / "a guard is missing" | Mechanism → killed |
+| "claimants receive 15% less than their pro-rata share" | Harm → proceeds |
+| "withdrawals revert permanently once the parameter is zero" | Harm → proceeds |
+
+This gate tests whether a consequence was *stated*, not whether it was *proven* — proving
+it is the verification step's job. `MECHANISM-ONLY` kills are the reviewer's highest-priority
+revival class, because a missing description is cheap to fix and does not mean the mechanism
+was disproven.
+
 ### 10 False Positive Patterns
 
 After kill gates, remaining candidates are checked against 10 empirically-derived FP patterns:
@@ -338,7 +389,10 @@ Tested blind against 50 Code4rena contests. The full results are in [`shadow-aud
 | v6.4 | 36-40 | 90% | 11.8% | 0.2 | Primers + architecture cleanup |
 | v7 | 41-45 | **100%** | 11.0% | **0.0** | Module system + recon flags + new heuristics |
 | **v8** | **46-50** | **100%** | **15.2%** | **0.0** | Open-source integration (pashov/plamen/forefy) + 5 new modules |
-| **v8.1 (pilot)** | **3 re-runs** | **100%** | **54.1%** | **0.0** | Tier A methodology audit trail (6 new finding-schema fields) |
+
+**v8 is the canonical baseline.** v8.1 and v8.2 changed methodology but have not yet been
+measured over the full 50-contest registry — see "Unvalidated since the v8 baseline" below.
+No headline number moves until that regression runs.
 
 ### Latest 5 Contests (v8)
 
@@ -352,16 +406,50 @@ Tested blind against 50 Code4rena contests. The full results are in [`shadow-aud
 
 10 TPs, 0 FPs across the v8 batch. 4/5 contests at 100% precision (InitCapital found no TPs but also no FPs — clean sheet). No other AI audit tool publishes precision/recall against real competitions.
 
-### v8.1 Pilot — Same 3 Contests Re-Run with Tier A Audit Trail
+---
 
-| Contest | v8 P / R / FP | v8.1 P / R / FP | Δ Recall | Notes |
-|---------|---|---|---|---|
-| PoolTogether | 100% / 11.1% / 0 | **100% / 44.4% (4/9) / 0** | **+33.3 pp** | yieldFeeBalance ↔ TWAB uint96 cap interactions surfaced via R8+R10 |
-| Arcade | 100% / 25.0% / 0 | **100% / 75.0% (6/8) / 0** | **+50.0 pp** | setter↔consumer asymmetries surfaced via R8 + R12 enabler enumeration |
-| Frankencoin | 100% / 10.0% / 0 | **100% / 42.9% (9/21) / 0** | **+32.9 pp** | auction-state enablers + balance-based bypass paths via R12 + R15 |
-| **Average** | **100% / 15.4% / 0** | **100% / 54.1% / 0** | **+38.7 pp** | Schema fields present on 100% of final findings; R10 fired on every finding |
+## ⚠ Unvalidated since the v8 baseline
 
-Caveats: (1) v8 baselines are ~2 months old — some delta is "today's run vs old run" rather than purely the schema change; (2) n=3 contests is signal, not statistical proof; (3) audit agents knew this was a Tier A pilot, which may bias adoption of the new fields upward vs a stock `/krait` invocation. Full 50-contest regression is required before promoting v8.1 to the headline metric.
+Everything in this section changed the methodology **after** the 50-contest measurement.
+None of it has been re-measured over the full registry. **Do not quote these numbers as
+Krait's performance.** They are recorded here so the eventual regression has something to
+compare against.
+
+### v8.1 pilot — Tier A audit trail (n=3, NOT a benchmark)
+
+| Contest | v8 P / R / FP | v8.1 P / R / FP | Δ Recall |
+|---------|---|---|---|
+| PoolTogether | 100% / 11.1% / 0 | 100% / 44.4% (4/9) / 0 | +33.3 pp |
+| Arcade | 100% / 25.0% / 0 | 100% / 75.0% (6/8) / 0 | +50.0 pp |
+| Frankencoin | 100% / 10.0% / 0 | 100% / 42.9% (9/21) / 0 | +32.9 pp |
+| Average | 100% / 15.4% / 0 | 100% / 54.1% / 0 | +38.7 pp |
+
+Why this is signal and not proof:
+
+1. The v8 baselines were ~2 months old, so part of the delta is "today's run vs an old run", not the schema change.
+2. n=3. On an 8-finding contest like Arcade, a single extra finding is ±12.5 pp — the observed +50 pp is four findings.
+3. The audit agents knew this was a Tier A pilot, which likely biased adoption of the new fields upward relative to a stock `/krait` invocation.
+
+### v8.2 — unmeasured entirely
+
+| Change | Surface | Expected direction |
+|---|---|---|
+| Kill gates A–H + 10 FP patterns ported into the CLI critic | CLI only | Precision ↑ on the CLI (it previously had neither); no change to the skill |
+| Impact Premise gate (A3) | both | Precision ↑, recall ↓ slightly — it is a stricter Gate D |
+| Rescan pass (B4) | both | Recall ↑, cost ↑ ~2 agents |
+| Per-contract pass (B3) | both | Recall ↑, cost ↑ up to 8 agents |
+| Trust downgrade (A5) | both | Finding count ↑ (previously killed by gate E), severity distribution shifts down |
+| Root-cause consolidation (A7) | both | Finding count ↓ without losing locations |
+| Detector prompt 767 → 613 lines | skill | Instruction adherence ↑ (v7 measured this effect once already) |
+
+To validate:
+
+```bash
+npm run shadow:regress -- --contests <ids> --update   # record the current baseline
+npm run shadow:regress -- --contests <ids>            # gate a change against it
+```
+
+The gate blocks on any new false positive and on a recall drop worse than 2 pp.
 
 ### Self-Improving Loop
 
@@ -378,11 +466,15 @@ After each blind test: score → root-cause every miss → update methodology �
 | Inline analysis modules | 26 (A-X) |
 | Analysis angles per function | 16 (4 lenses × 4 mindsets) |
 | Domain-specific primers | 7 |
-| Kill gates | 8 |
+| Kill gates | 8 (+ Impact Premise) |
 | False positive patterns | 10 |
 | Feynman question categories | 7 (28+ questions) |
 | Mechanical sweep checks | 7 |
+| Recall phases (v8.2) | 2 (rescan, per-contract) |
 | Shadow audits completed | 50 |
 | Precision (v7 + v8, last 10 contests) | 100% |
 | FPs per contest (v7 + v8) | 0.0 |
 | Recall (v8) | 15.2% |
+
+The last three rows are the **v8** measurement. v8.1 and v8.2 have not been re-measured
+over the registry — see [Unvalidated since the v8 baseline](#-unvalidated-since-the-v8-baseline).

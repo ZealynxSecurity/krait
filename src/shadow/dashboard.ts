@@ -114,7 +114,7 @@ export function formatDashboard(dashboard: DashboardData): string {
   lines.push('├──────────────────────┼───────────┼────────┼────────┼─────────┼──────────┤');
 
   const latestEntries: DashboardEntry[] = [];
-  for (const [contestId, entries] of byContest) {
+  for (const [_contestId, entries] of byContest) {
     const latest = entries[entries.length - 1];
     latestEntries.push(latest);
     const name = latest.contestName.slice(0, 20).padEnd(20);
@@ -151,7 +151,7 @@ export function formatDashboard(dashboard: DashboardData): string {
   if (contestsWithHistory.length > 0) {
     lines.push('');
     lines.push('Trend (latest vs previous):');
-    for (const [contestId, entries] of contestsWithHistory) {
+    for (const [_contestId, entries] of contestsWithHistory) {
       const prev = entries[entries.length - 2];
       const curr = entries[entries.length - 1];
       const recDelta = ((curr.recall - prev.recall) * 100).toFixed(1);

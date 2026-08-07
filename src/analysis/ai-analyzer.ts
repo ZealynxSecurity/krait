@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { Finding, FileInfo, KraitConfig, VulnerabilityPattern, ArchitectureAnalysis, FundFlow } from '../core/types.js';
+import { Finding, FileInfo, KraitConfig, ArchitectureAnalysis, FundFlow } from '../core/types.js';
 import { summarizeContract, formatSummariesForPrompt, ContractSummary } from './contract-summarizer.js';
 import { ProjectContext, formatContextForPrompt } from './context-gatherer.js';
 import { getProtocolChecklist } from './domain-checklists.js';
@@ -139,8 +139,6 @@ export class AIAnalyzer {
       return `### File: ${file.relativePath} (${file.lines} lines)\n\`\`\`${file.language}\n${numbered}\n\`\`\``;
     }).join('\n\n');
 
-    const fileList = batch.files.map(f => f.relativePath).join(', ');
-
     const userPrompt = `Analyze these ${batch.files.length} small files for security vulnerabilities.
 
 IMPORTANT: For each finding, include the \`file\` field with the exact file path where the vulnerability exists.
@@ -263,8 +261,6 @@ ${FP_AVOIDANCE}`;
     // Add function inventory so deep pass knows which functions to examine
     const functionInventory = file.lines > 150 ? this.extractFunctionInventory(fileContent) : '';
 
-    // Identify which functions already have findings
-    const coveredLines = new Set(firstPassFindings.map(f => f.line));
     const uncoveredNote = functionInventory ? this.identifyUncoveredFunctions(fileContent, firstPassFindings) : '';
 
     const userPrompt = `## Deep Analysis: ${file.relativePath}
@@ -630,7 +626,7 @@ Look specifically for the vulnerability patterns from real audits described in t
     files: Array<{ file: FileInfo; content: string }>,
     perFileFindings: Finding[],
     architectureContext: ArchitectureAnalysis,
-    patternContext: string
+    _patternContext: string
   ): Promise<Finding[]> {
     if (flows.length === 0 || files.length < 2) return [];
 
@@ -1048,7 +1044,6 @@ Report findings with exact line numbers. Empty findings array is fine.`;
    * functions later in the file (flashLoan, changeFeeQuote, etc).
    */
   private extractFunctionInventory(content: string): string {
-    const funcRegex = /function\s+(\w+)\s*\(([^)]*)\)[^{]*(?:external|public|internal|private)?[^{]*/g;
     const functions: Array<{ name: string; line: number; visibility: string; mutability: string }> = [];
     const lines = content.split('\n');
 

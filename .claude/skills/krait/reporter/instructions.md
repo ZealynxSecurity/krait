@@ -33,6 +33,45 @@ Multiple candidates may describe the same underlying bug from different angles (
 - Same root cause but different manifestations → single finding with multiple impact paths
 - Related but distinct bugs → keep separate, note relationship
 
+### Step 2.5: Root-Cause Consolidation (A7)
+
+*(Source: PlamenTSV/plamen, MIT — `phase6-report-prompts.md` § STEP 1.5)*
+
+Step 2 removes findings that are the SAME bug seen twice. This step handles the different
+problem: several findings that are genuinely distinct **locations** of ONE root cause with
+ONE fix — the "10 separate missing-checkpoint findings" shape. Reporting those as ten
+findings inflates the count and hides the fact that the developer has one job to do.
+
+**Merge two or more findings into one when ALL of these hold:**
+
+1. **Same fix pattern** — the same kind of code change closes all of them
+2. **Same severity tier** — a tier gap means the impacts differ; keep them separate
+3. **Same vulnerability class** — same bug pattern, not just the same file
+4. **Describable together** — a reader understands every location from one description plus a table
+5. **≤ 6 locations** — beyond that, split into two findings for readability
+
+**Do NOT merge when:**
+- The fixes touch **different functions** — write the one-line fix for each; if they differ, these are different root causes
+- Merging would hide a severity difference
+- You are unsure. **A duplicate finding is cosmetic. A dropped true positive is a missed vulnerability. When in doubt, keep them separate.**
+
+**Format for a consolidated finding**: use a class-level title (e.g. "Reward checkpoint
+missing on balance-changing paths"), not a single-location title. List every location in a
+table under the description, then give ONE recommendation covering all of them:
+
+```markdown
+**Affected locations** (4):
+
+| File | Line | Issue |
+|------|------|-------|
+| `Staking.sol` | 142 | `withdraw()` skips `_updateReward` |
+| `Staking.sol` | 201 | `emergencyWithdraw()` skips `_updateReward` |
+| `Staking.sol` | 233 | `transferStake()` skips `_updateReward` |
+| `Migrator.sol` | 88  | `migrate()` skips `_updateReward` |
+
+*One fix closes all 4 locations above.*
+```
+
 ### Step 3: Severity Ranking
 
 Final severity assignment using this rubric:
@@ -43,6 +82,33 @@ Final severity assignment using this rubric:
 | **HIGH** | Conditional fund loss, privilege escalation, or broken core invariant. Requires specific conditions but attacker can create them. | Oracle manipulation for bad debt, self-liquidation profit, reentrancy fund drain |
 | **MEDIUM** | Value leakage, griefing with cost to attacker, degraded functionality. Limited impact or requires unlikely conditions. | Rounding exploitation over many txs, reward gaming, event inconsistency affecting integrations |
 | **LOW** | Informational, gas optimization, cosmetic inconsistency. No direct value impact. | Unnecessary storage reads, missing events, style inconsistency |
+
+#### Step 3.5: Trust-Assumption Downgrade (A5)
+
+*(Source: PlamenTSV/plamen, MIT — `report-template.md` § Downgrade modifiers)*
+
+Kill gate E discards findings that need a **fully trusted** actor (governance multisig,
+DAO, timelock) to act maliciously. That is correct for a rug vector nobody can act on —
+but it is too blunt for the middle ground, where a real bug exists and the only question
+is how much weight to give it. This step is that middle option: **report at one tier lower
+with an explicit note, rather than discard.**
+
+Apply when the critic recorded a trust dependency on a finding that **survived** gate E:
+
+| Actor class | Examples | Treatment |
+|---|---|---|
+| **Fully trusted** | governance multisig, DAO, timelock | Already killed by gate E — nothing to do here |
+| **Semi-trusted** | keeper, operator, relayer, sequencer, oracle updater, whitelisted caller | **−1 severity tier**, floor Informational, plus the note below |
+| **Untrusted** | any EOA, any contract | No adjustment — full severity |
+
+Print the adjustment on the finding so the reader can re-rate it themselves:
+
+```
+**Severity adjusted**: High → Medium — the attack path requires `keeper` to violate a
+stated trust assumption: keepers are assumed to submit prices within 1% of market.
+```
+
+Never apply the downgrade silently. An unexplained severity is worse than either severity.
 
 ### Step 4: Write Report
 

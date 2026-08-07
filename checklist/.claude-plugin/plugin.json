@@ -1,0 +1,11 @@
+{
+  "name": "krait",
+  "description": "Smart contract security analysis powered by 4,500+ real audit findings from Solodit. Quick scans, full framework assessments, and integration with audit-readiness.zealynx.io.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Zealynx Security",
+    "url": "https://www.zealynx.io"
+  },
+  "repository": "https://github.com/ZealynxSecurity/krait",
+  "license": "MIT"
+}

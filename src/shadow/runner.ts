@@ -26,7 +26,7 @@ import {
   compareFindingsAI,
   CompareResult,
 } from '../core/comparator.js';
-import { Finding, FileInfo, Report, Domain, KraitConfig, ArchitectureAnalysis } from '../core/types.js';
+import { Finding, Report, Domain, ArchitectureAnalysis } from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
 import { scoreFileComplexity, batchSmallFiles } from '../core/file-scorer.js';
 import { runMultiAgentPipeline } from '../agents/multi-agent.js';
@@ -161,7 +161,7 @@ export async function runShadowAudit(
     }
 
     log(`  Running Krait audit on: ${auditPath}`);
-    const { findings, report, reportPath } = await runAudit(
+    const { findings, reportPath } = await runAudit(
       auditPath, contest, options, log
     );
 
@@ -423,7 +423,7 @@ async function runAudit(
         const findings = await analyzer.analyzeFile(file, content, patternContext);
         allFindings.push(...findings);
         log(`    [${i + 1}/${analyzeFiles.length + batches.length}] ${file.relativePath} (${findings.length} findings)`);
-      } catch (err) {
+      } catch {
         log(`    [${i + 1}/${analyzeFiles.length + batches.length}] ${file.relativePath} — error`);
       }
     }

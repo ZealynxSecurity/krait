@@ -6,7 +6,7 @@
 import { execSync, execFile } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { resolve, join, dirname } from 'path';
+import { resolve, dirname } from 'path';
 import { FoundryConfig, ForgeTestResult, TestRunResult } from './types.js';
 
 const execFileAsync = promisify(execFile);

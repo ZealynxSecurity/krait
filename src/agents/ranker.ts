@@ -3,10 +3,22 @@
  * No API calls needed — pure computation.
  */
 
-import { Finding } from '../core/types.js';
+import { Finding, Severity } from '../core/types.js';
 import { CandidateFinding, ExploitProof, CriticVerdict, RankedFinding } from './types.js';
 
 const DEFAULT_THRESHOLD = 40;
+
+/** Severity ladder, strongest first. Used by the A5 trust downgrade. */
+const SEVERITY_LADDER: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
+
+/**
+ * A5 — drop a finding one severity tier. Floor is 'info'; 'info' never moves.
+ */
+export function demoteOneTier(severity: Severity): Severity {
+  const idx = SEVERITY_LADDER.indexOf(severity);
+  if (idx < 0 || idx === SEVERITY_LADDER.length - 1) return severity;
+  return SEVERITY_LADDER[idx + 1];
+}
 
 /**
  * Score, deduplicate, and filter findings. Produces final RankedFinding[].
@@ -46,11 +58,28 @@ export function rank(
     );
 
     // Severity adjustment: if critic found mitigations, consider downgrade
-    let adjustedSeverity = candidate.severity;
+    let adjustedSeverity: Severity = candidate.severity;
     if (verdict.mitigatingFactors.length >= 2 && verdict.verdict === 'uncertain') {
       // Downgrade one level if multiple mitigations found
       if (adjustedSeverity === 'critical') adjustedSeverity = 'high';
       else if (adjustedSeverity === 'high') adjustedSeverity = 'medium';
+    }
+
+    // A5 — trust-assumption downgrade. The attack path needs a trusted actor to
+    // violate a stated assumption: report it, but one tier lower, with a note.
+    // This is the middle option between gate E (kill outright) and full severity.
+    let trustAdjustment: Finding['trustAdjustment'];
+    if (verdict.trustAssumption) {
+      const originalSeverity = adjustedSeverity;
+      const demoted = demoteOneTier(adjustedSeverity);
+      if (demoted !== originalSeverity) {
+        adjustedSeverity = demoted;
+        trustAdjustment = {
+          actor: verdict.trustAssumption.actor,
+          assumption: verdict.trustAssumption.assumption,
+          originalSeverity,
+        };
+      }
     }
 
     // Confidence mapping
@@ -72,6 +101,7 @@ export function rank(
       category: candidate.category,
       codeSnippet: candidate.codeSnippet,
       ...mergeMethodologyFields(candidate, proof, verdict),
+      ...(trustAdjustment ? { trustAdjustment } : {}),
     };
 
     scored.push({
@@ -91,10 +121,111 @@ export function rank(
   // Deduplicate by title similarity + same file + same category
   filtered = deduplicateRanked(filtered);
 
+  // A7 — consolidate remaining findings that share a root cause and fix across files
+  filtered = consolidateByRootCause(filtered);
+
   // Sort by composite score descending
   filtered.sort((a, b) => b.compositeScore - a.compositeScore);
 
   return filtered;
+}
+
+/**
+ * A7 — root-cause consolidation.
+ *
+ * Deduplication (above) removes findings that are the SAME bug seen twice. This step
+ * handles the different problem: N findings that are genuinely distinct locations of
+ * ONE root cause with ONE fix — the "10 separate missing-event findings" shape. They
+ * become a single finding carrying a locations table, so the report reflects the work
+ * a developer actually has to do.
+ *
+ * Merge requires ALL of:
+ *   1. same severity tier      (a tier gap means different impact — keep separate)
+ *   2. same category           (proxy for vulnerability class)
+ *   3. same normalized fix     (proxy for "one fix closes all of them")
+ *   4. at least 2 members, capped at 6 locations for readability
+ *
+ * Conservative by design: when the fix text differs, nothing merges. A duplicate
+ * finding in a report is cosmetic; a dropped true positive is a missed vulnerability.
+ */
+export function consolidateByRootCause(findings: RankedFinding[]): RankedFinding[] {
+  if (findings.length <= 1) return findings;
+
+  const MAX_LOCATIONS = 6;
+  const groups = new Map<string, RankedFinding[]>();
+
+  for (const f of findings) {
+    const key = [
+      f.finding.severity,
+      f.finding.category.toLowerCase().trim(),
+      normalizeFix(f.finding.remediation),
+    ].join('|');
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(f);
+    else groups.set(key, [f]);
+  }
+
+  const result: RankedFinding[] = [];
+
+  for (const bucket of groups.values()) {
+    // A single-member group, an empty fix, or an over-large group stays untouched.
+    if (bucket.length < 2 || bucket.length > MAX_LOCATIONS || !normalizeFix(bucket[0].finding.remediation)) {
+      result.push(...bucket);
+      continue;
+    }
+
+    // Keep the highest-scoring member as the surviving finding.
+    const sorted = [...bucket].sort((a, b) => b.compositeScore - a.compositeScore);
+    const primary = sorted[0];
+    const absorbed = sorted.slice(1);
+
+    const locations = sorted.map(f => ({
+      file: f.finding.file,
+      line: f.finding.line,
+      note: f.finding.title,
+    }));
+
+    result.push({
+      ...primary,
+      finding: {
+        ...primary.finding,
+        title: classLevelTitle(primary.finding.title, sorted.length),
+        description:
+          `${primary.finding.description}\n\n**Affected locations (${sorted.length}):**\n` +
+          locations.map(l => `- \`${l.file}:${l.line}\` — ${l.note}`).join('\n'),
+        consolidatedFrom: absorbed.map(f => f.finding.title),
+        locations,
+      },
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Normalize a remediation string so two fixes that say the same thing in different
+ * words collapse to the same key. Deliberately strict: identifiers and file paths are
+ * dropped (they differ per location), but the verbs and nouns of the fix are kept.
+ */
+function normalizeFix(remediation: string): string {
+  return remediation
+    .toLowerCase()
+    .replace(/`[^`]*`/g, ' ')          // drop inline code (identifiers, paths)
+    .replace(/\b\d+\b/g, ' ')          // drop line numbers and literals
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 3)
+    .slice(0, 12)                       // first dozen significant words carry the intent
+    .join(' ')
+    .trim();
+}
+
+/**
+ * Turn a single-location title into a class-level one when several locations merge.
+ * Keeps the original wording (it already describes the bug) and appends the count.
+ */
+function classLevelTitle(title: string, count: number): string {
+  return `${title} (${count} locations)`;
 }
 
 /**
@@ -203,6 +334,9 @@ export function mergeMethodologyFields(
     if (typeof criticStep === 'string' && criticStep.trim()) stepParts.push(`Critic: ${criticStep.trim()}`);
   }
   if (stepParts.length > 0) out.stepExecution = stepParts.join(' | ');
+
+  // A3 — the critic's harm statement is authoritative (it gates the verdict)
+  if (verdict.harmStatement) out.harmStatement = verdict.harmStatement;
 
   // Rules Applied: prefer critic's (later, authoritative), fall back to detector
   if (verdict.rulesApplied && verdict.rulesApplied.length > 0) {

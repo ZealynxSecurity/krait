@@ -71,6 +71,21 @@ export interface ExploitProof {
   whoBenefits?: string;
 }
 
+/**
+ * The 8 automatic kill gates. Parity with
+ * `.claude/skills/krait/critic/instructions.md` § Step 0 — any change here must be
+ * mirrored there (enforced by src/agents/__tests__/parity.test.ts).
+ */
+export type KillGate = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
+
+/**
+ * The 10 empirically-derived false-positive patterns applied after the kill gates.
+ * Parity with the skill critic's § Common False Positive Patterns.
+ */
+export type FpPattern =
+  | 'FP-1' | 'FP-2' | 'FP-3' | 'FP-4' | 'FP-5'
+  | 'FP-6' | 'FP-7' | 'FP-8' | 'FP-9' | 'FP-10';
+
 export interface CriticVerdict {
   candidateId: string;
   verdict: 'valid' | 'invalid' | 'uncertain';
@@ -79,8 +94,22 @@ export interface CriticVerdict {
   mitigatingFactors: string[];
   finalReasoning: string;
   criticConfidence: number;       // 0-100
+  // P0 — kill gate / FP pattern attribution (parity with the skill critic)
+  killedByGate?: KillGate;        // set when the candidate died at Step 0
+  fpPattern?: FpPattern;          // set when the candidate died at the FP-pattern step
+  dosExceptionApplied?: boolean;  // true when the DoS carve-out rescued it from A/B/D/F
   // A1 — which rules the critic actually exercised (vs N/A)
   rulesApplied?: RuleApplication[];
+  // A3 — Impact Premise: the concrete HARM, not the mechanism
+  harmStatement?: string;
+  harmIsMechanismOnly?: boolean;  // true = no concrete consequence stated -> cannot be 'valid'
+  // A5 — trust-assumption dependency. Set when the attack path requires a trusted or
+  // semi-trusted actor to act against a stated assumption, but the finding still stands
+  // (i.e. gate E did not kill it). The ranker turns this into a -1 tier adjustment.
+  trustAssumption?: {
+    actor: string;
+    assumption: string;
+  };
   // A4 — if 'uncertain' or 'invalid' because a precondition was missing
   missingPrecondition?: string;
   preconditionType?: ConditionType;

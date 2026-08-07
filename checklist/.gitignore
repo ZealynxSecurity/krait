@@ -1,0 +1,8 @@
+# Don't commit the full framework JSONs (large, synced from website)
+# Only the condensed indexes are committed
+frameworks/*.json
+!frameworks/index.json
+!frameworks/condensed/
+
+# Python bytecode from build-index.py
+__pycache__/

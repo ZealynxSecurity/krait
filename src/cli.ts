@@ -41,11 +41,10 @@ import {
   buildSummary,
   generateJsonReport,
   writeMarkdownReport,
-  generateMarkdownReport,
 } from './core/reporter.js';
 import { Finding, Report, Domain, ArchitectureAnalysis } from './core/types.js';
 import { ResponseCache } from './core/cache.js';
-import { scoreFileComplexity, batchSmallFiles, FileScore, BatchGroup } from './core/file-scorer.js';
+import { scoreFileComplexity, batchSmallFiles } from './core/file-scorer.js';
 import {
   parseOfficialFindings,
   loadKraitReport,
@@ -54,14 +53,13 @@ import {
   formatCompareResults,
 } from './core/comparator.js';
 import {
-  CONTEST_REGISTRY,
   getContestById,
   listContests,
 } from './shadow/registry.js';
-import { runShadowAudit, runBatchShadowAudit } from './shadow/runner.js';
+import { runBatchShadowAudit } from './shadow/runner.js';
 import { generateFeedback, writeFeedbackReport } from './shadow/feedback.js';
 import { updateDashboard, loadDashboard, formatDashboard } from './shadow/dashboard.js';
-import { gatherProjectContext, formatContextForPrompt } from './analysis/context-gatherer.js';
+import { gatherProjectContext } from './analysis/context-gatherer.js';
 import { generatePatternsFromSolodit } from './knowledge/pattern-generator.js';
 import { SoloditClient } from './knowledge/solodit-client.js';
 import { runMultiAgentPipeline } from './agents/multi-agent.js';
@@ -217,7 +215,6 @@ program
         for (const s of analyzeFiles) {
           const content = fileContentsMap.get(s.file.relativePath)!;
           const filePatterns = loader.filterPatternsForFile(domainPatterns, content);
-          const hints = s.details;
           console.log(`    ${s.file.relativePath} (${s.file.lines} LOC, score=${s.score.toFixed(1)}, ${filePatterns.length} patterns)`);
         }
 
@@ -806,7 +803,6 @@ program
 
         const { extractInvariants, extractCrossContractInvariants } = await import('./fuzzer/invariant-extractor.js');
         const { InvariantCounter } = await import('./fuzzer/types.js');
-        const { scoreFileComplexity: scoreFn } = await import('./core/file-scorer.js');
 
         const counter = new InvariantCounter();
         const allInvariants = [];

@@ -4,7 +4,7 @@
 
 import { writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import { FuzzReport, InvariantResult, FuzzPipelineStats, Invariant } from './types.js';
+import { FuzzReport, InvariantResult } from './types.js';
 
 export function generateFuzzJsonReport(report: FuzzReport, outputPath: string): void {
   mkdirSync(dirname(outputPath), { recursive: true });

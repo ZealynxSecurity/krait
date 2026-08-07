@@ -31,7 +31,7 @@ export class PatternLoader {
             this.patterns.push(entry as VulnerabilityPattern);
           }
         }
-      } catch (err) {
+      } catch {
         // Skip invalid files silently
       }
     }

@@ -42,9 +42,6 @@ export async function discoverFiles(
   });
 
   const results: FileInfo[] = [];
-  let skippedTest = 0;
-  let skippedInterface = 0;
-  let skippedSmall = 0;
 
   for (const relativePath of files) {
     const fullPath = resolve(absPath, relativePath);
@@ -52,7 +49,6 @@ export async function discoverFiles(
 
     // Skip test/mock files by name pattern
     if (TEST_FILE_PATTERNS.some(p => p.test(fileName))) {
-      skippedTest++;
       continue;
     }
 
@@ -68,13 +64,11 @@ export async function discoverFiles(
 
       // Skip files below minimum line count
       if (lineCount < minLines) {
-        skippedSmall++;
         continue;
       }
 
       // Skip pure interface files (Solidity: only function signatures, no implementation)
       if (language === 'solidity' && isPureInterface(content)) {
-        skippedInterface++;
         continue;
       }
 

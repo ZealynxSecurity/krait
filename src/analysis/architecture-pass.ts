@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { FileInfo, ArchitectureAnalysis, FundFlow, ContractRole } from '../core/types.js';
-import { summarizeContract, formatSummariesForPrompt, ContractSummary } from './contract-summarizer.js';
+import { FileInfo, ArchitectureAnalysis } from '../core/types.js';
+import { formatSummariesForPrompt, ContractSummary } from './contract-summarizer.js';
 import { ResponseCache } from '../core/cache.js';
 
 const ARCHITECTURE_TOOL: Anthropic.Tool = {
