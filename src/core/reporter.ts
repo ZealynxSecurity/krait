@@ -67,18 +67,52 @@ export function generateMarkdownReport(report: Report): string {
     for (const finding of sevFindings) {
       lines.push(`### ${finding.id}: ${finding.title}`);
       lines.push('');
-      lines.push(`**File**: \`${finding.file}:${finding.line}\``);
+
+      // A7 — a consolidated finding leads with its locations table, not a single file.
+      if (finding.locations && finding.locations.length > 1) {
+        lines.push(`**Affected locations** (${finding.locations.length}):`);
+        lines.push('');
+        lines.push('| File | Line | Issue |');
+        lines.push('|------|------|-------|');
+        for (const loc of finding.locations) {
+          lines.push(`| \`${loc.file}\` | ${loc.line} | ${loc.note ?? '—'} |`);
+        }
+        lines.push('');
+      } else {
+        lines.push(`**File**: \`${finding.file}:${finding.line}\``);
+      }
+
       lines.push(`**Confidence**: ${finding.confidence}`);
       lines.push(`**Category**: ${finding.category}`);
       if (finding.patternId) {
         lines.push(`**Pattern**: ${finding.patternId}`);
       }
+
+      // A5 — say plainly that severity was reduced and on what assumption.
+      if (finding.trustAdjustment) {
+        const { actor, assumption, originalSeverity } = finding.trustAdjustment;
+        lines.push(
+          `**Severity adjusted**: ${originalSeverity} → ${finding.severity} — ` +
+          `the attack path requires \`${actor}\` to violate a stated trust assumption: ${assumption}`,
+        );
+      }
+
       lines.push('');
+      if (finding.harmStatement) {
+        lines.push(`**Harm**: ${finding.harmStatement}`);
+        lines.push('');
+      }
       lines.push(`**Description**: ${finding.description}`);
       lines.push('');
       lines.push(`**Impact**: ${finding.impact}`);
       lines.push('');
       lines.push(`**Remediation**: ${finding.remediation}`);
+      if (finding.consolidatedFrom && finding.consolidatedFrom.length > 0) {
+        lines.push('');
+        lines.push(
+          `*One fix closes all ${finding.locations?.length ?? finding.consolidatedFrom.length + 1} locations above.*`,
+        );
+      }
       if (finding.codeSnippet) {
         lines.push('');
         lines.push('**Code**:');

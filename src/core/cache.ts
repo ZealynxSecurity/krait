@@ -21,7 +21,10 @@ import { Finding } from './types.js';
  * (e.g. architecture context shape, project context version). Bumping
  * because prior keys did not factor in those tags.
  */
-export const PROMPT_VERSION = 'v2';
+// v3: critic gained the 8 kill gates, 10 FP patterns and the Impact Premise step;
+// detector/reasoner gained the rescan + per-contract passes. All prior cached
+// responses were produced by materially different prompts.
+export const PROMPT_VERSION = 'v3';
 
 export interface CacheEntry {
   findings: Finding[];

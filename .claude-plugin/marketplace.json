@@ -1,0 +1,29 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "krait",
+  "owner": {
+    "name": "Zealynx Security",
+    "url": "https://www.zealynx.io"
+  },
+  "metadata": {
+    "description": "Smart contract security tooling by Zealynx Security.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "krait",
+      "source": "./checklist",
+      "description": "Checklist-driven security analysis: quick scans, full framework assessments, and single-check deep dives against 845 checks across 39 DeFi verticals, derived from 4,500+ real Solodit audit findings. Provides /krait:scan, /krait:assess and /krait:check.",
+      "category": "security",
+      "keywords": [
+        "solidity",
+        "security",
+        "smart-contracts",
+        "audit",
+        "defi",
+        "checklist",
+        "solodit"
+      ]
+    }
+  ]
+}

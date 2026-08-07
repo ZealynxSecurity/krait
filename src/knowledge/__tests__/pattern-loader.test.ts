@@ -290,13 +290,6 @@ describe('filterPatternsForFile', () => {
   // but we can test it via the public method with a subclass or by constructing patterns directly
   const testLoader = new PatternLoader('/nonexistent');
 
-  // Manually inject patterns via reflection
-  function setupPatterns(patterns: VulnerabilityPattern[]): PatternLoader {
-    const loader = new PatternLoader('/nonexistent');
-    (loader as any).patterns = patterns;
-    (loader as any).loaded = true;
-    return loader;
-  }
 
   it('scores patterns higher when indicators match file content', () => {
     const patterns = [

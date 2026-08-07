@@ -6,21 +6,33 @@
 
 | | |
 |---|---|
-| **Current version** | v8.1 (Tier A methodology audit trail; v8 numbers remain the 50-contest baseline) |
+| **Current version** | v8.2 (kill-gate parity, Impact Premise, rescan + per-contract recall phases) |
+| **Measured baseline** | **v8** — 50 contests. v8.1/v8.2 are not yet re-measured ([why](METHODOLOGY.md#-unvalidated-since-the-v8-baseline)) |
 | **Detection angles** | 16 per function (4 lenses × 4 mindsets) |
 | **Heuristics** | 43 original + 58 extended (from open-source community) |
 | **Analysis modules** | 15 deep-dive module files + 26 inline modules (A-X) |
 | **Audit-trail rules** | R8 / R10 / R11 / R12 / R15 / R16 — exercised per finding (v8.1) |
 | **Domain primers** | 7 (DEX, Lending, Staking, GameFi, Bridges, Proxies, Wallets) |
-| **Kill gates** | 8 automatic + 10 FP patterns |
-| **Shadow audits** | 50 contests, 100% precision, 0 FPs/contest (v8 baseline); 3-contest v8.1 pilot 100% precision / 54.1% recall |
+| **Kill gates** | 8 automatic + Impact Premise + 10 FP patterns (identical on both surfaces, parity-tested) |
+| **Shadow audits** | 50 contests, 100% precision, 0 FPs/contest (v8 baseline) |
 | **Full methodology** | [`METHODOLOGY.md`](METHODOLOGY.md) — every technique, publicly documented |
 
-### Two Products, One Goal
+### Two Local Surfaces, One Web Platform
 
-**1. Audit skills** (this repo) — run `/krait` in Claude Code on any Solidity project. Free.
+This repo ships **two** Claude Code surfaces. They answer different questions, and you can run either or both.
 
-**2. Web platform** ([krait.zealynx.io](https://krait.zealynx.io)) — AI-assisted security verification with per-check prompt generation, auto-parsed verdicts, shareable reports, and PDF export. Also free.
+| | **Audit pipeline** (`/krait`) | **Checklist plugin** (`/krait:scan`) |
+|---|---|---|
+| Question it answers | "What bugs are in this code?" | "Am I ready for an audit?" |
+| Method | Multi-phase adversarial reasoning from first principles | 845 curated checks across 39 DeFi verticals |
+| Output | Exploit traces with file:line, severity, suggested fix | Per-check verdicts, importable assessment JSON |
+| Bar | Zero false positives — 8 kill gates try to disprove every finding | Coverage — every applicable check gets a verdict |
+| Lives in | `.claude/`, `src/` | [`checklist/`](checklist/) |
+| Install | `./scripts/install.sh` | `/plugin marketplace add ZealynxSecurity/krait` |
+
+Use the checklist to find out where you stand before an audit; use the audit pipeline to find the actual bugs.
+
+**Web platform** ([krait.zealynx.io](https://krait.zealynx.io)) — AI-assisted security verification with per-check prompt generation, auto-parsed verdicts, shareable reports, and PDF export. Both local surfaces produce output you can upload to it. Also free.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -45,8 +57,10 @@ Krait is a structured audit methodology encoded as Claude Code skills. When you 
 
 1. **Recon** — maps the architecture, extracts the AST, scores every file by risk, selects protocol-specific detection primers
 2. **Detection** — analyzes each high-risk function from 16 angles (4 technical lenses x 4 independent mindsets), with consensus scoring across passes
-3. **State Analysis** — finds coupled state pairs and mutation patterns that per-function scanning misses
-4. **Verification** — 8 kill gates try to disprove every finding. Only those with a concrete exploit trace (WHO does WHAT to steal HOW MUCH) survive
+3. **Rescan** — a second broad pass told exactly what pass 1 found, so its attention goes to the gaps. Skips itself if pass 1 found nothing above Informational
+4. **Per-contract** — one agent per inheritance cluster at maximum depth, countering the dilution that makes a whole-codebase agent skim everything after the two most interesting files
+5. **State Analysis** — finds coupled state pairs and mutation patterns that per-function scanning misses
+6. **Verification** — 8 kill gates try to disprove every finding, and the Impact Premise gate demands a harm statement (WHO loses WHAT) before any trace. Only findings with a concrete exploit trace survive
 
 The output is a structured report with findings at exact file:line locations, vulnerable code, suggested fixes, and exploit traces. Saved as both markdown and JSON.
 
@@ -72,34 +86,46 @@ The output is a structured report with findings at exact file:line locations, vu
 
 ```bash
 git clone https://github.com/ZealynxSecurity/krait.git
-mkdir -p ~/.claude/commands ~/.claude/skills
-cp -r krait/.claude/commands/* ~/.claude/commands/
-cp -r krait/.claude/skills/* ~/.claude/skills/
+cd krait && ./scripts/install.sh
 ```
 
-Open Claude Code in any Solidity project and run `/krait`.
+That single command:
+
+1. copies the commands and skills into `~/.claude/`
+2. builds both bundled MCP servers
+3. registers them with Claude Code at **user scope**, so they work in every project — not just inside this clone
+
+Open Claude Code in any Solidity project and run `/krait`. No API keys needed for any of it.
+
+Preview without touching anything: `./scripts/install.sh --dry-run`.
+Skip the MCP servers entirely: `./scripts/install.sh --no-mcp` (the skills work fine without them).
 
 ### Update
 
 ```bash
-cd krait && git pull
-cp -r .claude/commands/* ~/.claude/commands/
-cp -r .claude/skills/* ~/.claude/skills/
+cd krait && git pull && ./scripts/install.sh
 ```
 
-### Optional: MCP Servers
+Re-running the installer is safe and idempotent — it refreshes the skills and re-points the
+MCP registration at this clone's current path.
 
-Krait ships two optional MCP servers. The skills work fine without them — they enrich specific flows.
+### The MCP servers
+
+| Server | What it adds | Used by |
+|--------|--------------|---------|
+| `krait-solodit` | Local search over the Solodit-derived vulnerability patterns in `patterns/` | Detection |
+| `krait-forge` | `forge build` / `test` / `fmt-check` without round-tripping shell output | `/krait-fuzz`, PoC verification |
+
+Both are optional, run locally, and need no API key. If you'd rather wire them by hand:
 
 ```bash
-# Pattern search (Solodit-derived vulnerability patterns, used during detection)
-cd krait/mcp-servers/solodit && npm install && npm run build
-
-# Foundry gateway (forge build / test / fmt-check, used by /krait-fuzz and PoC verification)
-cd krait/mcp-servers/forge && npm install && npm run build
+npm run mcp:build   # build only
+claude mcp add krait-solodit --scope user -- node "$PWD/mcp-servers/solodit/build/index.js"
+claude mcp add krait-forge   --scope user -- node "$PWD/mcp-servers/forge/build/index.js"
 ```
 
-The `.mcp.json` in the repo root auto-configures both for Claude Code. No API keys needed.
+`npm install` in the clone also builds them via a postinstall step (set
+`KRAIT_SKIP_MCP_BUILD=1` to opt out). Run `/krait-init` at any time to see what's wired up.
 
 ### Commands
 
@@ -112,6 +138,26 @@ The `.mcp.json` in the repo root auto-configures both for Claude Code. No API ke
 | `/krait-init` | Standalone readiness check (tools, project shape, MCP wiring). `/krait` runs this automatically; this command is for CI setup and debugging. |
 
 All output to `.audit/` in your project directory.
+
+### Checklist commands (separate plugin)
+
+Installed via the plugin marketplace rather than `scripts/install.sh`:
+
+```bash
+/plugin marketplace add ZealynxSecurity/krait
+/plugin install krait@krait
+```
+
+(`krait@krait` = plugin `krait` from marketplace `krait`. Verified end to end with
+`claude plugin install`; both manifests pass `claude plugin validate`.)
+
+| Command | What it does |
+|---------|-------------|
+| `/krait:scan` | Quick scan — auto-detects the vertical, applies its checks |
+| `/krait:assess` | Full check-by-check assessment; emits `.zealynx-run.json` for the web platform |
+| `/krait:check LN-01` | Deep analysis of a single framework check against your code |
+
+845 checks across 39 verticals, derived from 4,500+ Solodit audit findings. Runs locally, no API key. See [`checklist/README.md`](checklist/README.md).
 
 ### After the Audit
 
@@ -184,7 +230,6 @@ Tested blind against 50 Code4rena contests. No other AI audit tool publishes pre
 | v6.4 | 36-40 | 90% | 11.8% | 0.2 |
 | v7 | 41-45 | 100% | 11.0% | 0.0 |
 | **v8** | **46-50** | **100%** | **15.2%** | **0.0** |
-| **v8.1 (pilot)** | **3 re-runs** | **100%** | **54.1%** | **0.0** |
 
 **Latest 5 contests (v8):**
 
@@ -196,22 +241,33 @@ Tested blind against 50 Code4rena contests. No other AI audit tool publishes pre
 | Frankencoin | CDP Stablecoin | 20 | 2 | 0 | **100%** | 10% |
 | InitCapital | Lending/Hooks | 15 | 0 | 0 | N/A | 0% |
 
-**v8.1 Tier A pilot — same 3 contests re-run with the methodology audit-trail fields enabled:**
+Every result is verifiable in [`shadow-audits/`](shadow-audits/).
 
-| Contest | v8 Precision / Recall / FPs | v8.1 Precision / Recall / FPs | Δ Recall |
-|---------|---|---|---|
-| PoolTogether | 100% / 11.1% / 0 | **100% / 44.4% (4/9) / 0** | **+33.3 pp** |
-| Arcade | 100% / 25.0% / 0 | **100% / 75.0% (6/8) / 0** | **+50.0 pp** |
-| Frankencoin | 100% / 10.0% / 0 | **100% / 42.9% (9/21) / 0** | **+32.9 pp** |
-| **Average** | **100% / 15.4% / 0** | **100% / 54.1% / 0** | **+38.7 pp** |
+> **v8 is the number Krait stands behind.** v8.1 and v8.2 changed the methodology after that
+> measurement and have not been re-run over the registry. A 3-contest v8.1 pilot suggested a
+> large recall gain, but n=3 against two-month-old baselines is a hint, not a benchmark —
+> the figures and their caveats are quarantined in
+> [METHODOLOGY.md § Unvalidated since the v8 baseline](METHODOLOGY.md#-unvalidated-since-the-v8-baseline)
+> rather than mixed into the table above.
 
-Three contests is signal, not statistical proof — a full 50-contest regression is required before changing the published v8 headline numbers. Every result is verifiable in [`shadow-audits/`](shadow-audits/).
+Changes are gated mechanically:
+
+```bash
+npm run shadow:regress -- --contests neobase,opendollar --update   # record a baseline
+npm run shadow:regress -- --contests neobase,opendollar            # gate a change
+```
+
+Any new false positive fails the gate. So does a recall drop worse than 2 percentage points.
 
 ### Self-Improving
 
 After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 43 original heuristics, 15 deep-dive module files, 58 extended heuristics, 26 inline modules, and 7 protocol-specific primers. v8 integrated open-source vectors from [pashov/skills](https://github.com/pashov/skills), [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen), and [forefy/.context](https://github.com/forefy/.context) (all MIT) — improving recall from 11% to 15.2% while maintaining 100% precision.
 
-**v8.1 (Tier A — methodology audit trail)** adds six structured fields to every detector / state-auditor / critic finding: `stepExecution` (which lenses/phases/gates ran), `rulesApplied` (R8 cached params, R10 worst-state severity, R11 unsolicited token transfer, R12 enabler enumeration, R15 flash-loan precondition, R16 oracle integrity), `depthEvidence` (`[BOUNDARY:…]` / `[VARIATION:…]` / `[TRACE:…]` concrete-value tags), `missingPrecondition` / `preconditionType`, `postconditionsCreated` / `postconditionTypes` / `whoBenefits`. Rules and tags are derived from [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen)'s methodology framework, integrated under MIT. Three pilot contests show recall +33–50 pp with precision held at 100% and zero new false positives; the full 50-contest regression has not been run yet.
+**v8.1 (Tier A — methodology audit trail)** adds six structured fields to every detector / state-auditor / critic finding: `stepExecution` (which lenses/phases/gates ran), `rulesApplied` (R8 cached params, R10 worst-state severity, R11 unsolicited token transfer, R12 enabler enumeration, R15 flash-loan precondition, R16 oracle integrity), `depthEvidence` (`[BOUNDARY:…]` / `[VARIATION:…]` / `[TRACE:…]` concrete-value tags), `missingPrecondition` / `preconditionType`, `postconditionsCreated` / `postconditionTypes` / `whoBenefits`. Rules and tags are derived from [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen)'s methodology framework, integrated under MIT.
+
+**v8.2** closes the gap between Krait's two surfaces and adds recall. The 8 kill gates, the DoS exception and the 10 FP patterns now live in the TypeScript CLI critic as well as the skill — previously the CLI ran a generic reviewer prompt with none of them, even though the benchmark harness runs the CLI. Gate attribution is enforced in code rather than requested in a prompt, and a parity test suite fails the build when the two surfaces drift. On top of that: the Impact Premise gate (a finding must state WHO loses WHAT, not just what the machinery does), two exclusion-list recall phases (rescan, per-contract), trust-assumption downgrade instead of outright dismissal, and root-cause consolidation in the report.
+
+**Neither v8.1 nor v8.2 has been re-measured across the 50-contest registry.** The v8 numbers below remain the honest baseline until it is. The gate that will do the measuring ships with this version: `npm run shadow:regress` blocks on any new false positive and on a recall drop worse than 2 pp.
 
 ---
 

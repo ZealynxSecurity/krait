@@ -211,7 +211,7 @@ function adjustConfidence(finding: Finding, fileContents: Map<string, string>, p
   return adjusted;
 }
 
-function isFalsePositive(finding: Finding, fileContents: Map<string, string>, projectContext?: ProjectContext): boolean {
+function isFalsePositive(finding: Finding, fileContents: Map<string, string>, _projectContext?: ProjectContext): boolean {
   const titleLower = (finding.title || '').toLowerCase();
   const descLower = (finding.description || '').toLowerCase();
 

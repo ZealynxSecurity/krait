@@ -109,6 +109,30 @@ Save candidates to `.audit/findings/detector-candidates.md`.
 
 ---
 
+## Phase 1b: RESCAN (second pass with exclusion list)
+
+**Goal**: Counter attention saturation — find what pass 1 missed because a prominent bug masked it.
+
+**Read and follow**: `~/.claude/skills/krait/detector/rescan.md`
+
+**Hard exit**: if Phase 1 produced 0 candidates above Informational, SKIP this phase entirely.
+
+2 broad passes over the codebase, each given the pass-1 finding list as an exclusion list and the list of files that produced no candidates (the blind spots). Save to `.audit/findings/rescan-candidates.md`.
+
+---
+
+## Phase 1c: PER-CONTRACT ANALYSIS (narrow scope, maximum depth)
+
+**Goal**: Counter attention dilution — give each contract cluster an agent that can afford line-by-line depth.
+
+**Read and follow**: `~/.claude/skills/krait/detector/per-contract.md`
+
+One agent per inheritance cluster (max ~1500 LOC/cluster, max 8 clusters), each receiving the combined Phase 1 + 1b exclusion list. Max 5 findings per cluster. Save to `.audit/findings/percontract-candidates.md`.
+
+**Skipped in `/krait-quick`.**
+
+---
+
 ## Phase 2: STATE INCONSISTENCY ANALYSIS
 
 **Goal**: Find bugs where one piece of coupled state changes without its dependent counterpart.
@@ -136,7 +160,9 @@ Masking code → what invariant is broken underneath?
 
 **Goal**: ZERO FALSE POSITIVES. Only provably real findings ship.
 
-**Read and follow**: `~/.claude/skills/krait/critic/instructions.md` — contains Kill Gates A-H, DoS exception, 10 FP patterns, verification methods, and verdict format.
+**Read and follow**: `~/.claude/skills/krait/critic/instructions.md` — contains Kill Gates A-H, the Impact Premise gate, the DoS exception, 10 FP patterns, verification methods, and verdict format.
+
+**Input**: all four candidate files — `detector-candidates.md`, `rescan-candidates.md`, `percontract-candidates.md`, `state-candidates.md`.
 
 **Pipeline summary** (details in instructions.md):
 
@@ -145,6 +171,9 @@ Masking code → what invariant is broken underneath?
 - A: Generic best practice | B: Theoretical | C: Intentional design | D: Speculative
 - E: Admin trust | F: Dust | G: Out of context | H: Known/acknowledged (mechanism match only)
 - **DoS exception**: DoS bricking core lifecycle function + low cost + persistent = Medium minimum
+
+### Step 0.5: Impact Premise (MANDATORY — before any trace)
+Write the claimed HARM in one sentence: WHO loses WHAT. Mechanism statements ("the function is callable", "state is corrupted", "the parameter can be zero") are NOT harm. No harm statement = kill under Gate D, recorded as `Harm: MECHANISM-ONLY`.
 
 ### Steps 1-3: Code Re-Read → Call Chain Trace → Exploit Trace
 Re-read cited code. Trace full call chain. Write concrete exploit with actual values.

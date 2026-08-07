@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ResponseCache, PROMPT_VERSION } from '../cache.js';
+import { ResponseCache } from '../cache.js';
 import { Finding } from '../types.js';
 import { mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';

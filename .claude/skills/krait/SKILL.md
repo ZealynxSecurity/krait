@@ -14,10 +14,12 @@ When invoked via `/krait`, a preflight readiness check runs first, then the 4-ph
 - **Preflight** (`preflight/instructions.md`): Hard checks (forge / bash / jq / `.sol` files) before any work. Same skill is invoked in *report* mode by `/krait-init` and in *gate* mode by `/krait`.
 1. **Phase 0 — Recon** (`recon/instructions.md`): Architecture mapping, deterministic file risk scoring, module selection
 2. **Phase 1 — Detection** (`detector/instructions.md`): 3-pass analysis with 4 parallel lenses × 4 mindsets, 101 heuristics, activated detection modules
-3. **Phase 2 — State Analysis** (`state-auditor/instructions.md`): Coupled state pair analysis, mutation matrix, masking code detection
-4. **Phase 3 — Verification** (`critic/instructions.md`): 8 automatic kill gates, concrete exploit trace required for every H/M finding
-5. **Phase 3b — Review** (`reviewer/instructions.md`): Second opinion on killed findings, catches over-filtering
-6. **Phase 4 — Report** (`reporter/instructions.md`): Dedup, rank, format to markdown + JSON
+3. **Phase 1b — Rescan** (`detector/rescan.md`): Second broad pass with pass-1 findings as an exclusion list; counters attention saturation. Self-skips when pass 1 found nothing above Info
+4. **Phase 1c — Per-Contract** (`detector/per-contract.md`): One agent per inheritance cluster at maximum depth; counters attention dilution
+5. **Phase 2 — State Analysis** (`state-auditor/instructions.md`): Coupled state pair analysis, mutation matrix, masking code detection
+6. **Phase 3 — Verification** (`critic/instructions.md`): 8 automatic kill gates + Impact Premise (harm, not mechanism); concrete exploit trace required for every H/M finding
+7. **Phase 3b — Review** (`reviewer/instructions.md`): Second opinion on killed findings, catches over-filtering
+8. **Phase 4 — Report** (`reporter/instructions.md`): Root-cause consolidation, trust-assumption downgrade, dedup, rank, format to markdown + JSON
 
 ## Reference Files
 
@@ -25,6 +27,8 @@ When invoked via `/krait`, a preflight readiness check runs first, then the 4-ph
 - `preflight/instructions.md` — Shared readiness check (gate vs report mode)
 - `recon/instructions.md` — Full recon methodology
 - `detector/instructions.md` — Detection methodology with all question categories and heuristics
+- `detector/rescan.md` — Phase 1b second pass with exclusion list
+- `detector/per-contract.md` — Phase 1c per-cluster deep analysis
 - `state-auditor/instructions.md` — State inconsistency analysis
 - `critic/instructions.md` — Kill gates and verification
 - `reviewer/instructions.md` — Second opinion methodology
@@ -34,6 +38,7 @@ When invoked via `/krait`, a preflight readiness check runs first, then the 4-ph
 ### Detection Modules (loaded selectively based on protocol type)
 - `detector/modules/*.md` — 15 deep-dive detection modules (ERC-4626 vaults, lending/liquidation, AMM/MEV, governance, oracles, etc.)
 - `detector/primers/*.md` — 7 protocol-type primers (DEX, lending, staking, bridges, proxies, wallets, gamefi)
+- `detector/heuristics-core.md` — 43 core trigger-based heuristics
 - `detector/heuristics-extended.md` — 58 advanced detection vectors
 
 ### Supporting Files

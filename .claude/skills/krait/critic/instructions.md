@@ -8,9 +8,15 @@ Invoked by `/krait` (as part of full audit) or `/krait-critic` (standalone).
 
 ## Prerequisites
 
-- `.audit/findings/detector-candidates.md` (from krait-detect)
-- `.audit/findings/state-candidates.md` (from krait-state)
-- Read BOTH before starting
+Read ALL available candidate files before starting:
+
+- `.audit/findings/detector-candidates.md` (Phase 1, required)
+- `.audit/findings/rescan-candidates.md` (Phase 1b — may be absent if the hard-exit rule fired)
+- `.audit/findings/percontract-candidates.md` (Phase 1c — absent in `/krait-quick`)
+- `.audit/findings/state-candidates.md` (Phase 2 — absent in `/krait-quick`)
+
+Every candidate from every file goes through the same gates. A candidate from a
+second-pass agent gets no benefit of the doubt and no extra suspicion.
 
 ## Purpose
 
@@ -74,7 +80,40 @@ If DoS permanently/repeatedly bricks a CORE lifecycle function (settlement, liqu
 
 ---
 
-**After Kill Gate, surviving candidates proceed to verification methods below.**
+## Step 0.5: IMPACT PREMISE — harm, not mechanism (MANDATORY, runs before any trace)
+
+*(Source: PlamenTSV/plamen, MIT — `phase5-poc-execution.md` § Impact Premise Verification)*
+
+Gate D kills "speculative" findings, but "speculative" is a judgement call. This step makes it mechanical.
+
+Before you trace anything, write the candidate's claimed **HARM in ONE sentence**: **WHO loses WHAT.** Not the mechanism — the consequence.
+
+**Mechanism statements — INSUFFICIENT. These describe machinery, not damage:**
+- "`startLiquidation` succeeds while the market is active" — proves a call is possible, not that anyone loses
+- "the parameter can be set to zero" — proves a setter works, not that zero causes harm
+- "the reentrancy callback is triggered" — proves a callback fires, not that state corrupts
+- "state is corrupted" / "a guard is missing" / "the function is callable" / "value diverges" — all machinery
+
+**Harm statements — REQUIRED:**
+- "claimants receive 15% less than their pro-rata share after the attack sequence"
+- "a user's withdrawal reverts permanently once the parameter is set to zero"
+- "the attacker extracts 1.5x their fair share before the guard triggers"
+- "any peer can permanently halt settlement for all borrowers"
+
+**Decision:**
+
+| Outcome | Action |
+|---|---|
+| You can write a harm statement naming a **specific user class** AND a **specific fund / liveness / privilege / accounting consequence** | Record it as `Harm` and proceed to verification |
+| You can only describe machinery | **KILL under Gate D.** Record `Harm: MECHANISM-ONLY` |
+
+"Could be exploited", "may be unsafe", and "is dangerous" are not harm statements. A finding whose only stated harm is a mechanism is not a finding.
+
+**Note on scope**: this gate tests whether a *consequence was stated*, not whether it was *proven*. Proving it is Step 1–3's job. Do not use this gate to kill a finding that names real harm but hasn't yet traced it.
+
+---
+
+**After the Kill Gate and Impact Premise, surviving candidates proceed to verification methods below.**
 
 ## Consensus-Aware Verification
 
@@ -283,6 +322,7 @@ Save to `.audit/findings/critic-verdicts.md`:
 **Severity**: HIGH (original: CRITICAL — downgraded because...)
 **File**: path/to/file.sol:XX
 
+**Harm**: [WHO loses WHAT, one sentence — from Step 0.5. Required for every non-killed finding.]
 **Verification Method**: Code trace / PoC trace / Hybrid
 
 **Proof**:
@@ -311,6 +351,15 @@ complete code trace showing no mitigation exists]
 **Rules Applied**: [R10:✓, R11:✗(no external tokens), R16:✗(no oracle)]
 **Missing Precondition** (the blocker that makes this invalid): Virtual offset of 10^6 prevents share-price manipulation at first deposit
 **Precondition Type**: STATE
+```
+
+For a candidate killed at Step 0.5 rather than by a gate match, use:
+
+```markdown
+### CANDIDATE-XXX: Title
+**Verdict**: FALSE POSITIVE
+**Reason**: Gate D via Impact Premise — Harm: MECHANISM-ONLY. The candidate states that
+`setFeeRate()` accepts zero, but names no user class and no consequence of a zero fee.
 ```
 
 The new **Step Execution / Rules Applied / Depth Evidence / Precondition / Postcondition** fields are the **methodology audit trail** — see detector skill `instructions.md` Step 6 for full definitions. Critic's `Step Execution` lists the 8 kill gates (A=Generic Best Practice, B=Theoretical/Unrealistic, C=Intentional Design, D=Speculative, E=Admin Trust, F=Dust, G=Out of Context, H=Publicly Known Issues). For invalid verdicts, the `Missing Precondition` field captures the specific blocker so future chain analysis can search for an enabler that creates it. All six are optional but strongly encouraged.

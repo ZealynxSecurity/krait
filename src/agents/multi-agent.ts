@@ -13,6 +13,7 @@ import { scoreFileComplexity } from '../core/file-scorer.js';
 import { runParallel } from '../core/parallel.js';
 import { CandidateFinding, MultiAgentStats } from './types.js';
 import { detect, CandidateCounter } from './detector.js';
+import { rescan, perContract } from './second-pass.js';
 import { reason } from './reasoner.js';
 import { criticize } from './critic.js';
 import { rank } from './ranker.js';
@@ -24,6 +25,7 @@ export interface MultiAgentOptions {
   verbose?: boolean;
   threshold?: number;             // Ranker composite score threshold (default 40)
   config?: KraitConfig;           // Full config for deep pass model selection
+  secondPass?: boolean;           // B3/B4 recall stages (default true; off in quick mode)
 }
 
 /**
@@ -268,6 +270,51 @@ export async function runMultiAgentPipeline(
         }
       }
     }
+  }
+
+  // ─── Stage 1e: Second-pass recall agents (B4 rescan + B3 per-contract) ───
+  // Both are exclusion-list driven and both feed the same critic, so they can only add
+  // candidates — never weaken the gates. Skipped in quick mode and switchable off.
+  // Rescan runs even in quick mode — it is the cheapest recall stage and self-skips when
+  // pass 1 found nothing above Info. Per-contract is full-mode only (one agent per cluster).
+  if (options?.secondPass !== false) {
+    const secondPassStart = Date.now();
+    const scopeFiles = files.filter(f => fileContentsMap.has(f.relativePath));
+    const secondPassOpts = {
+      architectureContext: options?.architectureContext,
+      verbose,
+      concurrency: CONCURRENCY,
+    };
+
+    if (verbose) console.error('\n  [multi-agent] Stage 1e: Second pass (rescan + per-contract)...');
+
+    // Run sequentially: per-contract's exclusion list should include what rescan found,
+    // otherwise the two agents duplicate each other's work at full cost.
+    try {
+      const rescanFindings = await rescan(
+        client, scopeFiles, fileContentsMap, allCandidates,
+        model, counter, cache, secondPassOpts,
+      );
+      allCandidates.push(...rescanFindings);
+      if (verbose) console.error(`  [multi-agent] Rescan: +${rescanFindings.length} candidates`);
+    } catch (err) {
+      if (verbose) console.error(`  [multi-agent] Rescan failed: ${err instanceof Error ? err.message : err}`);
+    }
+
+    if (!isQuick) {
+      try {
+        const perContractFindings = await perContract(
+          client, scopeFiles, fileContentsMap, allCandidates,
+          model, counter, cache, secondPassOpts,
+        );
+        allCandidates.push(...perContractFindings);
+        if (verbose) console.error(`  [multi-agent] Per-contract: +${perContractFindings.length} candidates`);
+      } catch (err) {
+        if (verbose) console.error(`  [multi-agent] Per-contract failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    stageTime(`Second pass complete: ${allCandidates.length} total candidates`, secondPassStart);
   }
 
   // ─── Stage 1d: Filter obvious noise + pre-dedup ───

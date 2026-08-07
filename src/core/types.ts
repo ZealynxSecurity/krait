@@ -29,6 +29,19 @@ export interface Finding {
   postconditionsCreated?: string;
   postconditionTypes?: Array<'STATE' | 'ACCESS' | 'TIMING' | 'EXTERNAL' | 'BALANCE'>;
   whoBenefits?: string;
+  // A3 — Impact Premise: the concrete harm (WHO loses WHAT), not the mechanism
+  harmStatement?: string;
+  // A5 — trust-assumption downgrade. Present when severity was reduced one tier
+  // because the attack path requires a trusted actor to violate a stated assumption.
+  trustAdjustment?: {
+    actor: string;              // e.g. "owner", "keeper", "governance"
+    assumption: string;         // the stated trust assumption being violated
+    originalSeverity: Severity; // severity before the -1 tier adjustment
+  };
+  // A7 — root-cause consolidation. Present when several findings sharing one root
+  // cause and fix were merged into this finding.
+  consolidatedFrom?: string[];  // titles of the absorbed findings
+  locations?: Array<{ file: string; line: number; note?: string }>;
 }
 
 export interface Report {

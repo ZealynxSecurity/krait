@@ -83,6 +83,16 @@ Not all gates deserve re-examination. Some are reliably correct. Others are know
   2. If the mechanism is valid but the exploit path is unclear, try different entry points
   3. If still speculative after re-examination → confirm the kill
 
+**Gate D via Impact Premise — "Harm: MECHANISM-ONLY"** (HIGH PRIORITY — this is a distinct kill reason)
+- The critic killed it because no **harm statement** could be written, not because the mechanism was disproven. That is a *description* failure, and descriptions are cheap to fix.
+- **Re-examination approach** — try to supply the harm yourself:
+  1. Take the stated mechanism and ask: *if this machinery does exactly what the candidate says, who ends up worse off?* Name the user class (depositors, borrowers, LPs, the last claimant, the protocol treasury).
+  2. Quantify the consequence in the units the protocol actually uses — share of pro-rata claim, blocked lifecycle action, escalated privilege, corrupted accounting total.
+  3. Check the *inverse*: if you assume the harm is zero, does the mechanism still make sense as written? Code that is pointless under the no-harm assumption usually hides the harm.
+  4. If you can now write "WHO loses WHAT" → **REVIVE**. The critic's kill was a wording failure, not a security judgment.
+  5. If after honest effort the mechanism still leads to no one losing anything → **CONFIRM KILL**. That is the gate working correctly.
+- Do NOT revive by restating the mechanism in more dramatic language. "State is corrupted, which is dangerous" is still mechanism-only.
+
 **FP-1 — "Authorization Handled Elsewhere"** (LOWER PRIORITY)
 - **Re-examination**: Verify that ALL call paths go through auth. One unguarded path = real finding.
 
@@ -115,10 +125,11 @@ From the killed findings, extract ONLY those killed by gates C, E, B, F, D, FP-1
 Sort by priority:
 1. Gate C kills (intentional design)
 2. Gate E kills (admin trust)
-3. Gate B kills (theoretical)
-4. Gate F kills (dust)
-5. Gate D kills (speculative)
-6. FP-1 / FP-2 kills
+3. **Gate D kills marked `Harm: MECHANISM-ONLY`** (Impact Premise) — highest-yield class: the mechanism was never disproven, only under-described
+4. Gate B kills (theoretical)
+5. Gate F kills (dust)
+6. Gate D kills (speculative — mechanism actually untraceable)
+7. FP-1 / FP-2 kills
 
 ### Step 3: Re-Examine Each Finding
 

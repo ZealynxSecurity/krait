@@ -22,7 +22,7 @@ The caller specifies one of two modes:
 | `foundry.toml` / `hardhat.config.*` at target or parent | no | warn only; ast-extract has a regex fallback |
 | `.audit/` in `.gitignore` | no | cosmetic; warn |
 | `.krait-cache/` in `.gitignore` | no | cosmetic; warn |
-| `.mcp.json` declared servers have built artifacts | no | only matters if the user actually wants those servers |
+| MCP servers registered (user scope) or built (project scope) | no | optional enrichment; skills work without them |
 | `~/.claude/skills/krait/` and `~/.claude/commands/krait.md` exist | no | user may be running from a clone; warn |
 
 ## Step 1 — Required tooling
@@ -72,13 +72,34 @@ If there is no `.gitignore` at all, say so and suggest creating one — don't cr
 
 ## Step 4 — MCP wiring (soft)
 
-If `<target>/.mcp.json` exists, read it and:
+Krait ships two optional MCP servers (`krait-solodit`, `krait-forge`). They can be
+registered two ways, and either is fine:
 
-- List the declared servers.
-- For each `"command": "node"` entry, check that `args[0]` resolves to an existing file relative to `<target>`. If not, the server's build step hasn't run.
-- If `mcp-servers/solodit/` exists in the target but `mcp-servers/solodit/build/index.js` does not, surface: `cd mcp-servers/solodit && npm install && npm run build`. Same for `mcp-servers/forge/`.
+- **User scope** (what `scripts/install.sh` does) — registered once with absolute
+  paths, available in every project. Check with `claude mcp list 2>/dev/null`.
+- **Project scope** — a `.mcp.json` in the target declaring them with paths
+  relative to the target. Only works when the target *is* the Krait clone.
 
-Never modify `.mcp.json`.
+Check in that order:
+
+1. Run `claude mcp list 2>/dev/null | grep -i krait` (tolerate a missing `claude`
+   CLI — that is not an error). If both servers appear, report OK and stop here.
+2. Otherwise, if `<target>/.mcp.json` exists, read it, list the declared servers,
+   and for each `"command": "node"` entry check that `args[0]` resolves to an
+   existing file relative to `<target>`. A missing file means the build step
+   hasn't run.
+3. If neither is wired, surface the one-line fix and move on — the skills work
+   without these servers:
+
+   ```
+   bash scripts/install.sh          # from a Krait clone: builds + registers both
+   ```
+
+   If the user is inside a Krait clone but only wants the build step:
+   `npm run mcp:build`.
+
+This check is always soft. Never modify `.mcp.json`, and never run `claude mcp add`
+yourself — report the command, let the user run it.
 
 ## Step 5 — `~/.claude` skills sync (soft, report mode only)
 
@@ -89,12 +110,10 @@ ls ~/.claude/skills/krait/SKILL.md 2>/dev/null
 ls ~/.claude/commands/krait.md 2>/dev/null
 ```
 
-If missing, point them at the install snippet — don't copy files:
+If missing, point them at the installer — don't copy files yourself:
 
 ```bash
-mkdir -p ~/.claude/commands ~/.claude/skills
-cp -r .claude/commands/* ~/.claude/commands/
-cp -r .claude/skills/* ~/.claude/skills/
+bash scripts/install.sh    # from a Krait clone
 ```
 
 (In `gate` mode, skip this check entirely — if the user just typed `/krait`, the skill obviously resolved.)
@@ -134,8 +153,8 @@ Emit the full summary table:
 | foundry.toml          | OK at ./foundry.toml| —                                               |
 | .audit/ in .gitignore | MISSING             | add line: .audit/                               |
 | .krait-cache/ in .gi  | MISSING             | add line: .krait-cache/                         |
-| .mcp.json             | OK 2 servers        | —                                               |
-| krait-solodit build   | MISSING             | cd mcp-servers/solodit && npm i && npm run build|
+| MCP krait-solodit     | OK (user scope)     | —                                               |
+| MCP krait-forge       | MISSING             | bash scripts/install.sh (from a Krait clone)    |
 | ~/.claude/skills/krait| OK                  | —                                               |
 ```
 

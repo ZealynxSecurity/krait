@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { FileInfo, ArchitectureAnalysis } from '../core/types.js';
+import { ArchitectureAnalysis } from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
 import { Invariant, FuzzTestFile, FoundryConfig, TestFileCounter } from './types.js';
 
@@ -170,7 +170,7 @@ ${archContext}`;
 function buildGeneratorUserPrompt(
   invariants: Invariant[],
   fileContentsMap: Map<string, string>,
-  options?: TestGeneratorOptions,
+  _options?: TestGeneratorOptions,
 ): string {
   // Group invariants by contract
   const byContract = new Map<string, Invariant[]>();

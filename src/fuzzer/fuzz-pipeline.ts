@@ -6,9 +6,8 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { FileInfo, ArchitectureAnalysis } from '../core/types.js';
+import { FileInfo } from '../core/types.js';
 import { ResponseCache } from '../core/cache.js';
-import { ProjectContext } from '../analysis/context-gatherer.js';
 import { scoreFileComplexity } from '../core/file-scorer.js';
 import { runParallel } from '../core/parallel.js';
 import {
@@ -17,7 +16,6 @@ import {
   InvariantResult,
   FuzzPipelineStats,
   FuzzPipelineOptions,
-  FoundryConfig,
   InvariantCounter,
   TestFileCounter,
 } from './types.js';
