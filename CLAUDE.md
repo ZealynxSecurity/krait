@@ -99,6 +99,17 @@ reporter/      (Phase 4: consolidation + trust downgrade + format to .audit/)
 fuzzer/        (used by /krait-fuzz)
 ```
 
+**`krait-poc` is a separate top-level skill** (`.claude/skills/krait-poc/`, not nested under
+`krait/`), invoked by `/krait-poc` or as an escalation from the critic's Verification Method
+D. It writes and runs Foundry PoCs that assert HARM (not mechanism) via the forge MCP,
+emitting `[POC-PASS]`/`[POC-FAIL]`/`[CODE-TRACE]`. It practices progressive disclosure — a
+tight `SKILL.md` entry point that loads `references/*.md` only as its 7-step workflow
+reaches them — so the always-on cost stays small while the on-invoke depth is large. Its
+patterns are derived (not vendored) from DeFiHackLabs (Apache-2.0) and other corpora;
+sourcing and license reasoning are in `krait-poc/references/ATTRIBUTION.md`. When editing it,
+keep the assert-harm-not-mechanism rule central — it is the same Impact Premise the critic
+enforces, and the two must not drift.
+
 `detector/instructions.md` has a **700-line cap**, asserted by the parity test. v7 measured
 that shrinking it improved instruction adherence, and it had grown back past the threshold
 by v8.1. When it approaches the cap, extract a catalogue into its own file and leave a
