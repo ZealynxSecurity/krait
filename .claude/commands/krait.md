@@ -182,6 +182,13 @@ Re-read cited code. Trace full call chain. Write concrete exploit with actual va
 10 FP patterns (auth elsewhere, validation in callees, library protection, etc.).
 Verdicts: VERIFIED, VERIFIED-CONDITIONAL, DOWNGRADE, KILLED.
 
+### Method D: Executable PoC (targeted escalation, optional)
+For a genuinely-uncertain **Critical** where a forge harness is available, the critic MAY
+escalate to an executed PoC via the `krait-poc` skill — `[POC-PASS]` upgrades the finding to
+mechanically proven. This is rare and targeted; routine PoC verification is the opt-in
+handoff after the report, not an inline step. Un-PoC-able findings stay `[CODE-TRACE]` and
+are never penalized.
+
 ### Final Checks
 - "Would a C4 judge accept this?" test
 - Post-verification code check: re-read lines, verify quotes match
@@ -257,4 +264,24 @@ Present the final report to the user.
 
 ## After the Report
 
-After presenting the report, **always show the web links banner** from reporter instructions.md (the block with krait.zealynx.io/report/findings and /dashboard links). Then offer to complete the security assessment online. See reporter instructions.md for the exact format.
+After presenting the report:
+
+1. **Offer an executable-PoC pass (opt-in).** If the report contains any Critical or High
+   findings AND `forge` is available (preflight already knows), offer — do not run
+   automatically — to verify them mechanically:
+
+   ```
+   N Critical/High findings. Verify them with executable PoCs?
+     → /krait-poc triage .audit/krait-findings.json
+   ```
+
+   This keeps the default audit cheap (reasoning-based verification) while making mechanical
+   proof one command away. `krait-poc` returns a verdict table: `[POC-PASS]` upgrades a
+   finding to proven (with a fix diff), `[POC-FAIL]` flags a likely false positive, and
+   findings that are un-PoC-able by nature (trusted-actor, off-chain, cross-chain) keep their
+   severity — a PoC is not the right instrument for them and their absence is never a strike.
+   Skip the offer if there are no Critical/High findings or `forge` is absent.
+
+2. **Always show the web links banner** from reporter instructions.md (the block with
+   krait.zealynx.io/report/findings and /dashboard links). Then offer to complete the
+   security assessment online. See reporter instructions.md for the exact format.
