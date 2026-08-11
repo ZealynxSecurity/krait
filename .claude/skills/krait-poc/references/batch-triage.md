@@ -30,7 +30,7 @@ cannot speak to.
 
 | Lane | Meaning | Action |
 |------|---------|--------|
-| **TESTABLE** | Concrete on-chain harm, reachable from an entry point, buildable env | Full 7-step workflow. Budget attempts. |
+| **TESTABLE** | Concrete on-chain harm, reachable from an entry point, buildable env | Full 8-step workflow. Budget attempts. |
 | **STRUCTURAL** | Real finding, but no executable on-chain harm assertion exists | Do NOT attempt a PoC. Record `[CODE-TRACE]` + the structural reason. Keep severity. |
 | **BLOCKED** | Testable in principle, but this environment can't (no build, no fork RPC, external dep) | Record `[CODE-TRACE]` + the environmental blocker. Keep severity. Re-runnable elsewhere. |
 | **NO-HARM** | Only a mechanism stated, no consequence | Flag for the author. Not a PoC target. |
@@ -63,7 +63,7 @@ a testable finding as STRUCTURAL hides whether it was real.
 ## Step 2 — run the TESTABLE lane, severity-ordered
 
 Process TESTABLE findings **Critical → High → Medium** (spend the budget where the stakes
-are). For each, run the standard 7-step workflow from `SKILL.md`.
+are). For each, run the standard 8-step workflow from `SKILL.md`.
 
 **The "few runs" rule** — this is where multiple attempts are legitimate:
 

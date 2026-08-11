@@ -13,14 +13,14 @@ exploit by asserting the actual harm on a forked chain or against local source.
 /krait-poc triage .audit/krait-findings.json
 ```
 
-**Single finding** → follow the 7-step workflow. **A list of findings** (the `triage` form,
+**Single finding** → follow the 8-step workflow. **A list of findings** (the `triage` form,
 a `.md`/`.json` of findings, or more than one pasted) → read and follow
 `~/.claude/skills/krait-poc/references/batch-triage.md`, which produces a consolidated
 verdict table.
 
 ## Instructions
 
-Read and follow `~/.claude/skills/krait-poc/SKILL.md`, then work through its 7-step
+Read and follow `~/.claude/skills/krait-poc/SKILL.md`, then work through its 8-step
 workflow, loading the referenced files under `~/.claude/skills/krait-poc/references/` only
 as each step directs.
 
