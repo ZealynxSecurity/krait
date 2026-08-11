@@ -9,7 +9,14 @@ exploit by asserting the actual harm on a forked chain or against local source.
 /krait-poc                          # Build a PoC for the finding(s) in .audit/, or ask what to prove
 /krait-poc src/Vault.sol:142        # Build a PoC for a suspected bug at a location
 /krait-poc reproduce <incident>     # Reproduce a known on-chain hack from its post-mortem
+/krait-poc triage findings.md       # Batch: verify a LIST of findings → one verdict table
+/krait-poc triage .audit/krait-findings.json
 ```
+
+**Single finding** → follow the 7-step workflow. **A list of findings** (the `triage` form,
+a `.md`/`.json` of findings, or more than one pasted) → read and follow
+`~/.claude/skills/krait-poc/references/batch-triage.md`, which produces a consolidated
+verdict table.
 
 ## Instructions
 
@@ -29,6 +36,10 @@ as each step directs.
 - **Max 5 compile attempts**, then fall back to `[CODE-TRACE]` with the specific blocker.
 - **Never weaken an assertion to force a pass.** If the harm does not reproduce, that is
   `[POC-FAIL]` — a real result.
+- **Inability to PoC is not a refutation.** Only `[POC-FAIL]` (a harm-asserting test that
+  ran and did not reproduce) argues a finding is invalid. A finding that is un-PoC-able by
+  nature (trusted-actor, off-chain, cross-chain) or un-buildable here keeps its severity as
+  `[CODE-TRACE]` — never mark it "invalid" for lack of a PoC.
 
 Local forks only, for verification of past/public incidents and in-scope findings. Do not
 target live systems, include real funding keys, or add deployment steps.

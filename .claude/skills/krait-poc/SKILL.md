@@ -37,7 +37,20 @@ pattern (see `references/harness.md`) exists for exactly this.
 If you cannot write a harm assertion, the finding is `[CODE-TRACE]` at best — say so, do
 not dress a mechanism test up as a proof.
 
-## Workflow
+## Two modes
+
+- **Single finding** (the default) — prove or disprove one suspected bug. Follow the
+  workflow below.
+- **Batch triage** — verify a *list* of findings and emit one consolidated verdict table
+  ("here are my N findings, which hold up?"). Read `references/batch-triage.md` and follow
+  it; it wraps the single-finding workflow with a PoC-ability triage and the table format.
+  Use this whenever the target is more than one finding.
+
+Both modes obey the same evidence rule: a passing PoC promotes a finding, a failing PoC
+demotes it, and **inability to PoC does neither** — some valid findings are un-PoC-able by
+nature and must keep their severity.
+
+## Workflow (single finding)
 
 Follow these steps in order. Each references a file you load only when you reach it —
 keep this top-level file in context, pull the rest on demand.
@@ -129,6 +142,7 @@ Load these as the workflow directs — do not read them all up front.
 | `references/debug-ladder.md` | Step 5 — error class → fix, ordered by frequency |
 | `references/assertion-protocol.md` | Step 6 — the one-retry protocol before FALSE_POSITIVE |
 | `references/fix-and-report.md` | Step 7 — fix diff + report block format |
+| `references/batch-triage.md` | Batch mode — verify a list of findings → verdict table |
 
 ## Boundaries
 

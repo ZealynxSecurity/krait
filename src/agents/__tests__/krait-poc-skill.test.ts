@@ -78,9 +78,52 @@ describe('krait-poc central rule: assert harm, not mechanism', () => {
     }
   });
 
+  it('states that inability to PoC is not a refutation', () => {
+    // The load-bearing epistemic rule: only [POC-FAIL] argues invalidity.
+    expect(skill).toMatch(/inability to PoC does neither|un-PoC-able/i);
+  });
+
   it('critic Verification Method D routes to the krait-poc skill', () => {
     expect(critic).toContain('krait-poc');
     expect(critic).toMatch(/\[POC-PASS\]/);
+  });
+});
+
+describe('krait-poc batch triage', () => {
+  const skill = read('SKILL.md');
+  const triage = read('references/batch-triage.md');
+
+  it('is offered as a distinct mode from SKILL.md', () => {
+    expect(skill).toContain('references/batch-triage.md');
+    expect(skill).toMatch(/batch triage/i);
+  });
+
+  it('separates the four PoC-ability lanes', () => {
+    for (const lane of ['TESTABLE', 'STRUCTURAL', 'BLOCKED', 'NO-HARM']) {
+      expect(triage).toContain(lane);
+    }
+  });
+
+  it('keeps un-PoC-able findings at their severity, never marking them invalid', () => {
+    expect(triage).toMatch(/valid.*un-PoC-able|un-PoC-able.*valid/i);
+    // The single most important guarantee: only POC-FAIL counts against a finding.
+    // (POC-FAIL is wrapped in backticks/bold in the prose, so match loosely.)
+    expect(triage).toMatch(/POC-FAIL.{0,4}bucket is the ONLY one that counts against/i);
+  });
+
+  it('names the structural reasons a finding can be un-PoC-able', () => {
+    for (const reason of ['TRUSTED_ACTOR', 'OFF_CHAIN_HARM', 'CROSS_CHAIN_DESTINATION']) {
+      expect(triage).toContain(reason);
+    }
+  });
+
+  it('caps re-attempts and forbids re-attempting structural findings', () => {
+    expect(triage).toMatch(/3 attempts/);
+    expect(triage).toMatch(/[Nn]ever re-attempt a STRUCTURAL/);
+  });
+
+  it('is explicitly not a filter that drops un-PoC-able findings', () => {
+    expect(triage).toMatch(/not a filter/i);
   });
 });
 
