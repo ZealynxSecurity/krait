@@ -167,6 +167,28 @@ If you cannot construct a concrete trace with actual values → the finding is l
 
 Code trace to confirm mechanism plausibility + concrete trace with values to verify impact.
 
+### Method D: Executable PoC (escalation for CRITICAL / HIGH)
+
+A written trace is `[CODE-TRACE]` — fallible reasoning. For a Critical or High finding where
+a forge harness is available, escalate to an **executed** PoC via the `krait-poc` skill
+(`~/.claude/skills/krait-poc/SKILL.md`): it forks the chain or builds against in-scope
+source, asserts the actual HARM (not the mechanism), and returns `[POC-PASS]` / `[POC-FAIL]`
+via the forge MCP.
+
+- `[POC-PASS]` → the only tag that supports CONFIRMED as ground truth. Upgrade confidence.
+- `[POC-FAIL]` → the attack did not reproduce. Default to killing the finding unless the
+  krait-poc assertion-retry protocol shows the failure was a setup error.
+- Can't execute (no build env, external dep unavailable, ≥5 failed compiles) → stay at
+  `[CODE-TRACE]`; do not claim a proof you did not run.
+
+This is a **targeted, rare** escalation — not a routine per-finding step. Reach for it only
+when a specific **Critical** cannot be resolved by reasoning alone and the cost of shipping
+it wrong (or killing a real one) is high. Do NOT PoC every High inline; routine PoC
+verification across Critical/High is the **opt-in post-report handoff** (see `/krait` §After
+the Report), which runs `krait-poc` batch-triage on demand so the default audit stays cheap.
+A Medium with a clean trace never needs a PoC, and a genuinely un-executable finding stays
+`[CODE-TRACE]` honestly — never penalized for it.
+
 ## Verification Checklist
 
 For EVERY CRITICAL, HIGH, and MEDIUM candidate, answer ALL of these:

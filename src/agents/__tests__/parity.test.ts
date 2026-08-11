@@ -146,3 +146,34 @@ describe('prompt size budget', () => {
     expect(unresolved).toEqual([]);
   });
 });
+
+describe('krait ↔ krait-poc integration (opt-in handoff)', () => {
+  const REPO = join(import.meta.dirname, '../../..');
+  const readF = (p: string) => readFileSync(join(REPO, p), 'utf-8');
+
+  const command = readF('.claude/commands/krait.md');
+  const critic = readF('.claude/skills/krait/critic/instructions.md');
+  const reporter = readF('.claude/skills/krait/reporter/instructions.md');
+
+  it('the /krait command offers the PoC pass as opt-in, not automatic', () => {
+    expect(command).toContain('/krait-poc triage');
+    expect(command).toMatch(/opt-in|do not run\s+automatically|offer — do not run/i);
+  });
+
+  it('critic Method D is a targeted escalation, not a routine per-High step', () => {
+    expect(critic).toContain('Method D');
+    expect(critic).toMatch(/targeted, rare|Do NOT PoC every High/i);
+  });
+
+  it('reporter surfaces an evidence tier distinguishing PROVEN from REASONED', () => {
+    expect(reporter).toContain('Evidence Tier');
+    expect(reporter).toContain('PROVEN');
+    expect(reporter).toContain('REASONED');
+  });
+
+  it('reporter states REASONED is not a weaker/unverified finding', () => {
+    // The load-bearing guarantee: lacking a PoC never reads as doubt.
+    expect(reporter).toMatch(/REASONED is not a weaker finding|NOT.*"unverified"/i);
+    expect(reporter).toMatch(/un-PoC-able/i);
+  });
+});
