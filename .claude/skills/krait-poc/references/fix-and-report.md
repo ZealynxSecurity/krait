@@ -1,12 +1,25 @@
-# Fix and report — after a passing PoC
+# Fix and report — after the falsification gate
 
-This runs only for `[POC-PASS]` findings. `[CODE-TRACE]` and `[POC-FAIL]` findings do NOT
-get a fix — you have not proven there is anything to fix.
+This runs for findings that survived the Step 7 falsification gate — `[POC-PASS]` and
+`[POC-PASS · FIX-INSUFFICIENT]`. `[POC-UNPINNED]`, `[CODE-TRACE]`, and `[POC-FAIL]` findings
+do NOT get a fix here: an unpinned test has not proven a defect to fix, and the others have
+nothing confirmed to fix.
 
-## Generate the fix
+Note that by the time you reach this step, the fix-efficacy control (gate Control 2) has
+**already run the recommended fix against the exploit** — so you know whether it holds:
 
-After a passing PoC confirms the bug, you already hold deep context. Write the **minimal**
-diff that removes the defect — the smallest change that makes your PoC no longer pass.
+- **`[POC-PASS]`** — the fix killed the exploit. Report the verified fix (below).
+- **`[POC-PASS · FIX-INSUFFICIENT]`** — the fix did NOT kill the exploit, but the finding is
+  pinned and real. Report the bug, show the exploit surviving the proposed fix, and state
+  what a correct fix must change — derived from the defect-mutation that *did* kill it (the
+  mutation is the specification for a correct fix). Do NOT iterate a patch against the test
+  to manufacture a green fix; hand the remediation to human review.
+
+## Generate the fix (verified `[POC-PASS]` only)
+
+You already hold deep context and the fix-efficacy control has confirmed the diff works.
+Write the **minimal** diff that removes the defect — the smallest change that makes the PoC
+no longer pass, which the gate has already demonstrated.
 
 ```diff
 - uint256 shares = amount * totalShares / totalAssets;
@@ -48,9 +61,11 @@ Attach this to the finding so the reporter can paste it verbatim:
 - **File**: test/Victim_exp.sol
 - **Command**: forge test --match-contract ExploitTest -vvv
 - **Result**: PASS
-- **Evidence**: [POC-PASS]
+- **Evidence**: [POC-PASS] | [POC-PASS · FIX-INSUFFICIENT]
 - **Harm asserted**: <WHO lost WHAT — the exact assertion that passed>
 - **Output**: <the profit / drain line from the run>
+- **Pinned (defect-mutation)**: YES — <the one-line change to the defective line that killed the exploit>
+- **Fix efficacy**: fix killed exploit (verified) | fix did NOT kill exploit (FIX-INSUFFICIENT)
 
 ### Suggested Fix
 ​```diff

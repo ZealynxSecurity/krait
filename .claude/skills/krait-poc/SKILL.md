@@ -37,14 +37,20 @@ pattern (see `references/harness.md`) exists for exactly this.
 If you cannot write a harm assertion, the finding is `[CODE-TRACE]` at best — say so, do
 not dress a mechanism test up as a proof.
 
+## The second rule: a green test is a hypothesis, not a proof
+
+You wrote the test to confirm a finding you already believe, so it will build the world where
+the finding is true. `[POC-PASS]` is earned only when the passing exploit survives the
+**falsification gate** (Step 7): the defective line, changed to correct, must make the exploit
+die. Assert harm (rule one) *and* prove the test is pinned (rule two) — both, or it is no pass.
+
 ## Two modes
 
 - **Single finding** (the default) — prove or disprove one suspected bug. Follow the
   workflow below.
-- **Batch triage** — verify a *list* of findings and emit one consolidated verdict table
-  ("here are my N findings, which hold up?"). Read `references/batch-triage.md` and follow
-  it; it wraps the single-finding workflow with a PoC-ability triage and the table format.
-  Use this whenever the target is more than one finding.
+- **Batch triage** — verify a *list* of findings → one consolidated verdict table. Whenever
+  the target is more than one finding, read `references/batch-triage.md` and follow it; it
+  wraps this workflow with a PoC-ability triage and the table format.
 
 Both modes obey the same evidence rule: a passing PoC promotes a finding, a failing PoC
 demotes it, and **inability to PoC does neither** — some valid findings are un-PoC-able by
@@ -97,16 +103,11 @@ hides. When torn between a faithful fork and a convenient mock, fork.
 
 ### 3. Gather the concrete facts
 
-Collect the real values the harness needs:
-
-- Chain + block number (pin it — an un-pinned fork is not reproducible)
-- Addresses of every contract you touch (victim, tokens, pools, oracles)
-- Real function signatures — **read the deployed source or ABI, never guess a signature**
-- The attacker's funding source (own capital via `deal`, or a flash loan — see step 5)
-
-Anti-hallucination rule: every address and every selector in your PoC must come from a
-source you actually read (Etherscan source, the project repo, a cast call). A made-up
-signature is the #1 cause of a PoC that "should work" but doesn't compile.
+Collect the real values the harness needs: the chain + a **pinned** block; every contract
+address you touch; **real function signatures read from deployed source or ABI, never
+guessed**; the attacker's funding source (`deal` or a flash loan, step 5). Every address and
+selector must come from a source you actually read (Etherscan, the repo, a `cast` call) — a
+made-up signature is the #1 cause of a PoC that "should work" but doesn't compile.
 
 ### 4. Build the skeleton and instantiate the target
 
@@ -114,23 +115,16 @@ Use the harness in `references/harness.md`: inherit the balance-logging base, se
 fork or local deploy in `setUp()`, put the attack in `testExploit()`. Instantiate the
 in-scope contract per its **deployment shape** (`references/deploy-shapes.md`) — reuse the
 project's own deploy script / base fixture rather than hand-rolling a constructor call. On a
-fork, the system is already deployed: cast the known addresses to their interfaces. Label
-every address with `vm.label` (the single most-used cheatcode in the corpus — 2,363 uses
-across 844 PoCs — because unreadable traces waste more time than they save).
+fork, the system is already deployed: cast the known addresses to their interfaces. `vm.label`
+every address (the corpus's most-used cheatcode — unreadable traces waste more time than they save).
 
 ### 5. Wire the money
 
-Most real exploits are flash-loan-funded (36% of the corpus). If the attack needs capital
-it does not have:
-
-- Read `references/flashloan.md` — it has the exact callback signature and liquidity
-  source for each major provider (Balancer, DODO, Aave V3, Uniswap V2/V3, Morpho, Pancake).
-- Match the callback to the provider. `executeOperation` is Aave; `receiveFlashLoan` is
-  Balancer; `uniswapV2Call`/`pancakeCall` is a V2 pair; `DPPFlashLoanCall` is DODO. Getting
-  this wrong is the second most common compile failure.
-
-If the attacker uses its own capital, `vm.deal` (native) or a `deal(token, addr, amt)`
-cheat (ERC-20) funds it — no flash loan needed.
+Most real exploits are flash-loan-funded (36% of the corpus). If the attack needs capital it
+does not have, read `references/flashloan.md` and **match the callback to the provider**
+(`executeOperation`=Aave, `receiveFlashLoan`=Balancer, `uniswapV2Call`/`pancakeCall`=V2 pair,
+`DPPFlashLoanCall`=DODO) — mismatching it is the second most common compile failure. If the
+attacker uses its own capital, `vm.deal` (native) / `deal(token, addr, amt)` (ERC-20) funds it.
 
 ### 6. Compile → run → fix (the loop)
 
@@ -142,22 +136,42 @@ On failure, read `references/debug-ladder.md` — it maps every common error cla
 reading). **Max 5 compile attempts, then fall back to `[CODE-TRACE]`** — do not grind
 forever on a setup that will not build.
 
-### 7. Assign the evidence tag
+### 7. Falsification gate — prove the PoC is pinned, not theater (MANDATORY when the exploit passes)
+
+**Do not record `[POC-PASS]` on a green test alone.** The reasoning that produced the finding
+produced the test, so it will build the exact world where the finding is true. Read
+`references/falsification-gate.md` and run its two controls — they answer different questions:
+
+- **Defect-mutation (the honest pin)**: change the *defective line itself* to correct, re-run the
+  unchanged exploit. Survives → `[POC-UNPINNED]` (theater → `[CODE-TRACE]`). Dies → the bug is
+  real, settled independent of any fix. Cross-check with a negative/baseline control (the C-01 move).
+- **Fix-efficacy (separate verdict)**: only after the pin holds, apply the *recommended fix* and
+  **fuzz the parameter it constrains** (not just re-run the literal exploit — that is
+  tautological when the fix bounds the value the exploit sets). Whole neighborhood clean → fix
+  verified. Any variant still reproduces → `FIX-INSUFFICIENT` — real, pinned, fix doesn't close it.
+
+Never iterate a candidate fix against a single exploit test (theater again); derive a better fix
+from the mutation, validate it under a fuzz sweep, cap at 2, hand to human review. Recursion-trap
+rules are in the reference.
+
+### 8. Assign the evidence tag
 
 | Tag | Meaning |
 |---|---|
-| `[POC-PASS]` | Compiled, ran, the **harm assertion** passed. Ground truth. |
-| `[POC-FAIL]` | Compiled, ran, the harm assertion failed. Default: the attack does not work as described. To overturn, prove the failure is a setup error (see the Assertion Retry Protocol in `references/assertion-protocol.md`), not a real defense. |
-| `[CODE-TRACE]` | Could not execute (no build env, unavailable external dep, no fork RPC, ≥5 failed compiles). Fallible — never supports CONFIRMED on its own, but also never counts *against* the finding. |
+| `[POC-PASS]` | Exploit passed **and** the gate held: defect-mutation killed it (pinned), fix killed it (verified). |
+| `[POC-PASS · FIX-INSUFFICIENT]` | Pinned, but the proposed fix does **not** close it. Bug real; remediation flagged. A finding, not a demotion. |
+| `[POC-UNPINNED]` | Exploit passed but the defect-mutation did **not** kill it — not pinned to the cited defect. → `[CODE-TRACE]`, flag for review. |
+| `[POC-FAIL]` | Ran, harm assertion failed. The attack does not work as described (overturn only via `references/assertion-protocol.md`). |
+| `[CODE-TRACE]` | Could not execute (no build env / dep / fork RPC / ≥5 compile fails). Never supports CONFIRMED, never counts *against* the finding. |
 
-A `[POC-FAIL]` is a real result, not a failure of yours. Reporting a bug that a passing PoC
-would have disproven is worse than reporting `[POC-FAIL]`.
+`[POC-FAIL]` and `[POC-UNPINNED]` are real results — they protect you from reporting a bug your
+own test only appeared to prove.
 
-### 8. (When the PoC passes) generate the fix
+### 9. Report the result and the fix
 
-For `[POC-PASS]` only: write the minimal diff that removes the defect, and — if the harness
-allows — re-run the PoC with the fix applied to confirm it no longer triggers. Read
-`references/fix-and-report.md` for the diff format and the report block.
+Write up the finding with its gate outcome. For a `[POC-PASS]`, include the verified fix diff;
+for `[POC-PASS · FIX-INSUFFICIENT]`, include the exploit surviving the fix and what a correct
+fix must change (from the mutation spec). Read `references/fix-and-report.md` for the block.
 
 ## Reference files
 
@@ -174,8 +188,9 @@ Load these as the workflow directs — do not read them all up front.
 | `references/flashloan.md` | Step 5 — provider callback signatures + liquidity sources |
 | `references/cheatsheet.md` | Any step — the cheatcodes real PoCs actually use, ranked |
 | `references/debug-ladder.md` | Step 6 — error class → fix, ordered by frequency |
-| `references/assertion-protocol.md` | Step 7 — the one-retry protocol before FALSE_POSITIVE |
-| `references/fix-and-report.md` | Step 8 — fix diff + report block format |
+| `references/falsification-gate.md` | Step 7 — defect-mutation + fix-efficacy: pin vs. theater |
+| `references/assertion-protocol.md` | Step 6/7 — one-retry protocol; variant sweep dimensions |
+| `references/fix-and-report.md` | Step 9 — fix diff + report block format |
 | `references/batch-triage.md` | Batch mode — verify a list of findings → verdict table |
 
 ## Boundaries

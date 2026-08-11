@@ -32,7 +32,10 @@ describe('krait-poc skill structure', () => {
   it('keeps the entry point tight (progressive disclosure)', () => {
     // The whole point is a small always-on entry that pulls references on demand.
     // If SKILL.md itself balloons, that discipline is broken.
-    expect(skill.split('\n').length).toBeLessThan(200);
+    // Cap raised 200 -> 215 when the falsification gate added a 9th workflow step (the
+    // anti-confirmation-bias defect-mutation/fix-efficacy control). Essential growth, not
+    // bloat — the gate's detail lives in references/falsification-gate.md, not here.
+    expect(skill.split('\n').length).toBeLessThan(215);
   });
 
   it('every reference the workflow names exists on disk', () => {
@@ -79,8 +82,8 @@ describe('krait-poc central rule: assert harm, not mechanism', () => {
     expect(critic).toMatch(/harm/i);
   });
 
-  it('defines the three evidence tags the critic consumes', () => {
-    for (const tag of ['[POC-PASS]', '[POC-FAIL]', '[CODE-TRACE]']) {
+  it('defines the evidence tags the critic consumes', () => {
+    for (const tag of ['[POC-PASS]', '[POC-FAIL]', '[CODE-TRACE]', '[POC-UNPINNED]']) {
       expect(skill).toContain(tag);
     }
   });
@@ -93,6 +96,62 @@ describe('krait-poc central rule: assert harm, not mechanism', () => {
   it('critic Verification Method D routes to the krait-poc skill', () => {
     expect(critic).toContain('krait-poc');
     expect(critic).toMatch(/\[POC-PASS\]/);
+  });
+});
+
+describe('krait-poc falsification gate (anti-confirmation-bias)', () => {
+  const skill = read('SKILL.md');
+  const gate = read('references/falsification-gate.md');
+
+  it('SKILL.md makes the gate mandatory before a POC-PASS stands', () => {
+    expect(skill).toMatch(/falsification gate/i);
+    expect(skill).toMatch(/green test is a hypothesis, not a proof/i);
+    expect(skill).toMatch(/Step 7/);
+  });
+
+  it('separates the defect-mutation (pin) from the fix-efficacy (remediation) control', () => {
+    // Conflating these was the flaw: a failed fix could be theater OR a real bug with a bad fix.
+    expect(gate).toMatch(/Defect-mutation/);
+    expect(gate).toMatch(/Fix-efficacy/);
+    expect(gate).toMatch(/two DIFFERENT questions/i);
+  });
+
+  it('uses the corrected defective line as the pin, not the proposed fix', () => {
+    // The pin must be independent of whether we got the fix right.
+    expect(gate).toMatch(/defective line/i);
+    expect(gate).toMatch(/independent of any fix/i);
+  });
+
+  it('treats a surviving defect-mutation as UNPINNED (theater), downgraded to CODE-TRACE', () => {
+    expect(gate).toContain('[POC-UNPINNED]');
+    expect(gate).toMatch(/\[POC-UNPINNED\][^\n]*CODE-TRACE|not pinned/i);
+  });
+
+  it('treats a surviving fix on a pinned bug as FIX-INSUFFICIENT, never a demotion', () => {
+    expect(gate).toContain('FIX-INSUFFICIENT');
+    expect(gate).toMatch(/finding, not a failure|higher.*value|never a demotion/i);
+  });
+
+  it('forbids iterating a candidate fix against a single exploit test (the recursion trap)', () => {
+    expect(gate).toMatch(/never iterate a candidate fix|do not iterate a candidate fix/i);
+    expect(gate).toMatch(/fuzz\/variant sweep|fuzz.variant/i);
+  });
+
+  it('makes fix-efficacy FUZZ the fix, not just re-run the literal exploit', () => {
+    // The H-05 near-miss: a fix that bounds the exact value the exploit sets passes
+    // tautologically; only a neighborhood sweep catches the surviving harm.
+    expect(gate).toMatch(/tautolog/i);
+    expect(gate).toMatch(/variant sweep of the parameter|fuzz the parameter|neighborhood/i);
+    // SKILL.md's step-7 summary must carry the same rule, not just the reference.
+    expect(skill).toMatch(/fuzz the parameter it constrains|not just re-run the literal/i);
+  });
+
+  it('requires a negative/baseline control as a cross-check', () => {
+    expect(gate).toMatch(/negative.*control|baseline control/i);
+  });
+
+  it('keeps the human in the loop for remediation', () => {
+    expect(gate).toMatch(/human review/i);
   });
 });
 
