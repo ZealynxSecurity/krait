@@ -72,6 +72,29 @@ table under the description, then give ONE recommendation covering all of them:
 *One fix closes all 4 locations above.*
 ```
 
+### Step 2.75: Evidence Tier (surface how a finding was verified)
+
+Every finding carries an **Evidence** line saying how strongly it was verified. This is the
+payoff of the opt-in PoC pass: a client can see at a glance which findings have mechanical
+proof versus expert reasoning. Derive it from the finding's evidence tag (from the critic,
+or from a `krait-poc` run if one was done):
+
+| Evidence line | When | Meaning |
+|---------------|------|---------|
+| `PROVEN — executed PoC [POC-PASS]` | A `krait-poc` run reproduced the harm | Ground truth. Attach the passing harm assertion + the verified fix diff. |
+| `REASONED — code trace [CODE-TRACE]` | Verified by the critic's trace, no PoC run (or un-PoC-able by nature) | A real confirmed finding. **NOT** "unverified" — most valid findings live here, including governance/off-chain/cross-chain issues a PoC cannot speak to. |
+| `DISPUTED — PoC did not reproduce [POC-FAIL]` | A PoC was attempted and the harm did not materialize | Should normally have been dropped by the critic; if it still appears, flag it loudly for human review. |
+
+Rules:
+
+- **`REASONED` is not a weaker finding, just a differently-evidenced one.** Never imply a
+  finding is doubtful because it lacks a PoC — some of the highest-value findings (trusted-
+  actor, off-chain, cross-chain) are un-PoC-able by construction.
+- A `PROVEN` finding SHOULD carry its harm assertion in the PoC block and its verified fix in
+  the Recommendation — that is the concrete value of having run the PoC.
+- If no PoC pass was run at all, every finding is `REASONED` — that is the normal default
+  audit, and it is fine.
+
 ### Step 3: Severity Ranking
 
 Final severity assignment using this rubric:
@@ -144,6 +167,7 @@ Generate `.audit/krait-report.md`:
 
 **File**: `path/to/file.sol:XX`
 **Category**: [e.g., reentrancy, state-desync, access-control]
+**Evidence**: [one of — see the Evidence tier below]
 
 **Description**:
 [Clear explanation of the vulnerability. What's wrong and why it matters.]
@@ -153,7 +177,8 @@ Generate `.audit/krait-report.md`:
 
 **Proof of Concept**:
 ```
-[Concrete attack steps or code trace]
+[If [POC-PASS]: the passing test's harm assertion + the profit/drain output, and the
+run command. Otherwise: the concrete attack steps / code trace.]
 ```
 
 **Root Cause**:

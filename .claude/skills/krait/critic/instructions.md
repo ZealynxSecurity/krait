@@ -181,9 +181,13 @@ via the forge MCP.
 - Can't execute (no build env, external dep unavailable, ≥5 failed compiles) → stay at
   `[CODE-TRACE]`; do not claim a proof you did not run.
 
-This is an escalation, not a requirement: a Medium with a clean code trace does not need a
-PoC, and a genuinely un-executable finding stays `[CODE-TRACE]` honestly. Use it where the
-severity justifies the cost and the harness exists.
+This is a **targeted, rare** escalation — not a routine per-finding step. Reach for it only
+when a specific **Critical** cannot be resolved by reasoning alone and the cost of shipping
+it wrong (or killing a real one) is high. Do NOT PoC every High inline; routine PoC
+verification across Critical/High is the **opt-in post-report handoff** (see `/krait` §After
+the Report), which runs `krait-poc` batch-triage on demand so the default audit stays cheap.
+A Medium with a clean trace never needs a PoC, and a genuinely un-executable finding stays
+`[CODE-TRACE]` honestly — never penalized for it.
 
 ## Verification Checklist
 
