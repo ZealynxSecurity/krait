@@ -58,9 +58,33 @@ source and re-run the exploit:
 
 | Defect-mutation (Control 1) | Proposed fix (Control 2) | Verdict |
 |---|---|---|
-| exploit dies | exploit dies | `[POC-PASS]` + verified fix. Real, pinned, fix works. |
-| exploit dies | exploit survives | `[POC-PASS]` **+ `FIX-INSUFFICIENT`**. Real, pinned, the proposed fix does NOT close it — a *higher*-value finding, never a demotion. |
+| exploit dies | fix survives the **fuzz sweep** | `[POC-PASS]` + verified fix. Real, pinned, fix closes the harm. |
+| exploit dies | fix fails the sweep (a variant still reproduces) | `[POC-PASS]` **+ `FIX-INSUFFICIENT`**. Real, pinned, the proposed fix does NOT close the harm — a *higher*-value finding, never a demotion. |
 | exploit survives | (not run) | `[POC-UNPINNED]` → `[CODE-TRACE]`. Theater. |
+
+### Control 2 must FUZZ the fix, not just re-run the literal exploit (MANDATORY)
+
+Re-running the exact exploit against the fix is **not sufficient** — and is often
+*tautological*. When the fix constrains the very variable the exploit sets, re-running passes
+by construction and tells you nothing. Example: a fix that rejects a **zero-amount** input,
+tested against an exploit that used amount = 0, will always pass — yet a **1-wei** variant can
+reproduce the identical harm because the fix closed the literal value, not the mechanism.
+
+So evaluating the recommended fix requires a **variant sweep of the parameter(s) the fix
+constrains**, not one re-run:
+
+1. Identify what the fix bounds (an amount, a threshold, a timing window, an ordering).
+2. Run the harm assertion across the **neighborhood** of that bound — boundary and just-past
+   values (`0, 1, dust, threshold, threshold+1`), and the adjacent dimensions from
+   `assertion-protocol.md` (timing, ordering, initial state).
+3. If **any** variant still reproduces the harm → `FIX-INSUFFICIENT`, even though the literal
+   exploit died against the fix. The fix masks the tested case; it does not close the harm.
+4. Only if the **whole neighborhood is clean** is the fix `verified`.
+
+This is the same fuzz discipline the recursion trap (below) demands of *candidate better-fixes*
+— applied to the **original recommended fix** as well, because that is exactly where a fix that
+"passes the test" but leaves the harm live slips through. A fix verified only against the literal
+PoC value is not verified.
 
 **`FIX-INSUFFICIENT` is a finding, not a failure.** "Here is the bug, and the obvious fix
 does not close it" is one of the most valuable things an audit can deliver. Report it loudly;

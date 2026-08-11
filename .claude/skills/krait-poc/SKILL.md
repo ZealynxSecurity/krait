@@ -146,7 +146,9 @@ produced the test, so it will build the exact world where the finding is true. R
   unchanged exploit. Survives → `[POC-UNPINNED]` (theater → `[CODE-TRACE]`). Dies → the bug is
   real, settled independent of any fix. Cross-check with a negative/baseline control (the C-01 move).
 - **Fix-efficacy (separate verdict)**: only after the pin holds, apply the *recommended fix* and
-  re-run. Dies → fix verified. Survives → `FIX-INSUFFICIENT` — real, pinned, fix doesn't close it.
+  **fuzz the parameter it constrains** (not just re-run the literal exploit — that is
+  tautological when the fix bounds the value the exploit sets). Whole neighborhood clean → fix
+  verified. Any variant still reproduces → `FIX-INSUFFICIENT` — real, pinned, fix doesn't close it.
 
 Never iterate a candidate fix against a single exploit test (theater again); derive a better fix
 from the mutation, validate it under a fuzz sweep, cap at 2, hand to human review. Recursion-trap

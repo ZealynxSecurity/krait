@@ -137,6 +137,15 @@ describe('krait-poc falsification gate (anti-confirmation-bias)', () => {
     expect(gate).toMatch(/fuzz\/variant sweep|fuzz.variant/i);
   });
 
+  it('makes fix-efficacy FUZZ the fix, not just re-run the literal exploit', () => {
+    // The H-05 near-miss: a fix that bounds the exact value the exploit sets passes
+    // tautologically; only a neighborhood sweep catches the surviving harm.
+    expect(gate).toMatch(/tautolog/i);
+    expect(gate).toMatch(/variant sweep of the parameter|fuzz the parameter|neighborhood/i);
+    // SKILL.md's step-7 summary must carry the same rule, not just the reference.
+    expect(skill).toMatch(/fuzz the parameter it constrains|not just re-run the literal/i);
+  });
+
   it('requires a negative/baseline control as a cross-check', () => {
     expect(gate).toMatch(/negative.*control|baseline control/i);
   });

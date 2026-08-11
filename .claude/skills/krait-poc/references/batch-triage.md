@@ -93,7 +93,7 @@ One row per finding. This is the deliverable.
 |---------|-----|---------|----------|------------------|
 | H-01 vault drain via reentrancy | High | PASS | [POC-PASS] | Pinned (fixing the guard kills it) + fix verified. Confirmed. Promote. |
 | H-02 oracle staleness theft | High | FAIL | [POC-FAIL] | Harm did not reproduce after retry + variant. Likely false positive — re-read before dropping. |
-| H-06 fee coefficient typo | High | PASS* | [POC-PASS · FIX-INSUFFICIENT] | Pinned (correct constant kills it), but the recommended fix does NOT close it. Bug real; remediation flagged for human review. |
+| H-06 fee coefficient typo | High | PASS* | [POC-PASS · FIX-INSUFFICIENT] | Pinned (correct constant kills it), but the fix fails the fuzz sweep — the literal exploit dies yet a boundary variant still reproduces the harm. Bug real; remediation flagged for human review. |
 | H-08 share inflation | High | ? | [POC-UNPINNED] → [CODE-TRACE] | Exploit passed but the defect-mutation did NOT kill it — test not pinned to the cited line. Downgraded; needs manual review. |
 | M-03 governance timelock bypass | Med | — | [CODE-TRACE: TRUSTED_ACTOR] | VALID, un-PoC-able. Requires admin to act. Keep at Medium; PoC is not the right instrument. |
 | M-04 wrong event on rebalance | Med | — | [CODE-TRACE: OFF_CHAIN_HARM] | VALID. Off-chain impact (indexer). No on-chain delta to assert. Keep severity. |
