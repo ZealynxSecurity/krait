@@ -81,8 +81,9 @@ or from a `krait-poc` run if one was done):
 
 | Evidence line | When | Meaning |
 |---------------|------|---------|
-| `PROVEN — executed PoC [POC-PASS]` | A `krait-poc` run reproduced the harm | Ground truth. Attach the passing harm assertion + the verified fix diff. |
-| `REASONED — code trace [CODE-TRACE]` | Verified by the critic's trace, no PoC run (or un-PoC-able by nature) | A real confirmed finding. **NOT** "unverified" — most valid findings live here, including governance/off-chain/cross-chain issues a PoC cannot speak to. |
+| `PROVEN — executed PoC [POC-PASS]` | A `krait-poc` run reproduced the harm AND the finding survived the falsification gate (the defective line, corrected, kills the exploit; the fix also kills it) | Ground truth. Attach the passing harm assertion, the defect-mutation that pinned it, and the verified fix diff. |
+| `PROVEN — fix insufficient [POC-PASS · FIX-INSUFFICIENT]` | Pinned and real, but the recommended fix does NOT close the exploit | The bug is confirmed; the *remediation* is flagged. Report the exploit surviving the proposed fix and note a correct fix is pending human review. **Not** a weaker finding — often a more important one. |
+| `REASONED — code trace [CODE-TRACE]` | Verified by the critic's trace, no PoC run, un-PoC-able by nature, OR a PoC reproduced but was **not pinned** to the defect (`[POC-UNPINNED]`) | A real finding held on reasoning. **NOT** "unverified." An `[POC-UNPINNED]` finding is here because its test did not prove the cited line caused the harm — the mechanism may still be real, so it is flagged for human review, never dropped on the PoC's say-so. |
 | `DISPUTED — PoC did not reproduce [POC-FAIL]` | A PoC was attempted and the harm did not materialize | Should normally have been dropped by the critic; if it still appears, flag it loudly for human review. |
 
 Rules:

@@ -171,9 +171,17 @@ describe('krait ↔ krait-poc integration (opt-in handoff)', () => {
     expect(reporter).toContain('REASONED');
   });
 
+  it('reporter evidence tier recognizes the falsification-gate outcomes', () => {
+    // A PoC-verified finding must distinguish "fix works" from "fix insufficient", and an
+    // unpinned PoC must fall back to REASONED, never inflate to PROVEN.
+    expect(reporter).toContain('FIX-INSUFFICIENT');
+    expect(reporter).toContain('POC-UNPINNED');
+  });
+
   it('reporter states REASONED is not a weaker/unverified finding', () => {
-    // The load-bearing guarantee: lacking a PoC never reads as doubt.
-    expect(reporter).toMatch(/REASONED is not a weaker finding|NOT.*"unverified"/i);
+    // The load-bearing guarantee: lacking a PoC never reads as doubt. Punctuation-robust.
+    expect(reporter).toMatch(/is not a weaker finding/i);
+    expect(reporter).toMatch(/\*\*NOT\*\*\s*"?unverified/i);
     expect(reporter).toMatch(/un-PoC-able/i);
   });
 });

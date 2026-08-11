@@ -63,7 +63,11 @@ a testable finding as STRUCTURAL hides whether it was real.
 ## Step 2 — run the TESTABLE lane, severity-ordered
 
 Process TESTABLE findings **Critical → High → Medium** (spend the budget where the stakes
-are). For each, run the standard 8-step workflow from `SKILL.md`.
+are). For each, run the standard 8-step workflow from `SKILL.md` — **including the Step 7
+falsification gate on every finding whose exploit passes.** A green exploit is not a
+`[POC-PASS]` until the defect-mutation control has proven the test is pinned to the defect
+(`references/falsification-gate.md`). This is what stops the batch from becoming a row of
+self-confirming green checks.
 
 **The "few runs" rule** — this is where multiple attempts are legitimate:
 
@@ -87,18 +91,27 @@ One row per finding. This is the deliverable.
 
 | Finding | Sev | Verdict | Evidence | Meaning / action |
 |---------|-----|---------|----------|------------------|
-| H-01 vault drain via reentrancy | High | PASS | [POC-PASS] | Confirmed. Fix diff attached. Promote. |
+| H-01 vault drain via reentrancy | High | PASS | [POC-PASS] | Pinned (fixing the guard kills it) + fix verified. Confirmed. Promote. |
 | H-02 oracle staleness theft | High | FAIL | [POC-FAIL] | Harm did not reproduce after retry + variant. Likely false positive — re-read before dropping. |
+| H-06 fee coefficient typo | High | PASS* | [POC-PASS · FIX-INSUFFICIENT] | Pinned (correct constant kills it), but the recommended fix does NOT close it. Bug real; remediation flagged for human review. |
+| H-08 share inflation | High | ? | [POC-UNPINNED] → [CODE-TRACE] | Exploit passed but the defect-mutation did NOT kill it — test not pinned to the cited line. Downgraded; needs manual review. |
 | M-03 governance timelock bypass | Med | — | [CODE-TRACE: TRUSTED_ACTOR] | VALID, un-PoC-able. Requires admin to act. Keep at Medium; PoC is not the right instrument. |
 | M-04 wrong event on rebalance | Med | — | [CODE-TRACE: OFF_CHAIN_HARM] | VALID. Off-chain impact (indexer). No on-chain delta to assert. Keep severity. |
 | H-05 liquidation rounding | High | — | [CODE-TRACE: COMPILE_UNRESOLVED_AFTER_5] | UNPROVEN, not disproven. Env couldn't build. Needs manual PoC / another environment. |
 
 ### Summary
-- Confirmed (POC-PASS): 1
+- Confirmed + pinned + fix verified (POC-PASS): 1
+- Confirmed + pinned, fix insufficient (FIX-INSUFFICIENT): 1   ← bug real, remediation flagged
 - Disproven (POC-FAIL): 1        ← the only bucket that argues a finding is invalid
+- Not pinned (POC-UNPINNED → CODE-TRACE): 1   ← reproduced but unproven; manual review
 - Valid but un-PoC-able (STRUCTURAL): 2   ← severity unchanged
 - Unproven (BLOCKED / construction): 1    ← still open, needs manual attention
 ```
+
+Note that `[POC-UNPINNED]` and `[POC-PASS · FIX-INSUFFICIENT]` come out of the Step 7
+falsification gate, not the initial exploit run. A batch report that shows only bare
+`[POC-PASS]` rows for every finding — with no pin result — did not run the gate. Every PASS
+row must state the defect-mutation it survived.
 
 ### Table rules (non-negotiable)
 
