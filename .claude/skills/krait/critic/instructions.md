@@ -167,6 +167,24 @@ If you cannot construct a concrete trace with actual values → the finding is l
 
 Code trace to confirm mechanism plausibility + concrete trace with values to verify impact.
 
+### Method D: Executable PoC (escalation for CRITICAL / HIGH)
+
+A written trace is `[CODE-TRACE]` — fallible reasoning. For a Critical or High finding where
+a forge harness is available, escalate to an **executed** PoC via the `krait-poc` skill
+(`~/.claude/skills/krait-poc/SKILL.md`): it forks the chain or builds against in-scope
+source, asserts the actual HARM (not the mechanism), and returns `[POC-PASS]` / `[POC-FAIL]`
+via the forge MCP.
+
+- `[POC-PASS]` → the only tag that supports CONFIRMED as ground truth. Upgrade confidence.
+- `[POC-FAIL]` → the attack did not reproduce. Default to killing the finding unless the
+  krait-poc assertion-retry protocol shows the failure was a setup error.
+- Can't execute (no build env, external dep unavailable, ≥5 failed compiles) → stay at
+  `[CODE-TRACE]`; do not claim a proof you did not run.
+
+This is an escalation, not a requirement: a Medium with a clean code trace does not need a
+PoC, and a genuinely un-executable finding stays `[CODE-TRACE]` honestly. Use it where the
+severity justifies the cost and the harness exists.
+
 ## Verification Checklist
 
 For EVERY CRITICAL, HIGH, and MEDIUM candidate, answer ALL of these:

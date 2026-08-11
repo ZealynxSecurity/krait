@@ -136,6 +136,7 @@ claude mcp add krait-forge   --scope user -- node "$PWD/mcp-servers/forge/build/
 | `/krait-review` | Second opinion on killed findings — re-examines aggressive gate decisions |
 | `/krait-fuzz` | Invariant extraction → Foundry test generation → run/fix loop |
 | `/krait-init` | Standalone readiness check (tools, project shape, MCP wiring). `/krait` runs this automatically; this command is for CI setup and debugging. |
+| `/krait-poc` | Write and run a Foundry PoC that proves an exploit by asserting the actual harm on a forked chain — or proves it does not reproduce. Emits `[POC-PASS]`/`[POC-FAIL]`. |
 
 All output to `.audit/` in your project directory.
 

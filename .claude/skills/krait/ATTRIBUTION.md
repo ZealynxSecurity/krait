@@ -1,12 +1,18 @@
 # Detection Sources
 
-Krait's detection layer combines original research with curated knowledge from the open-source security community. All integrated content is from MIT-licensed repositories.
+Krait's detection layer combines original research with curated knowledge from the open-source security community. The detection content below is integrated from MIT-licensed repositories.
 
 | Source | What We Integrated | License | Link |
 |--------|-------------------|---------|------|
 | **pashov/skills** | ~100 attack vectors across 8 modules + 58 extended heuristics | MIT | [github.com/pashov/skills](https://github.com/pashov/skills) |
 | **PlamenTSV/plamen** | Devil's Advocate verification methodology, cross-cutting analysis perspectives | MIT | [github.com/PlamenTSV/plamen](https://github.com/PlamenTSV/plamen) |
 | **forefy/.context** | Protocol-type context enrichment across 7 primers (10,600+ findings distilled) | MIT | [github.com/forefy/.context](https://github.com/forefy/.context) |
+
+The `krait-poc` skill (Foundry exploit PoC construction) derives its patterns from
+additional corpora, including the Apache-2.0 **DeFiHackLabs**; those sources and the
+license reasoning are documented separately in
+[`../krait-poc/references/ATTRIBUTION.md`](../krait-poc/references/ATTRIBUTION.md). No
+third-party Solidity is vendored — only facts derived from analyzing the corpora.
 
 ## What's Original to Krait
 
