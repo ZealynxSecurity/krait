@@ -43,6 +43,13 @@ describe('krait-poc skill structure', () => {
     }
   });
 
+  it('makes environment recon a mandatory gating first step', () => {
+    // Building tests without profiling the target is the failure this guards against.
+    expect(skill).toContain('references/environment-recon.md');
+    expect(skill).toMatch(/Recon the target's PoC environment.*MANDATORY/i);
+    expect(skill).toMatch(/[Dd]o not write a line of test code until/);
+  });
+
   it('every reference file is actually pointed at by SKILL.md', () => {
     // A reference nobody links is dead weight (ATTRIBUTION is linked from prose, so it
     // is allowed to sit outside the workflow table).
@@ -86,6 +93,39 @@ describe('krait-poc central rule: assert harm, not mechanism', () => {
   it('critic Verification Method D routes to the krait-poc skill', () => {
     expect(critic).toContain('krait-poc');
     expect(critic).toMatch(/\[POC-PASS\]/);
+  });
+});
+
+describe('krait-poc environment recon', () => {
+  const recon = read('references/environment-recon.md');
+  const deploy = read('references/deploy-shapes.md');
+
+  it('reviews the target build/test/deploy environment before construction', () => {
+    for (const field of ['BUILD SYSTEM', 'FORGE CONFIG', 'FORK FEASIBLE', 'TEST CONVENTION', 'TARGET SHAPE']) {
+      expect(recon).toContain(field);
+    }
+  });
+
+  it('answers the fork-vs-local decision as a framework, not a crude mode pick', () => {
+    expect(recon).toMatch(/local.*fork.*hybrid|Harness decision/i);
+    // The key correction: fork is often necessary for in-scope findings, not just incidents.
+    expect(recon).toMatch(/fork testing is frequently necessary for in-scope/i);
+  });
+
+  it('treats a missing fork RPC as BLOCKED, not FAIL', () => {
+    expect(recon).toContain('NO_FORK_RPC');
+    expect(recon).toMatch(/BLOCKED, not FAIL/);
+  });
+
+  it('covers non-trivial deployment shapes', () => {
+    for (const shape of ['Proxy', 'Factory', 'Diamond', 'Multi-contract', 'init sequence']) {
+      expect(deploy).toMatch(new RegExp(shape, 'i'));
+    }
+  });
+
+  it('tells the model to reuse the project’s own deploy scripts and fixtures', () => {
+    expect(recon).toMatch(/REUSE, do not reinvent/i);
+    expect(deploy).toMatch(/project's own deploy script/i);
   });
 });
 
