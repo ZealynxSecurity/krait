@@ -1,7 +1,7 @@
 {
   "name": "krait",
   "version": "0.2.0",
-  "description": "Solidity security audit CLI powered by Claude. 100% precision across 50 blind Code4rena contests (v8).",
+  "description": "Solidity security audit CLI powered by Claude. v8 benchmark: 10 true positives, 0 false positives, 15% recall on 5 past Code4rena contests (self-scored).",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

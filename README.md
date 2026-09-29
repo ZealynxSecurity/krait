@@ -1,6 +1,6 @@
 # Krait
 
-**AI-assisted security verification for Solidity smart contracts.** Not a scanner — a structured methodology with 101 heuristics, 26 analysis modules, and 8 kill gates, tested blind against 50 Code4rena contests at **100% precision**. Runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Free.
+**AI-assisted security verification for Solidity smart contracts.** Not a scanner — a structured methodology with 101 heuristics, 26 analysis modules, and 8 kill gates. In its last measured version (v8) it reported 10 true positives and 0 false positives on a 5-contest blind batch of past Code4rena contests, while finding 15.2% of the known High/Medium issues ([how this was measured](#how-these-numbers-were-measured)). Runs inside [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Free.
 
 ### At a Glance
 
@@ -14,7 +14,7 @@
 | **Audit-trail rules** | R8 / R10 / R11 / R12 / R15 / R16 — exercised per finding (v8.1) |
 | **Domain primers** | 7 (DEX, Lending, Staking, GameFi, Bridges, Proxies, Wallets) |
 | **Kill gates** | 8 automatic + Impact Premise + 10 FP patterns (identical on both surfaces, parity-tested) |
-| **Shadow audits** | 50 contests, 100% precision, 0 FPs/contest (v8 baseline) |
+| **Shadow audits** | v8: 10 TPs / 0 FPs, 15.2% recall on 5 contests. All 50 contests, v1–v8 pooled: ≈49% precision |
 | **Full methodology** | [`METHODOLOGY.md`](METHODOLOGY.md) — every technique, publicly documented |
 
 ### Two Local Surfaces, One Web Platform
@@ -222,15 +222,17 @@ Revived findings are surfaced as **"Worth Manual Review"** — flags for the aud
 
 ## Benchmarks
 
-Tested blind against 50 Code4rena contests. No other AI audit tool publishes precision/recall against real competitions.
+50 past Code4rena contests have been run blind, in batches of 3–10, each batch with a different methodology version. Every version's numbers are its own batch only; they are not cumulative. Selected versions:
 
-| Version | Contests | Precision | Recall | FPs/Contest |
+| Version | Contests | Precision* | Recall | FPs/Contest |
 |---------|----------|-----------|--------|-------------|
 | v1 | 1-3 | 12% | 5.8% | 1.3 |
 | v5 | 31-35 | 70% | 9.5% | 0.6 |
 | v6.4 | 36-40 | 90% | 11.8% | 0.2 |
 | v7 | 41-45 | 100% | 11.0% | 0.0 |
 | **v8** | **46-50** | **100%** | **15.2%** | **0.0** |
+
+\* Mean of per-contest precision, over the contests in that batch that produced any finding (contests with no findings are left out). Pooled over findings, v6.4 is 7 true positives to 1 false positive (87.5%) and v8 is 10 to 0. Pooled over all 50 contests and all versions, including the early ones, precision is ≈49% (93.5 weighted true positives, 96 false positives).
 
 **Latest 5 contests (v8):**
 
@@ -243,6 +245,15 @@ Tested blind against 50 Code4rena contests. No other AI audit tool publishes pre
 | InitCapital | Lending/Hooks | 15 | 0 | 0 | N/A | 0% |
 
 Every result is verifiable in [`shadow-audits/`](shadow-audits/).
+
+### How these numbers were measured
+
+- **Corpus:** 50 public Code4rena contests from April 2023 to August 2024 ([`shadow-audits/registry.yaml`](shadow-audits/registry.yaml)). One (Tangible Caviar) could not be scored because its findings were not public.
+- **Blind:** no official findings are visible during a run. The contests' reports are public, though, so they are likely in the model's training data.
+- **Scoring:** self-scored by the Krait author, with no outside review. An AI judge (Claude Haiku, [`src/core/comparator.ts`](src/core/comparator.ts)) decides whether a Krait finding matches an official High/Medium. An exact match counts 1, a partial match (related area or adjacent issue) 0.5, and an unmatched finding is a false positive ([`shadow-audits/scoring-template.md`](shadow-audits/scoring-template.md)).
+- **Per version:** the methodology is tuned on each batch's misses and then run on a new batch of 3–10 contests (v5.1 re-ran v5's five), so each version is measured on its own batch only. Batches are small, so a single false positive moves a batch's precision by 10 points or more.
+- **Where the totals come from:** the aggregate table in [`shadow-audits/progress.md`](shadow-audits/progress.md) and the per-contest results in `registry.yaml`.
+- **Which surface:** the harness (`src/shadow/runner.ts`) runs the CLI. Before v8.2 the CLI critic did not apply the 8 kill gates (see v8.2 below).
 
 > **v8 is the number Krait stands behind.** v8.1 and v8.2 changed the methodology after that
 > measurement and have not been re-run over the registry. A 3-contest v8.1 pilot suggested a

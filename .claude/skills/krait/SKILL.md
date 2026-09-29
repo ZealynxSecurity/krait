@@ -1,6 +1,6 @@
 ---
 name: krait
-description: AI-first security auditor for Solidity smart contracts. 4-phase pipeline (recon → detection → state analysis → verification) with 101 heuristics, 15 detection modules, 8 kill gates, and a 6-field methodology audit trail per finding (v8.1). Tested at 100% precision across 50 blind shadow audits.
+description: AI-first security auditor for Solidity smart contracts. 4-phase pipeline (recon → detection → state analysis → verification) with 101 heuristics, 15 detection modules, 8 kill gates, and a 6-field methodology audit trail per finding (v8.1). Last measured version (v8): 10 true positives, 0 false positives and 15.2% recall on a 5-contest blind batch of past Code4rena contests, self-scored.
 ---
 
 # Krait — AI Security Auditor
@@ -58,8 +58,8 @@ When invoked via `/krait`, a preflight readiness check runs first, then the 4-ph
 
 ## Benchmarks
 
-100% precision across 50 blind shadow audits against Code4rena contests. 0 false positives per contest (v7+v8). See `shadow-audits/progress.md` for full results.
+Last measured version (v8, March 2026): 10 true positives and 0 false positives on a 5-contest blind batch of 2023–24 Code4rena contests, finding 10 of 66 known High/Medium issues (15.2% recall). v7 also had 0 false positives on its 5 contests. Across all 50 contests and versions v1–v8, pooled precision is ≈49%. Self-scored with an AI judge; see the README's "How these numbers were measured" and `shadow-audits/progress.md`.
 
-v8.1 Tier A methodology audit trail (3-contest pilot): 100% precision / 54.1% avg recall / 0 FPs across PoolTogether, Arcade, Frankencoin. Schema-driven; awaits full 50-contest regression.
+v8.1 Tier A methodology audit trail: a 3-contest pilot (PoolTogether, Arcade, Frankencoin) had 0 FPs and 54.1% avg recall. n=3 is a hint, not a benchmark; v8.1 has not been re-measured.
 
 Built by [Zealynx Security](https://zealynx.io).
