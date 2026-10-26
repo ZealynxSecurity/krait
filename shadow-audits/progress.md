@@ -136,11 +136,11 @@ Integrated vectors from pashov/skills (MIT), PlamenTSV/plamen (MIT), forefy/.con
 | 49 | Arcade | Governance | 8 | 2 | 0 | **100%** | **25.0%** | governance-voting |
 | 50 | Frankencoin | Mixed CDP | 20 | 2 | 0 | **100%** | 10.0% | lending-liq + economic |
 
-**v8 totals (5 contests): 10 TPs, 0 FPs, 100% precision, 15.2% avg recall**
+**v8 totals (5 contests): 10 TPs, 0 FPs, 100% precision on reported findings, 15.2% pooled recall (10/66 official H/M)**
 
 ### v8 Key Results
 
-1. **Precision maintained at 100%** — 50 contests, still zero false positives post-kill-gates
+1. **No false positives recorded in the v8 batch** — five contests; the 50-contest history spans versions, and historical run provenance does not isolate the kill gates' effect
 2. **Recall improved from 11% (v7) to 15.2% (v8)** — 38% relative improvement
 3. **GoodEntry: 35.7% recall** — highest recall on a 14-finding contest ever. AMM-MEV module (slot0 manipulation) + heuristics-extended (flash callback trust) drove 2 extra HIGHs
 4. **Arcade: 25% recall** — Pashov's "voting power not synchronized after multiplier change" vector caught M-05 exactly
@@ -151,7 +151,7 @@ Integrated vectors from pashov/skills (MIT), PlamenTSV/plamen (MIT), forefy/.con
 
 The detection layer IS pluggable. Open-source vectors improve recall on domain-specific contests (GoodEntry +36%, Arcade +25%) without breaking precision. But the ceiling remains Claude's ability to reason about novel protocol logic — loading more vectors doesn't help when the bugs are in custom architectures the vectors don't cover (InitCapital).
 
-The moat is still the pipeline (kill gates, consensus scoring, multi-lens), not the detection content.
+Hypothesis for future controlled tests: the pipeline (kill gates, scoring and multiple lenses) matters more than any one detection catalogue. The historical batches do not isolate those contributions.
 
 ### v5.1 Methodology — Kill Gates + Two-Pass + D30 (Re-test of 31-35)
 

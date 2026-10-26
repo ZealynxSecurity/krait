@@ -2,7 +2,7 @@
 
 ## Context
 
-Krait today is a high-precision single-pass auditor: Recon → Detector (3 passes / 4 lenses / 4 mindsets) → State Auditor → Critic (8 kill gates) → Reviewer → Reporter, with a parallel TypeScript CLI mirroring the same stages. Shadow-audit results show 100% precision and ~15% recall over 50 contests.
+Krait today is a single-pass auditor: Recon → Detector (3 passes / 4 lenses / 4 mindsets) → State Auditor → Critic (8 kill gates) → Reviewer → Reporter, with a parallel TypeScript CLI mirroring the same stages. The recorded v8 five-contest batch had 10 matches, no false positives and 15.2% pooled recall; the 50-contest history spans versions.
 
 Plamen (PlamenTSV/plamen, v2.0.0, cloned to /tmp/plamen-research) is a multi-language auditor with a much larger surface area: explicit recon-instantiation-breadth-rescan-percontract-inventory-semantic-depth-RAG-chain-dedup-verify-skepticjudge-report pipeline, 8 niche agents, 9 injectable skills, 4-axis confidence scoring, Devil's-Advocate iteration, and a post-audit improvement protocol. Recall is higher (15%+ across blind tests in its own published numbers) at the cost of much higher complexity and token usage.
 
@@ -154,10 +154,10 @@ Out of scope unless explicitly called out: multi-language support (Solana/Aptos/
 
 ## Verification
 
-Krait's published bar is "100% precision across 50 blind shadow audits" — that bar applies to every change. The validation harness already exists:
+The last recorded v8 batch had no false positives on five contests. A change should be compared against a pinned baseline for the same contests and scoring method; the 50-contest history cannot be treated as one v8 result. The validation harness exists, but a live run requires a configured API key:
 
 1. After any change in tiers A or B, run `npm run dev shadow-audit` against a small slice of `shadow-audits/registry.yaml` (3–5 contests) and confirm no new false positives appear. Diff the report against the prior baseline with `src/core/comparator.ts` semantics — only severity demotions and new findings are acceptable; any new FP blocks the change.
-2. After tier C changes, re-run the full 50-contest shadow audit (`npm run dev shadow-audit`) and check both precision (must stay 100%) and recall (target: monotonic improvement). Recall regression of >2% on any single contest is a block.
+2. After tier C changes, re-run the full 50-contest shadow audit (`npm run dev shadow-audit`) against a comparable baseline and check for new false positives and recall loss. Do not claim 100% pooled precision for the historical versions; a >2 percentage-point recall drop on an eligible contest is a block.
 3. Tier D changes (D1/D2 especially) need staged rollout: ship behind a flag (`--enable-chain-analysis`), run on the full registry with and without the flag, compare deltas before making the flag default-on.
 4. The forge MCP itself is exercised by `mcp-servers/forge/` integration tests; the verifier (C2) should add tests there that exercise `forge_build` and `forge_test` from a deliberately broken contract to confirm error capture.
 5. Patterns directory changes (none in this backlog directly, but D4 injectables touch the same instinct) validate via `src/knowledge/__tests__/pattern-loader.test.ts` (extend if injectable skills bypass the loader).

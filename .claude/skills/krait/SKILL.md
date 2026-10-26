@@ -58,7 +58,7 @@ When invoked via `/krait`, a preflight readiness check runs first, then the 4-ph
 
 ## Benchmarks
 
-Last measured version (v8, March 2026): 10 true positives and 0 false positives on a 5-contest blind batch of 2023–24 Code4rena contests, finding 10 of 66 known High/Medium issues (15.2% recall). v7 also had 0 false positives on its 5 contests. Across all 50 contests and versions v1–v8, pooled precision is ≈49%. Self-scored with an AI judge; see the README's "How these numbers were measured" and `shadow-audits/progress.md`.
+Last measured version (v8, March 2026): 10 true positives and 0 false positives on a 5-contest blind batch of 2023–24 Code4rena contests, finding 10 of 66 known High/Medium issues (15.2% pooled recall). v7 also had 0 false positives on its 5 contests. Across all 50 contests and versions v1–v8, pooled precision is ≈49%. Self-scored; the historical matching mode is not recorded. See the README's "How these numbers were measured" and `shadow-audits/progress.md`.
 
 v8.1 Tier A methodology audit trail: a 3-contest pilot (PoolTogether, Arcade, Frankencoin) had 0 FPs and 54.1% avg recall. n=3 is a hint, not a benchmark; v8.1 has not been re-measured.
 

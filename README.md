@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Current version** | v8.2 (kill-gate parity, Impact Premise, rescan + per-contract recall phases) |
-| **Measured baseline** | **v8** — 50 contests. v8.1/v8.2 are not yet re-measured ([why](METHODOLOGY.md#-unvalidated-since-the-v8-baseline)) |
+| **Measured baseline** | **v8** — five contests (numbers 46–50 in the historical registry). v8.1/v8.2 are not yet re-measured ([why](METHODOLOGY.md#-unvalidated-since-the-v8-baseline)) |
 | **Detection angles** | 16 per function (4 lenses × 4 mindsets) |
 | **Heuristics** | 43 original + 58 extended (from open-source community) |
 | **Analysis modules** | 15 deep-dive module files + 26 inline modules (A-X) |
@@ -232,7 +232,7 @@ Revived findings are surfaced as **"Worth Manual Review"** — flags for the aud
 | v7 | 41-45 | 100% | 11.0% | 0.0 |
 | **v8** | **46-50** | **100%** | **15.2%** | **0.0** |
 
-\* Mean of per-contest precision, over the contests in that batch that produced any finding (contests with no findings are left out). Pooled over findings, v6.4 is 7 true positives to 1 false positive (87.5%) and v8 is 10 to 0. Pooled over all 50 contests and all versions, including the early ones, precision is ≈49% (93.5 weighted true positives, 96 false positives).
+\* Mean of per-contest precision, over the contests in that batch that produced any finding (contests with no findings are left out). Pooled over findings, v6.4 is 7 true positives to 1 false positive (87.5%) and v8 is 10 to 0. Pooled over all 50 contests and all versions, including the early ones, precision is ≈49% (93.5 weighted true positives, 96 false positives). The v8 recall of 15.2% is pooled: 10 matches out of 66 official High/Medium issues.
 
 **Latest 5 contests (v8):**
 
@@ -250,10 +250,10 @@ Every result is verifiable in [`shadow-audits/`](shadow-audits/).
 
 - **Corpus:** 50 public Code4rena contests from April 2023 to August 2024 ([`shadow-audits/registry.yaml`](shadow-audits/registry.yaml)). One (Tangible Caviar) could not be scored because its findings were not public.
 - **Blind:** no official findings are visible during a run. The contests' reports are public, though, so they are likely in the model's training data.
-- **Scoring:** self-scored by the Krait author, with no outside review. An AI judge (Claude Haiku, [`src/core/comparator.ts`](src/core/comparator.ts)) decides whether a Krait finding matches an official High/Medium. An exact match counts 1, a partial match (related area or adjacent issue) 0.5, and an unmatched finding is a false positive ([`shadow-audits/scoring-template.md`](shadow-audits/scoring-template.md)).
+- **Scoring:** self-scored in Krait's records, with no outside review. The [scoring template](shadow-audits/scoring-template.md) counts an exact match as 1, a partial match as 0.5, and an unmatched finding as a false positive. The current [comparator](src/core/comparator.ts) uses heuristic matching by default and an AI judge only with `--ai-match`; the registry does not identify which matcher scored each historical result.
 - **Per version:** the methodology is tuned on each batch's misses and then run on a new batch of 3–10 contests (v5.1 re-ran v5's five), so each version is measured on its own batch only. Batches are small, so a single false positive moves a batch's precision by 10 points or more.
 - **Where the totals come from:** the aggregate table in [`shadow-audits/progress.md`](shadow-audits/progress.md) and the per-contest results in `registry.yaml`.
-- **Which surface:** the harness (`src/shadow/runner.ts`) runs the CLI. Before v8.2 the CLI critic did not apply the 8 kill gates (see v8.2 below).
+- **Which surface:** the current harness (`src/shadow/runner.ts`) runs the CLI. The registry does not independently identify the surface that produced each historical result. Before v8.2 the CLI critic did not apply the skill's 8 kill gates (see v8.2 below).
 
 > **v8 is the number Krait stands behind.** v8.1 and v8.2 changed the methodology after that
 > measurement and have not been re-run over the registry. A 3-contest v8.1 pilot suggested a
@@ -273,7 +273,7 @@ Any new false positive fails the gate. So does a recall drop worse than 2 percen
 
 ### Self-Improving
 
-After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 43 original heuristics, 15 deep-dive module files, 58 extended heuristics, 26 inline modules, and 7 protocol-specific primers. v8 integrated open-source vectors from [pashov/skills](https://github.com/pashov/skills), [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen), and [forefy/.context](https://github.com/forefy/.context) (all MIT) — improving recall from 11% to 15.2% while maintaining 100% precision.
+After each blind test: score → root-cause every miss → update methodology → re-test. This loop produced 43 original heuristics, 15 deep-dive module files, 58 extended heuristics, 26 inline modules, and 7 protocol-specific primers. v8 integrated open-source vectors from [pashov/skills](https://github.com/pashov/skills), [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen), and [forefy/.context](https://github.com/forefy/.context) (all MIT). The recorded v8 five-contest batch had 10 matches, no false positives and 15.2% pooled recall; that sample does not isolate which change caused the result.
 
 **v8.1 (Tier A — methodology audit trail)** adds six structured fields to every detector / state-auditor / critic finding: `stepExecution` (which lenses/phases/gates ran), `rulesApplied` (R8 cached params, R10 worst-state severity, R11 unsolicited token transfer, R12 enabler enumeration, R15 flash-loan precondition, R16 oracle integrity), `depthEvidence` (`[BOUNDARY:…]` / `[VARIATION:…]` / `[TRACE:…]` concrete-value tags), `missingPrecondition` / `preconditionType`, `postconditionsCreated` / `postconditionTypes` / `whoBenefits`. Rules and tags are derived from [PlamenTSV/plamen](https://github.com/PlamenTSV/plamen)'s methodology framework, integrated under MIT.
 
