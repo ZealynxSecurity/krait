@@ -67,7 +67,11 @@ import { runFuzzPipeline } from './fuzzer/fuzz-pipeline.js';
 import { generateFuzzJsonReport, writeFuzzMarkdownReport } from './fuzzer/fuzz-reporter.js';
 import { FuzzReport } from './fuzzer/types.js';
 
-const VERSION = '0.1.0';
+// Read the packaged version so CLI banners and `--version` cannot drift from npm metadata.
+const packageMetadata = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+) as { version: string };
+const VERSION = packageMetadata.version;
 
 const program = new Command();
 
