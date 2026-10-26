@@ -3,12 +3,12 @@
 This document describes exactly how Krait finds vulnerabilities. Every technique here was derived from real missed findings in blind shadow audits against Code4rena contests, then validated by measuring precision/recall improvements.
 
 Current version: **v8.2** (kill-gate parity, Impact Premise, second-pass recall stages).
-**Measured baseline: v8** (50 contests, 100% precision, 15.2% recall). v8.1 and v8.2 are
+**Measured baseline: v8** (five contests, 10 matches, no false positives, 15.2% pooled recall). v8.1 and v8.2 are
 unmeasured — see [Unvalidated since the v8 baseline](#-unvalidated-since-the-v8-baseline).
 
 > **v8.2 changes**
 >
-> - **Kill-gate parity (P0)**: the 8 kill gates, the DoS exception and the 10 FP patterns now exist in the TypeScript CLI critic (`src/agents/critic.ts`), not just the skill. Previously the CLI ran a generic skeptical-reviewer prompt with none of them, while the shadow-audit harness — which runs the CLI — was the source of the published precision numbers. Gate attribution is enforced in code (`enforceGateContract`), not just requested in the prompt, and a parity test suite fails the build when the two surfaces drift.
+> - **Kill-gate parity (P0)**: the 8 kill gates, the DoS exception and the 10 FP patterns now exist in the TypeScript CLI critic (`src/agents/critic.ts`), not just the skill. Previously the CLI ran a generic skeptical-reviewer prompt with none of them. The current shadow-audit harness runs the CLI, but the registry does not identify the surface used for every historical result. Gate attribution is enforced in code (`enforceGateContract`), not just requested in the prompt, and a parity test suite fails the build when the two surfaces drift.
 > - **Impact Premise gate (A3)**: every candidate must carry a one-sentence harm statement — WHO loses WHAT — before any trace is attempted. Mechanism statements ("the function is callable", "state is corrupted") are killed under Gate D as `MECHANISM-ONLY`. The reviewer treats that kill class as its highest-yield revival target, because it is a description failure rather than a disproof.
 > - **Rescan pass (B4)** and **Per-contract pass (B3)**: two exclusion-list-driven recall phases between detection and state analysis. Rescan counters attention saturation (broad second pass told what pass 1 found); per-contract counters attention dilution (one agent per inheritance cluster). Both feed the same kill gates.
 > - **Trust-assumption downgrade (A5)**: a finding that survives gate E but still depends on a semi-trusted role is reported one tier lower with an explicit note, instead of being discarded.
@@ -248,7 +248,7 @@ This phase catches bugs that per-function analysis misses — where the vulnerab
 
 ## Phase 3: Verification — 8 Kill Gates
 
-Every candidate finding must survive **all 8 gates** before reaching the report. These gates have eliminated 95% of false positives across 50 blind shadow audits — 0.0 FPs/contest in v7 and v8.
+Every candidate finding must survive **all 8 gates** before reaching the report. The recorded v7 and v8 batches each had 0 false positives across five contests. Those observations do not isolate the gates' causal effect, and the pre-v8.2 CLI did not implement all eight gates.
 
 ### Automatic Kill Gates
 
@@ -379,7 +379,7 @@ Tested blind against 50 Code4rena contests. The full results are in [`shadow-aud
 
 ### Progression
 
-| Version | Contests | Avg Precision | Avg Recall | FPs/Contest | Key Change |
+| Version | Contests | Avg Precision | Recorded Recall* | FPs/Contest | Key Change |
 |---------|----------|--------------|------------|-------------|------------|
 | v1 | 1-3 | 12% | 5.8% | 1.3 | Baseline |
 | v2 | 5-10 | 66% | 30.2% | 2.3 | Multi-pass + lenses |
@@ -390,7 +390,9 @@ Tested blind against 50 Code4rena contests. The full results are in [`shadow-aud
 | v7 | 41-45 | **100%** | 11.0% | **0.0** | Module system + recon flags + new heuristics |
 | **v8** | **46-50** | **100%** | **15.2%** | **0.0** | Open-source integration (pashov/plamen/forefy) + 5 new modules |
 
-**v8 is the canonical baseline.** v8.1 and v8.2 changed methodology but have not yet been
+\* v8 recall is pooled (10 matches / 66 official High/Medium issues). Historical rows were recorded per version and are not a like-for-like comparison of one methodology on the same 50 contests.
+
+**v8 is the last recorded five-contest baseline.** v8.1 and v8.2 changed methodology but have not yet been
 measured over the full 50-contest registry — see "Unvalidated since the v8 baseline" below.
 No headline number moves until that regression runs.
 
@@ -404,13 +406,13 @@ No headline number moves until that regression runs.
 | Arcade | Governance | 8 | 2 | 0 | **100%** | **25.0%** | governance-voting |
 | Frankencoin | Mixed CDP | 20 | 2 | 0 | **100%** | 10.0% | lending-liq + economic |
 
-10 TPs, 0 FPs across the v8 batch. 4/5 contests at 100% precision (InitCapital found no TPs but also no FPs — clean sheet). No other AI audit tool publishes precision/recall against real competitions.
+10 TPs, 0 FPs across the v8 batch. Four contests with findings had 100% recorded precision; InitCapital found no TPs and no FPs, so its precision is undefined.
 
 ---
 
 ## ⚠ Unvalidated since the v8 baseline
 
-Everything in this section changed the methodology **after** the 50-contest measurement.
+Everything in this section changed the methodology **after** the five-contest v8 measurement.
 None of it has been re-measured over the full registry. **Do not quote these numbers as
 Krait's performance.** They are recorded here so the eventual regression has something to
 compare against.

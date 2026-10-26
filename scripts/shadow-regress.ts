@@ -2,10 +2,9 @@
 /**
  * Shadow-audit regression gate.
  *
- * Krait's published bar is "100% precision across blind shadow audits". That bar only
- * means anything if it is checked mechanically, on a change, before merge — so this
- * script runs a slice of the contest registry and FAILS (exit 1) on any new false
- * positive versus a stored baseline.
+ * Compare a change with a pinned baseline on the same contest slice. The historical
+ * 50-contest registry spans methodology versions, so it is not one precision result.
+ * This script FAILS (exit 1) on any new false positive versus the stored baseline.
  *
  *   npm run shadow:regress -- --contests neobase,opendollar     # check against baseline
  *   npm run shadow:regress -- --contests neobase --update       # (re)write the baseline

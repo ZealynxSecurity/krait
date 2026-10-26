@@ -136,7 +136,7 @@ Builds are automatic: `scripts/build-mcp.sh` runs on `postinstall` and from `scr
 
 ## Editing the audit methodology
 
-The repo iterates via blind shadow audits — see `shadow-audits/progress.md` and `shadow-audits/registry.yaml`. The measured bar is **100% precision across 50 contests (v8)**. False positives are treated as more severe than missed findings; the kill gates in `critic/instructions.md` are deliberately aggressive.
+The repo iterates via blind shadow audits — see `shadow-audits/progress.md` and `shadow-audits/registry.yaml`. The last recorded v8 batch covered five contests (10 matches, no false positives, 15.2% pooled recall); the 50-contest history spans versions. False positives are treated as more severe than missed findings; the kill gates in `critic/instructions.md` are deliberately aggressive.
 
 Validate a change with the regression gate rather than by eyeballing a report:
 
@@ -147,4 +147,4 @@ npm run shadow:regress -- --contests <ids>            # gate a change against it
 
 It blocks on **any** new false positive and on a recall drop worse than 2 pp (tunable with `--max-recall-drop`). Baseline lives in `shadow-audits/regression-baseline.json`. Needs `ANTHROPIC_API_KEY`, since it runs real audits.
 
-**Version claims must track measurement.** v8.1 and v8.2 changed methodology after the 50-contest run and have NOT been re-measured. `METHODOLOGY.md` quarantines their numbers under "Unvalidated since the v8 baseline", and the README publishes only v8. Do not promote an unmeasured version into a headline table — a 3-contest pilot against stale baselines is a hint, not a benchmark. When the full regression runs, move the numbers up and delete the quarantine section.
+**Version claims must track measurement.** v8.1 and v8.2 changed methodology after the five-contest v8 batch and have NOT been re-measured over the registry. `METHODOLOGY.md` quarantines their numbers under "Unvalidated since the v8 baseline", and the README publishes only v8. Do not promote an unmeasured version into a headline table — a 3-contest pilot against stale baselines is a hint, not a benchmark. When a comparable full regression runs, move the numbers up and delete the quarantine section.
