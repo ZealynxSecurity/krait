@@ -1140,6 +1140,12 @@ program
         }
       }
 
+      // A completed batch can contain per-contest errors; CI must not call it successful.
+      // Keep the summary and successful artifacts available before exiting nonzero.
+      if (results.some(result => result.error)) {
+        process.exitCode = 1;
+      }
+
       console.log('');
     } catch (err) {
       console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
