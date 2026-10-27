@@ -1,9 +1,9 @@
 name: Shadow Audit Pipeline
 
 on:
-  # Weekly on Sundays at 06:00 UTC
+  # Weekly on Saturdays at 23:00 UTC (Sunday 00:00/01:00 in Europe/Warsaw)
   schedule:
-    - cron: '0 6 * * 0'
+    - cron: '0 23 * * 6'
   # Manual trigger with optional contest filter
   workflow_dispatch:
     inputs:
