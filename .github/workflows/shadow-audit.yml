@@ -30,6 +30,15 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      - name: Require shadow audit credential
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY is missing; no shadow audit was run."
+            exit 1
+          fi
+
       - name: Checkout Krait
         uses: actions/checkout@v4
 
