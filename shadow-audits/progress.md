@@ -1,5 +1,11 @@
 # Shadow Audit Progress — Krait Self-Improvement Tracker
 
+## Scheduled-run health — 1 November 2026
+
+The [first scheduled overnight run after the workflow time change](https://github.com/ZealynxSecurity/krait/actions/runs/41262187764) failed before a usable benchmark: the Actions `ANTHROPIC_API_KEY` value was empty, and both selected contests returned `Anthropic API key required`. No detection score or model result can be inferred from that run. This patch adds a nonempty-credential check **before checkout, dependency installation or build**, failing with one explicit Actions error if it is absent. Once merged, it will prevent repeated contest attempts and unnecessary setup on the known missing-prerequisite path; it does not supply the credential or prove benchmark quality.
+
+**Verification:** locally exercised the shell preflight with an empty value (exit 1, one error) and a dummy nonempty value (exit 0); parsed the workflow YAML and checked its step ordering. No model-heavy benchmark was run for this change. **Next owner:** the Lead Auditor reviews and merges the focused PR, then checks the next scheduled run. The authorized repository secret administrator supplies the intended credential without exposing it. Record an actual benchmark result only if its contests execute and produce valid artifacts; do not rerun merely to clear a red status.
+
 ## Cumulative Results (30 Contests)
 
 ### v1 Methodology (Contests 1-3)
