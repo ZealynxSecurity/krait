@@ -1,5 +1,11 @@
 # Shadow Audit Progress — Krait Self-Improvement Tracker
 
+## Scheduled-run health — 9 November 2026
+
+The [8 November scheduled run](https://github.com/ZealynxSecurity/krait/actions/runs/42436414437) failed: the Actions `ANTHROPIC_API_KEY` value was empty, both selected contests returned that prerequisite error, and no benchmark artifact or detection result was produced. [PR #14](https://github.com/ZealynxSecurity/krait/pull/14) was merged as `27daafbc5dd7221a9cbebb26b30a4cc1ec89122d` on 9 November. It checks for a nonempty credential before checkout, dependency installation and build. The merged workflow was parsed as YAML, its first step verified as the guard, and the shell branch was checked locally: empty value exited 1 with one error; a dummy nonempty value exited 0. `git diff --check` passed before merge. No model-heavy benchmark was run for this maintenance task.
+
+**Next owner:** the authorized GitHub secret administrator supplies the intended credential without exposing it; the Lead Auditor checks the next scheduled run. A missing credential will now fail promptly, and a nonempty credential alone does not prove a valid benchmark. Record a measured result only after contest outputs and artifacts are verified. No npm package was published or released by this merge.
+
 ## Scheduled-run health — 1 November 2026
 
 The [first scheduled overnight run after the workflow time change](https://github.com/ZealynxSecurity/krait/actions/runs/41262187764) failed before a usable benchmark: the Actions `ANTHROPIC_API_KEY` value was empty, and both selected contests returned `Anthropic API key required`. No detection score or model result can be inferred from that run. This patch adds a nonempty-credential check **before checkout, dependency installation or build**, failing with one explicit Actions error if it is absent. Once merged, it will prevent repeated contest attempts and unnecessary setup on the known missing-prerequisite path; it does not supply the credential or prove benchmark quality.
